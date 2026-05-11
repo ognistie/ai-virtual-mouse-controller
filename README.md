@@ -264,11 +264,11 @@ Essa separação permite que o painel de settings seja **realmente útil** (mexe
 
 ```powershell
 # Clone
-git clone https://github.com/seu-user/ai-virtual-mouse-controller.git
+git clone https://github.com/ognistie/ai-virtual-mouse-controller.git)
 cd ai-virtual-mouse-controller
 
 # Virtual env (use Python 3.11 explicitamente)
-py -3.11 -m venv .venv
+python -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
 # Dependências
