@@ -1,0 +1,23 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+calibration.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;500;700&family=UnifrakturCook:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<title>Uso — AI Virtual Mouse Controller</title>
+<meta name="description" content="Guia de instalação, gestos e atalhos do AI Virtual Mouse Controller.">
+</head>
+<body>
+<div class="noise"></div>
+<div class="scanline"></div>
+<div class="cursor-orb" aria-hidden="true"></div>
+
+<header class="site-header" data-glitch-surface>
+    <a href="index.html" class="brand" aria-label="AI Virtual Mouse home">
+        <span class="brand-mark">AIVM</span>
+        <span class="brand-text">HAND//CURSOR</span>
+    </a>
+
+    <button class="menu-btn" type="button" aria-label="Abrir menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+    </button>
+
+    <nav class="nav-panel" aria-label="Navegação principal">
+        <a href="index.html" data-pt="Início" data-en="Home">Início</a>
+        <a href="usage.html" data-pt="Uso" data-en="Usage">Uso</a>
+        <a href="about.html" data-pt="Arquivo" data-en="Archive">Arquivo</a>
+        <a href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">GitHub ↗</a>
+
+        <div class="lang-toggle" role="group" aria-label="Selecionar idioma">
+            <button type="button" data-lang="pt">PT</button>
+            <button type="button" data-lang="en">EN</button>
+        </div>
+    </nav>
+</header>
+
+<main>
+    <section class="page-hero">
+        <p class="eyebrow">// USAGE_PROTOCOL</p>
+        <h1 class="glitch-title" data-text="USAGE GUIDE" data-pt="GUIA DE USO" data-en="USAGE GUIDE">GUIA DE USO</h1>
+        <p data-pt="Instalação, requisitos, gestos, atalhos e ajustes finos para dominar o controle gestual."
+           data-en="Installation, requirements, gestures, shortcuts and fine tuning to master gestural control.">
+           Instalação, requisitos, gestos, atalhos e ajustes finos para dominar o controle gestual.
+        </p>
+    </section>
+
+    <section class="panel-grid">
+        <article class="info-panel">
+            <span class="panel-index">01</span>
+            <h2 data-pt="Requisitos" data-en="Requirements">Requisitos</h2>
+            <ul class="signal-list">
+                <li>Python 3.11+</li>
+                <li>Windows 10/11</li>
+                <li>Webcam 720p+</li>
+                <li>4GB RAM mínimo</li>
+                <li data-pt="Ambiente com boa iluminação" data-en="Well-lit environment">Ambiente com boa iluminação</li>
+            </ul>
+        </article>
+
+        <article class="info-panel">
+            <span class="panel-index">02</span>
+            <h2 data-pt="Profiles" data-en="Profiles">Profiles</h2>
+            <div class="mini-grid">
+                <div><strong>Smooth</strong><p data-pt="Equilíbrio geral." data-en="General balance.">Equilíbrio geral.</p></div>
+                <div><strong>Precise</strong><p data-pt="Alvos pequenos." data-en="Small targets.">Alvos pequenos.</p></div>
+                <div><strong>Snappy</strong><p data-pt="Movimento rápido." data-en="Fast movement.">Movimento rápido.</p></div>
+                <div><strong>Stable</strong><p data-pt="Máxima filtragem." data-en="Maximum filtering.">Máxima filtragem.</p></div>
+            </div>
+        </article>
+    </section>
+
+    <section class="terminal-section">
+        <div>
+            <p class="eyebrow">// INSTALL</p>
+            <h2 data-pt="instalação limpa" data-en="clean install">instalação limpa</h2>
+            <p data-pt="Cole os comandos no terminal dentro da pasta onde quer guardar o projeto."
+               data-en="Paste the commands into the terminal inside the folder where you want to keep the project.">
+               Cole os comandos no terminal dentro da pasta onde quer guardar o projeto.
+            </p>
+        </div>
+        <div class="terminal-window">
+            <div class="terminal-bar"><span></span><span></span><span></span><strong>powershell</strong></div>
+<pre><code>git clone https://github.com/ognistie/ai-virtual-mouse-controller.git
+cd ai-virtual-mouse-controller
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python main.py</code></pre>
+        </div>
+    </section>
+
+    <section>
+        <div class="section-head">
+            <p class="eyebrow">// COMMAND TABLE</p>
+            <h2 data-pt="atalhos de operação" data-en="operation shortcuts">atalhos de operação</h2>
+        </div>
+
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Tecla</th><th data-pt="Função" data-en="Function">Função</th></tr></thead>
+                <tbody>
+                    <tr><td><code>S</code></td><td data-pt="Abre ou fecha painel de configurações." data-en="Toggles settings panel.">Abre ou fecha painel de configurações.</td></tr>
+                    <tr><td><code>T</code></td><td data-pt="Liga/desliga always-on-top." data-en="Toggles always-on-top.">Liga/desliga always-on-top.</td></tr>
+                    <tr><td><code>1-4</code></td><td data-pt="Alterna entre profiles." data-en="Switches between profiles.">Alterna entre profiles.</td></tr>
+                    <tr><td><code>A</code></td><td data-pt="Liga/desliga aim assist." data-en="Toggles aim assist.">Liga/desliga aim assist.</td></tr>
+                    <tr><td><code>K</code></td><td data-pt="Liga/desliga sticky targeting." data-en="Toggles sticky targeting.">Liga/desliga sticky targeting.</td></tr>
+                    <tr><td><code>ESC</code></td><td data-pt="Sai do programa." data-en="Quits the program.">Sai do programa.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section>
+        <div class="section-head">
+            <p class="eyebrow">// TROUBLESHOOT</p>
+            <h2 data-pt="quando algo falhar" data-en="when something breaks">quando algo falhar</h2>
+        </div>
+        <div class="stack-cards">
+            <article><h3 data-pt="Webcam não abre" data-en="Webcam does not open">Webcam não abre</h3><p data-pt="Feche Teams, Zoom, OBS e verifique permissões de câmera no Windows." data-en="Close Teams, Zoom, OBS and check Windows camera permissions.">Feche Teams, Zoom, OBS e verifique permissões de câmera no Windows.</p></article>
+            <article><h3 data-pt="Cursor tremendo" data-en="Shaky cursor">Cursor tremendo</h3><p data-pt="Use o profile Stable ou aumente Smoothness no painel." data-en="Use Stable profile or increase Smoothness in the panel.">Use o profile Stable ou aumente Smoothness no painel.</p></article>
+            <article><h3 data-pt="Clique falhando" data-en="Click failing">Clique falhando</h3><p data-pt="Melhore iluminação e mantenha a mão mais frontal para a webcam." data-en="Improve lighting and keep your hand facing the webcam.">Melhore iluminação e mantenha a mão mais frontal para a webcam.</p></article>
+        </div>
+    </section>
+</main>
+
+<footer class="site-footer">
+    <div class="footer-marquee" aria-hidden="true">
+        <span>AI VIRTUAL MOUSE CONTROLLER // WEBCAM INPUT // MEDIAPIPE // PYTHON // GESTURAL INTERFACE //</span>
+    </div>
+    <div class="footer-grid">
+        <div>
+            <p class="eyebrow">/END_OF_SIGNAL</p>
+            <h2 data-pt="controle sem periférico" data-en="control without peripheral">controle sem periférico</h2>
+        </div>
+        <div>
+            <p data-pt="Projeto open-source para transformar webcam comum em interface gestual de cursor."
+               data-en="Open-source project turning a regular webcam into a gestural cursor interface.">
+               Projeto open-source para transformar webcam comum em interface gestual de cursor.
+            </p>
+        </div>
+        <div class="footer-links">
+            <a href="index.html">home</a>
+            <a href="usage.html">usage</a>
+            <a href="about.html">archive</a>
+        </div>
+    </div>
+</footer>
+<script src="assets/js/main.js"></script>
+</body>
+</html>

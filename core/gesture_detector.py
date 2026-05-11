@@ -1,0 +1,882 @@
+"""
+core.gesture_detector  (v6.9.1 - Press-to-click)
+=================================================
+
+State machine de gestos da mao. Recebe HandLandmarks por frame, retorna
+GestureEvents (MOVE, CLICK, DOUBLE_CLICK, RIGHT_CLICK, DRAG_START, DRAG_END,
+PAUSE).
+
+Modelo de clique (v6.9.1+): PRESS-TO-CLICK
+   O CLICK e o RIGHT_CLICK disparam no momento em que os dedos se ENCOSTAM
+   (edge detection no raw_shape), nao quando soltam. Da a sensacao de botao
+   fisico — feedback imediato e zero cliques perdidos.
+
+Gestos suportados:
+- 🖐️  OPEN_HAND (4 dedos up)        -> MOVE
+- 🤏  PINCH     (polegar+indicador)  -> CLICK no encostar
+- 🤏  PINCH 3s+                       -> DRAG (continua rastreando apos click)
+- 🤞  PINCH_MIDDLE (polegar+medio)    -> RIGHT_CLICK no encostar
+- ✌️  PEACE                            -> DOUBLE_CLICK ao soltar
+- ✊  FIST                             -> congelado
+
+Recursos da v6.4-v6.7 mantidos:
+- Sticky targeting + aim assist com pre-ativacao
+- Curva ballistica suavizada
+- Histerese de gestos (debounce/exit frames)
+- Threshold adaptativo de pinch com piso minimo
+- Cooldown anti-bounce em todos os gestos de clique
+"""
+
+from __future__ import annotations
+
+import logging
+import math
+import time
+from collections import deque
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Deque, List, Optional, Tuple
+
+from .hand_tracker import HandLandmarks
+
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------
+# Landmark indices
+# ---------------------------------------------------------------------
+LM_WRIST = 0
+LM_THUMB_TIP = 4
+LM_INDEX_TIP = 8
+LM_MIDDLE_TIP = 12
+LM_MIDDLE_MCP = 9
+
+
+# ---------------------------------------------------------------------
+# Enums
+# ---------------------------------------------------------------------
+
+class Gesture(Enum):
+    NONE = "none"
+    MOVE = "move"
+    CLICK = "click"
+    DOUBLE_CLICK = "double_click"
+    RIGHT_CLICK = "right_click"
+    DRAG_START = "drag_start"
+    DRAG_END = "drag_end"
+    PAUSE = "pause"
+
+
+class HandShape(Enum):
+    UNKNOWN = "unknown"
+    OPEN_HAND = "open_hand"
+    PINCH = "pinch"
+    PINCH_MIDDLE = "pinch_middle"
+    PEACE = "peace"
+    FIST = "fist"
+    OTHER = "other"
+
+
+@dataclass
+class GestureEvent:
+    gesture: Gesture
+    position: Optional[Tuple[float, float]] = None
+    timestamp: float = field(default_factory=time.perf_counter)
+
+
+# ---------------------------------------------------------------------
+# Helpers geometricos
+# ---------------------------------------------------------------------
+
+def _distance_2d(p1, p2) -> float:
+    dx = p1[0] - p2[0]
+    dy = p1[1] - p2[1]
+    return math.sqrt(dx * dx + dy * dy)
+
+
+def compute_hand_size(hand: HandLandmarks) -> float:
+    lm = hand.landmarks
+    return _distance_2d(lm[LM_WRIST], lm[LM_MIDDLE_MCP])
+
+
+def get_anchor_position(hand: HandLandmarks, anchor_landmark: int = LM_MIDDLE_MCP):
+    lm = hand.landmarks[anchor_landmark]
+    return (lm[0], lm[1])
+
+
+def compute_dpi_multiplier(hand_size, reference_size, min_mult, max_mult, enabled=True):
+    if not enabled or reference_size <= 0:
+        return 1.0
+    ratio = hand_size / reference_size
+    if ratio >= 1.0:
+        t = min(1.0, (ratio - 1.0) / 0.5)
+        return 1.0 + (max_mult - 1.0) * t
+    else:
+        t = max(0.0, (ratio - 0.5) / 0.5)
+        return min_mult + (1.0 - min_mult) * t
+
+
+def apply_dpi_to_position(pos, dpi_mult, center=(0.5, 0.5)):
+    if dpi_mult == 1.0:
+        return pos
+    dx = (pos[0] - center[0]) * dpi_mult
+    dy = (pos[1] - center[1]) * dpi_mult
+    return (
+        max(0.0, min(1.0, center[0] + dx)),
+        max(0.0, min(1.0, center[1] + dy)),
+    )
+
+
+def classify_shape(
+    hand: HandLandmarks,
+    pinch_threshold: float,
+    pinch_middle_threshold: float = 0.0,
+    pinch_middle_index_guard: float = 0.0,
+) -> HandShape:
+    """
+    Classifica a forma da mao em uma das HandShape.
+
+    PRIORIDADE de classificacao:
+    1. PINCH_MIDDLE (clique direito v6.9) — polegar+medio juntos E indicador AFASTADO
+    2. PINCH (clique normal) — polegar+indicador juntos
+    3. FIST / OPEN_HAND / PEACE / OTHER
+
+    Args:
+        pinch_middle_threshold: 0 (default) desabilita deteccao de PINCH_MIDDLE,
+                                preservando comportamento pre-v6.9.
+        pinch_middle_index_guard: distancia minima polegar→indicador para
+                                  reconhecer PINCH_MIDDLE (evita falsos positivos
+                                  com a pinca normal).
+    """
+    lm = hand.landmarks
+    dist_thumb_index = _distance_2d(lm[LM_THUMB_TIP], lm[LM_INDEX_TIP])
+
+    # NOVO v6.9: clique direito tem prioridade
+    # So dispara se: medio junto AO polegar E indicador AFASTADO do polegar
+    if pinch_middle_threshold > 0:
+        dist_thumb_middle = _distance_2d(lm[LM_THUMB_TIP], lm[LM_MIDDLE_TIP])
+        if (dist_thumb_middle < pinch_middle_threshold
+                and dist_thumb_index > pinch_middle_index_guard):
+            return HandShape.PINCH_MIDDLE
+
+    # Pinch normal (mantido identico ao v6.5)
+    if dist_thumb_index < pinch_threshold:
+        return HandShape.PINCH
+
+    fingers = hand.fingers_up()
+    _thumb, index, middle, ring, pinky = fingers
+
+    if not index and not middle and not ring and not pinky:
+        return HandShape.FIST
+
+    if index and middle and ring and pinky:
+        return HandShape.OPEN_HAND
+
+    if index and middle and not ring and not pinky:
+        return HandShape.PEACE
+
+    return HandShape.OTHER
+
+
+# ---------------------------------------------------------------------
+# CURVA BALLISTICA SUAVIZADA (v6.4)
+# ---------------------------------------------------------------------
+
+def apply_velocity_curve_smooth(
+    delta: Tuple[float, float],
+    velocity: float,
+    tremor_threshold: float,
+    precision_zone: float,
+    fast_threshold: float,
+    slow_factor: float,
+    fast_factor: float,
+) -> Tuple[float, float]:
+    """
+    Curva ballistica SUAVIZADA (v6.4) usando smoothstep — sem saltos.
+
+    velocity < tremor → (0, 0)  [anti-tremor]
+    velocity entre tremor e precision → smoothstep(slow_factor → 1.0)
+    velocity entre precision e fast → 1.0 (zona neutra)
+    velocity entre fast e 2*fast → smoothstep(1.0 → fast_factor)
+    velocity >= 2*fast → fast_factor
+    """
+    if velocity < tremor_threshold:
+        return (0.0, 0.0)
+
+    factor: float
+
+    if velocity < precision_zone:
+        t = (velocity - tremor_threshold) / max(1e-9, precision_zone - tremor_threshold)
+        s = 3 * t * t - 2 * t * t * t  # smoothstep
+        factor = slow_factor + (1.0 - slow_factor) * s
+
+    elif velocity < fast_threshold:
+        factor = 1.0
+
+    else:
+        upper = fast_threshold * 2.0
+        t = min(1.0, (velocity - fast_threshold) / max(1e-9, upper - fast_threshold))
+        s = 3 * t * t - 2 * t * t * t
+        factor = 1.0 + (fast_factor - 1.0) * s
+
+    return (delta[0] * factor, delta[1] * factor)
+
+
+# ---------------------------------------------------------------------
+# ---------------------------------------------------------------------
+# Detector principal
+# ---------------------------------------------------------------------
+
+class GestureDetector:
+    """
+    State machine de gestos.
+
+    Combina:
+    - Press-to-click (v6.9.1) para CLICK e RIGHT_CLICK
+    - Sticky targeting + aim assist com pre-ativacao (v6.4)
+    - Curva ballistica suavizada (v6.4)
+    - Threshold de pinca adaptativo com piso minimo (v6.5)
+    - Histerese de gestos com debounce/exit frames separados (v6.0)
+    """
+
+    def __init__(
+        self,
+        anchor_landmark: int = LM_MIDDLE_MCP,
+        pinch_threshold: float = 0.075,
+        pinch_threshold_floor: float = 0.045,
+        pinch_middle_threshold: float = 0.075,
+        pinch_middle_index_guard: float = 0.110,
+        pinch_min_hold_seconds: float = 0.015,
+        pinch_adaptive: bool = True,
+        dpi_adaptive_enabled: bool = True,
+        hand_size_reference: float = 0.22,
+        dpi_min: float = 0.7,
+        dpi_max: float = 1.4,
+        dpi_fixed: float = 0.85,
+        drag_hold_seconds: float = 3.0,
+        click_cooldown: float = 0.25,
+        double_click_cooldown: float = 2.5,
+        double_click_window: float = 0.35,
+        debounce_frames: int = 2,
+        exit_frames: int = 3,
+        position_hold_frames: int = 3,
+        # Aim assist (v6.3 + v6.4)
+        aim_assist_enabled: bool = True,
+        aim_assist_slowdown_factor: float = 0.40,
+        aim_assist_trigger_shapes: Tuple[str, ...] = ("peace", "pinch"),
+        aim_assist_pre_activation: bool = True,
+        aim_assist_pre_pinch_threshold: float = 0.12,
+        aim_assist_holdover_seconds: float = 0.30,
+        # Sticky targeting (v6.4)
+        sticky_targeting_enabled: bool = True,
+        sticky_deceleration_threshold: float = 0.7,
+        sticky_friction_factor: float = 0.75,
+        sticky_min_velocity: float = 0.005,
+        # Curva ballistica
+        velocity_curve_enabled: bool = True,
+        velocity_tremor_threshold: float = 0.003,
+        velocity_precision_zone: float = 0.025,
+        velocity_fast_threshold: float = 0.12,
+        velocity_slow_factor: float = 0.55,
+        velocity_fast_factor: float = 1.15,
+        # Pinca dual (v6.4 → v6.5: default desabilitada)
+        pinch_dual_detection: bool = False,
+        pinch_velocity_threshold: float = 0.008,
+    ) -> None:
+        self.anchor_landmark = anchor_landmark
+        self.pinch_threshold = pinch_threshold
+        self.pinch_threshold_floor = pinch_threshold_floor
+        self.pinch_middle_threshold = pinch_middle_threshold
+        self.pinch_middle_index_guard = pinch_middle_index_guard
+        self.pinch_min_hold_seconds = pinch_min_hold_seconds
+        self.pinch_adaptive = pinch_adaptive
+        self.dpi_adaptive_enabled = dpi_adaptive_enabled
+        self.hand_size_reference = hand_size_reference
+        self.dpi_min = dpi_min
+        self.dpi_max = dpi_max
+        self.dpi_fixed = dpi_fixed
+        self.drag_hold_seconds = drag_hold_seconds
+        self.click_cooldown = click_cooldown
+        self.double_click_cooldown = double_click_cooldown
+        self.debounce_frames = max(1, debounce_frames)
+        self.exit_frames = max(self.debounce_frames, exit_frames)
+        self.position_hold_frames = max(0, position_hold_frames)
+
+        self.aim_assist_enabled = aim_assist_enabled
+        self.aim_assist_slowdown_factor = aim_assist_slowdown_factor
+        self.aim_assist_trigger_shapes = tuple(aim_assist_trigger_shapes)
+        self.aim_assist_pre_activation = aim_assist_pre_activation
+        self.aim_assist_pre_pinch_threshold = aim_assist_pre_pinch_threshold
+        self.aim_assist_holdover_seconds = aim_assist_holdover_seconds
+
+        self.sticky_targeting_enabled = sticky_targeting_enabled
+        self.sticky_deceleration_threshold = sticky_deceleration_threshold
+        self.sticky_friction_factor = sticky_friction_factor
+        self.sticky_min_velocity = sticky_min_velocity
+
+        self.velocity_curve_enabled = velocity_curve_enabled
+        self.velocity_tremor_threshold = velocity_tremor_threshold
+        self.velocity_precision_zone = velocity_precision_zone
+        self.velocity_fast_threshold = velocity_fast_threshold
+        self.velocity_slow_factor = velocity_slow_factor
+        self.velocity_fast_factor = velocity_fast_factor
+
+        self.pinch_dual_detection = pinch_dual_detection
+        self.pinch_velocity_threshold = pinch_velocity_threshold
+
+        # Estado interno
+        self._candidate_shape: HandShape = HandShape.UNKNOWN
+        self._candidate_count: int = 0
+        self._confirmed_shape: HandShape = HandShape.UNKNOWN
+
+        self._pinch_started_at: Optional[float] = None
+        self._drag_active: bool = False
+        self._last_click_time: float = 0.0
+        self._last_right_click_time: float = 0.0
+        self._pinch_middle_started_at: Optional[float] = None
+        # NOVO v6.9.1 — press-to-click
+        self._previous_raw_shape: HandShape = HandShape.UNKNOWN
+        self._click_already_fired: bool = False
+        self._right_click_already_fired: bool = False
+        self._last_double_click_time: float = 0.0
+
+        self._peace_started_at: Optional[float] = None
+        self.PEACE_MIN_HOLD_SECONDS: float = 0.04
+
+        self._hand_lost_frames: int = 0
+
+        # Tracking de movimento
+        self._last_smoothed_pos: Optional[Tuple[float, float]] = None
+        self._last_velocity: float = 0.0
+        self._velocity_history: Deque[float] = deque(maxlen=5)
+
+        # Aim assist com holdover
+        self._aim_assist_last_active_at: float = 0.0
+
+        # Pinca dual
+        self._pinch_dist_history: Deque[Tuple[float, float]] = deque(maxlen=3)
+
+        # Overlay
+        self._last_hand_size: float = 0.0
+        self._last_dpi: float = 1.0
+        self._last_pinch_dist: float = 0.0
+        self._last_event_gesture: Gesture = Gesture.NONE
+        self._aim_assist_active: bool = False
+        self._sticky_active: bool = False
+
+    def reset(self) -> None:
+        self._candidate_shape = HandShape.UNKNOWN
+        self._candidate_count = 0
+        self._confirmed_shape = HandShape.UNKNOWN
+        self._pinch_started_at = None
+        self._pinch_middle_started_at = None
+        self._peace_started_at = None
+        self._velocity_history.clear()
+        self._pinch_dist_history.clear()
+        # NOVO v6.9.1
+        self._previous_raw_shape = HandShape.UNKNOWN
+        self._click_already_fired = False
+        self._right_click_already_fired = False
+
+    # -----------------------------------------------------------------
+    # AIM ASSIST com pre-ativacao + holdover (NOVO v6.4)
+    # -----------------------------------------------------------------
+
+    def _is_aim_assist_active(self, shape: HandShape, hand: HandLandmarks, now: float) -> bool:
+        if not self.aim_assist_enabled:
+            return False
+
+        # 1. Shape em ✌️ ou 🤏
+        if shape.value in self.aim_assist_trigger_shapes:
+            self._aim_assist_last_active_at = now
+            return True
+
+        # 2. Pre-ativacao: dedos preparando pinca
+        if self.aim_assist_pre_activation:
+            pinch_dist = _distance_2d(
+                hand.landmarks[LM_THUMB_TIP],
+                hand.landmarks[LM_INDEX_TIP],
+            )
+            if self.pinch_threshold < pinch_dist < self.aim_assist_pre_pinch_threshold:
+                self._aim_assist_last_active_at = now
+                return True
+
+        # 3. Holdover (300ms apos soltar)
+        if (now - self._aim_assist_last_active_at) <= self.aim_assist_holdover_seconds:
+            return True
+
+        return False
+
+    # -----------------------------------------------------------------
+    # STICKY TARGETING (NOVO v6.4)
+    # -----------------------------------------------------------------
+
+    def _compute_sticky_friction(self, current_velocity: float) -> float:
+        if not self.sticky_targeting_enabled:
+            self._sticky_active = False
+            return 1.0
+
+        if current_velocity < self.sticky_min_velocity:
+            self._sticky_active = False
+            return 1.0
+
+        if len(self._velocity_history) < 3:
+            self._sticky_active = False
+            return 1.0
+
+        recent = list(self._velocity_history)[-3:]
+        avg_recent = sum(recent) / len(recent)
+
+        if avg_recent < 1e-6:
+            self._sticky_active = False
+            return 1.0
+
+        ratio = current_velocity / avg_recent
+
+        if ratio < self.sticky_deceleration_threshold:
+            self._sticky_active = True
+            return self.sticky_friction_factor
+
+        self._sticky_active = False
+        return 1.0
+
+    # -----------------------------------------------------------------
+    # PIPELINE DE PRECISAO (curva + sticky + aim assist)
+    # -----------------------------------------------------------------
+
+    def _apply_precision_pipeline(
+        self,
+        target_pos: Tuple[float, float],
+        is_aim_assist: bool,
+    ) -> Tuple[float, float]:
+        if self._last_smoothed_pos is None:
+            self._last_smoothed_pos = target_pos
+            self._last_velocity = 0.0
+            self._velocity_history.append(0.0)
+            return target_pos
+
+        dx = target_pos[0] - self._last_smoothed_pos[0]
+        dy = target_pos[1] - self._last_smoothed_pos[1]
+        velocity = math.sqrt(dx * dx + dy * dy)
+
+        # Adiciona ao historico ANTES (sticky usa o passado)
+        self._velocity_history.append(velocity)
+        self._last_velocity = velocity
+
+        # 1. Curva ballistica suavizada
+        if self.velocity_curve_enabled:
+            dx, dy = apply_velocity_curve_smooth(
+                (dx, dy), velocity,
+                self.velocity_tremor_threshold,
+                self.velocity_precision_zone,
+                self.velocity_fast_threshold,
+                self.velocity_slow_factor,
+                self.velocity_fast_factor,
+            )
+
+        # 2. Sticky targeting (friccao ao desacelerar)
+        sticky_factor = self._compute_sticky_friction(velocity)
+        dx *= sticky_factor
+        dy *= sticky_factor
+
+        # 3. Aim assist (slowdown global)
+        if is_aim_assist:
+            dx *= self.aim_assist_slowdown_factor
+            dy *= self.aim_assist_slowdown_factor
+
+        new_pos = (
+            max(0.0, min(1.0, self._last_smoothed_pos[0] + dx)),
+            max(0.0, min(1.0, self._last_smoothed_pos[1] + dy)),
+        )
+        self._last_smoothed_pos = new_pos
+        return new_pos
+
+    # -----------------------------------------------------------------
+    # PINCA DUAL (NOVO v6.4)
+    # -----------------------------------------------------------------
+
+    def _classify_shape_dual(
+        self,
+        hand: HandLandmarks,
+        effective_pinch_threshold: float,
+        now: float,
+    ) -> HandShape:
+        pinch_dist = _distance_2d(
+            hand.landmarks[LM_THUMB_TIP],
+            hand.landmarks[LM_INDEX_TIP],
+        )
+        self._pinch_dist_history.append((now, pinch_dist))
+
+        raw_shape = classify_shape(
+            hand,
+            effective_pinch_threshold,
+            pinch_middle_threshold=self.pinch_middle_threshold,
+            pinch_middle_index_guard=self.pinch_middle_index_guard,
+        )
+
+        if not self.pinch_dual_detection:
+            return raw_shape
+
+        if raw_shape != HandShape.PINCH:
+            return raw_shape
+
+        # Validar pinca: dedos devem estar aproximando ou mantendo
+        if len(self._pinch_dist_history) >= 2:
+            (t_prev, d_prev) = self._pinch_dist_history[-2]
+            dt = max(1e-6, now - t_prev)
+            d_velocity = (pinch_dist - d_prev) / dt
+
+            # Se afastando rapido E nao estava ja confirmado como PINCH, rejeita
+            if d_velocity > self.pinch_velocity_threshold:
+                if self._confirmed_shape == HandShape.PINCH:
+                    return HandShape.PINCH
+                return HandShape.OTHER
+
+        return HandShape.PINCH
+
+    # -----------------------------------------------------------------
+    # Update principal
+    # -----------------------------------------------------------------
+
+    def update(self, hand: Optional[HandLandmarks]) -> List[GestureEvent]:
+        events: List[GestureEvent] = []
+        now = time.perf_counter()
+
+        # Position hold
+        if hand is None:
+            self._hand_lost_frames += 1
+            if self._hand_lost_frames > self.position_hold_frames:
+                if self._drag_active:
+                    events.append(GestureEvent(Gesture.DRAG_END, None, now))
+                    self._drag_active = False
+                self.reset()
+                self._last_event_gesture = Gesture.PAUSE
+                self._aim_assist_active = False
+                self._sticky_active = False
+                return events
+            return events
+
+        self._hand_lost_frames = 0
+        self._last_hand_size = compute_hand_size(hand)
+
+        # Pinch threshold adaptativo (v6.5: com FLOOR minimo)
+        effective_pinch_threshold = self.pinch_threshold
+        if self.pinch_adaptive and self.hand_size_reference > 0:
+            scale = self._last_hand_size / self.hand_size_reference
+            effective_pinch_threshold = self.pinch_threshold * max(0.5, min(2.0, scale))
+            # v6.5: FLOOR garante que threshold nunca cai abaixo do minimo
+            # Sem isso: mao longe fazia threshold virar absurdamente apertado
+            effective_pinch_threshold = max(self.pinch_threshold_floor, effective_pinch_threshold)
+
+        self._last_pinch_dist = _distance_2d(
+            hand.landmarks[LM_THUMB_TIP],
+            hand.landmarks[LM_INDEX_TIP],
+        )
+
+        # Classificacao DUAL (v6.4)
+        raw_shape = self._classify_shape_dual(hand, effective_pinch_threshold, now)
+
+        # ===========================================================
+        # NOVO v6.9.1: PRESS-TO-CLICK
+        # ===========================================================
+        # Detecta a BORDA SUBINDO (dedos encostando) e dispara CLICK/RIGHT_CLICK
+        # IMEDIATAMENTE — em vez de esperar o usuario soltar.
+        #
+        # Por que: o modelo antigo (release-to-click) tinha duas falhas:
+        # 1. Feedback atrasado: nada acontecia ao encostar os dedos
+        # 2. Cliques perdidos: se soltava antes da histerese confirmar PINCH,
+        #    o evento sumia.
+        #
+        # Press-to-click resolve os dois: feedback imediato + sempre captura.
+        # ===========================================================
+        anchor_now = get_anchor_position(hand, self.anchor_landmark)
+
+        edge_pinch = (
+            self._previous_raw_shape != HandShape.PINCH
+            and raw_shape == HandShape.PINCH
+        )
+        edge_pinch_middle = (
+            self._previous_raw_shape != HandShape.PINCH_MIDDLE
+            and raw_shape == HandShape.PINCH_MIDDLE
+        )
+
+        # Atualiza estado para o proximo frame (depois das edges calculadas)
+        self._previous_raw_shape = raw_shape
+
+        # CLICK no PRESS (encostou)
+        if edge_pinch and not self._drag_active:
+            if (now - self._last_click_time) >= self.click_cooldown:
+                self._last_click_time = now
+                self._click_already_fired = True
+                self._pinch_started_at = now  # ainda rastreia para drag
+                logger.info("CLICK 🤏 (press-to-click)")
+                events.append(GestureEvent(Gesture.CLICK, anchor_now, now))
+
+        # RIGHT_CLICK no PRESS (encostou medio + indicador afastado)
+        if edge_pinch_middle:
+            if (now - self._last_right_click_time) >= self.click_cooldown:
+                self._last_right_click_time = now
+                self._right_click_already_fired = True
+                self._pinch_middle_started_at = now
+                logger.info("RIGHT_CLICK 👉 (press-to-click)")
+                events.append(GestureEvent(Gesture.RIGHT_CLICK, anchor_now, now))
+        # ===========================================================
+
+        # Histerese
+        if raw_shape == self._confirmed_shape:
+            self._candidate_shape = raw_shape
+            self._candidate_count = 0
+            confirmed_now = self._confirmed_shape
+        else:
+            if raw_shape == self._candidate_shape:
+                self._candidate_count += 1
+            else:
+                self._candidate_shape = raw_shape
+                self._candidate_count = 1
+
+            if self._confirmed_shape in (HandShape.UNKNOWN, HandShape.OTHER):
+                threshold = self.debounce_frames
+            else:
+                threshold = self.exit_frames
+
+            if self._candidate_count >= threshold:
+                confirmed_now = self._candidate_shape
+            else:
+                confirmed_now = self._confirmed_shape
+
+        # Aim assist (com pre-ativacao + holdover)
+        self._aim_assist_active = self._is_aim_assist_active(confirmed_now, hand, now)
+
+        # CURSOR MOVE
+        cursor_moves_in_open_hand = (confirmed_now == HandShape.OPEN_HAND)
+        cursor_moves_in_pinch_drag = (
+            confirmed_now == HandShape.PINCH and self._drag_active
+        )
+
+        if cursor_moves_in_open_hand or cursor_moves_in_pinch_drag:
+            anchor = get_anchor_position(hand, self.anchor_landmark)
+            dpi_adaptive = compute_dpi_multiplier(
+                self._last_hand_size,
+                self.hand_size_reference,
+                self.dpi_min,
+                self.dpi_max,
+                self.dpi_adaptive_enabled,
+            )
+            total_dpi = dpi_adaptive * self.dpi_fixed
+            self._last_dpi = total_dpi
+            target_pos = apply_dpi_to_position(anchor, total_dpi)
+
+            is_aim = self._aim_assist_active or cursor_moves_in_pinch_drag
+            final_pos = self._apply_precision_pipeline(target_pos, is_aim)
+
+            events.append(GestureEvent(Gesture.MOVE, final_pos, now))
+        else:
+            # Em PEACE/FIST: mantem posicao para continuidade
+            if confirmed_now in (HandShape.PEACE, HandShape.FIST):
+                anchor = get_anchor_position(hand, self.anchor_landmark)
+                dpi_adaptive = compute_dpi_multiplier(
+                    self._last_hand_size,
+                    self.hand_size_reference,
+                    self.dpi_min,
+                    self.dpi_max,
+                    self.dpi_adaptive_enabled,
+                )
+                total_dpi = dpi_adaptive * self.dpi_fixed
+                self._last_smoothed_pos = apply_dpi_to_position(anchor, total_dpi)
+                self._last_velocity = 0.0
+                self._sticky_active = False
+
+        # ACOES
+        previous_shape = self._confirmed_shape
+        action_event = self._process_action(
+            shape=confirmed_now,
+            previous_shape=previous_shape,
+            hand=hand,
+            now=now,
+        )
+        if action_event is not None:
+            events.append(action_event)
+            self._last_event_gesture = action_event.gesture
+        elif confirmed_now == HandShape.OPEN_HAND:
+            self._last_event_gesture = Gesture.MOVE
+        elif confirmed_now == HandShape.FIST:
+            self._last_event_gesture = Gesture.PAUSE
+        elif confirmed_now == HandShape.PEACE:
+            self._last_event_gesture = Gesture.PAUSE
+
+        self._confirmed_shape = confirmed_now
+        return events
+
+    # -----------------------------------------------------------------
+    # Logica de acoes (v6.2/v6.3 mantida)
+    # -----------------------------------------------------------------
+
+    def _process_action(self, shape, previous_shape, hand, now):
+        anchor = get_anchor_position(hand, self.anchor_landmark)
+        event = None
+
+        # 1. SAIU DE PEACE -> DOUBLE_CLICK
+        if previous_shape == HandShape.PEACE and shape != HandShape.PEACE:
+            peace_duration = 0.0
+            if self._peace_started_at is not None:
+                peace_duration = now - self._peace_started_at
+            self._peace_started_at = None
+
+            if peace_duration >= self.PEACE_MIN_HOLD_SECONDS:
+                if (now - self._last_double_click_time) >= self.double_click_cooldown:
+                    self._last_double_click_time = now
+                    logger.info("DOUBLE_CLICK ✌️ disparado (duration: %.2fs)", peace_duration)
+                    event = GestureEvent(Gesture.DOUBLE_CLICK, anchor, now)
+
+            if event is not None:
+                if shape == HandShape.PINCH:
+                    self._pinch_started_at = now
+                return event
+
+        # 2. SAIU DE PINCH
+        if previous_shape == HandShape.PINCH and shape != HandShape.PINCH:
+            if self._drag_active:
+                self._drag_active = False
+                self._pinch_started_at = None
+                self._click_already_fired = False
+                return GestureEvent(Gesture.DRAG_END, anchor, now)
+
+            self._pinch_started_at = None
+
+            # NOVO v6.9.1: se ja disparou no PRESS (encostou), so reseta a flag.
+            # Sem isso disparariamos 2 cliques (no encostar + no soltar).
+            if self._click_already_fired:
+                self._click_already_fired = False
+                return None
+
+            # FALLBACK release-to-click: roda apenas se a edge detection do press
+            # falhou (caso raro de MediaPipe perder 1-2 frames consecutivos).
+            held_for = 0.0
+            if self._pinch_started_at is not None:
+                held_for = now - self._pinch_started_at
+            if held_for < self.drag_hold_seconds and held_for > self.pinch_min_hold_seconds:
+                if (now - self._last_click_time) >= self.click_cooldown:
+                    self._last_click_time = now
+                    return GestureEvent(Gesture.CLICK, anchor, now)
+
+        # 2b. SAIU DE PINCH_MIDDLE
+        if previous_shape == HandShape.PINCH_MIDDLE and shape != HandShape.PINCH_MIDDLE:
+            self._pinch_middle_started_at = None
+
+            # NOVO v6.9.1: idem ao bloco 2 — se ja disparou no press, ignora.
+            if self._right_click_already_fired:
+                self._right_click_already_fired = False
+                return None
+
+            # FALLBACK release-to-click (caso edge detection tenha falhado)
+            held_for = 0.0
+            if self._pinch_middle_started_at is not None:
+                held_for = now - self._pinch_middle_started_at
+            if held_for > self.pinch_min_hold_seconds:
+                if (now - self._last_right_click_time) >= self.click_cooldown:
+                    self._last_right_click_time = now
+                    logger.info("RIGHT_CLICK 👉 (fallback release)")
+                    return GestureEvent(Gesture.RIGHT_CLICK, anchor, now)
+
+        # 3. ENTRA em PEACE
+        if shape == HandShape.PEACE:
+            if self._peace_started_at is None:
+                self._peace_started_at = now
+            return None
+
+        # 4. ENTRA em PINCH
+        if shape == HandShape.PINCH:
+            if self._pinch_started_at is None:
+                self._pinch_started_at = now
+
+            held_for = now - self._pinch_started_at
+
+            if held_for >= self.drag_hold_seconds and not self._drag_active:
+                self._drag_active = True
+                return GestureEvent(Gesture.DRAG_START, anchor, now)
+
+            return None
+
+        # 4b. ENTRA em PINCH_MIDDLE
+        # v6.9.1: o RIGHT_CLICK ja foi disparado no PRESS (edge detection no
+        # update). Aqui apenas marcamos o tempo para servir de fallback caso
+        # _right_click_already_fired seja False ao soltar (caso raro).
+        if shape == HandShape.PINCH_MIDDLE:
+            if self._pinch_middle_started_at is None:
+                self._pinch_middle_started_at = now
+            return None
+
+        return None
+
+    # -----------------------------------------------------------------
+    # Introspeccao
+    # -----------------------------------------------------------------
+
+    @property
+    def current_shape(self) -> HandShape:
+        return self._confirmed_shape
+
+    @property
+    def current_gesture(self) -> Gesture:
+        return self._last_event_gesture
+
+    @property
+    def is_dragging(self) -> bool:
+        return self._drag_active
+
+    @property
+    def hand_size(self) -> float:
+        return self._last_hand_size
+
+    @property
+    def dpi_multiplier(self) -> float:
+        return self._last_dpi
+
+    @property
+    def pinch_distance(self) -> float:
+        return self._last_pinch_dist
+
+    @property
+    def drag_progress(self) -> float:
+        if self._drag_active:
+            return 1.0
+        if self._pinch_started_at is None:
+            return 0.0
+        held = time.perf_counter() - self._pinch_started_at
+        return min(1.0, held / max(0.01, self.drag_hold_seconds))
+
+    @property
+    def double_click_cooldown_remaining(self) -> float:
+        elapsed = time.perf_counter() - self._last_double_click_time
+        remaining = self.double_click_cooldown - elapsed
+        return max(0.0, remaining)
+
+    @property
+    def is_frozen(self) -> bool:
+        return self._confirmed_shape in (
+            HandShape.PEACE, HandShape.FIST, HandShape.PINCH_MIDDLE,
+            HandShape.UNKNOWN, HandShape.OTHER,
+        )
+
+    @property
+    def aim_assist_active(self) -> bool:
+        return self._aim_assist_active
+
+    @property
+    def sticky_active(self) -> bool:
+        """NOVO v6.4: sticky targeting ativo neste momento?"""
+        return self._sticky_active
+
+    @property
+    def velocity(self) -> float:
+        return self._last_velocity
+
+    # Compat
+    @property
+    def freeze_remaining(self) -> float:
+        return 0.0
+
+    @property
+    def index_angle_from_up(self) -> float:
+        return 0.0
