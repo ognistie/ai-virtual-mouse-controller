@@ -449,13 +449,7 @@ Possíveis próximos passos, em ordem de impacto estimado:
 - **Atalhos customizáveis** — usuário define gestos próprios mapeados para combinações de teclas
 - **Modelo treinado custom** — substituir MediaPipe por modelo próprio menor/mais rápido para o conjunto restrito de gestos suportados
 
----
 
-## Licença
-
-A definir. (Sugestão: MIT, dada a dependência de bibliotecas permissivas.)
-
----
 
 ## Créditos
 
