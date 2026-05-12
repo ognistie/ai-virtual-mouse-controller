@@ -13,10 +13,6 @@ Sistema gestual de controle de cursor com qualidade de input comparável a perif
 
 ---
 
-## Demo
-
-> _Adicione um GIF/vídeo demonstrativo aqui — `docs/assets/img/demo.gif`_
-
 ```
 ┌──────────────────────────────────────────────────────────┐
 │ FPS 58  SHAPE PINCH  DPI 1.05x       PRECISION  FROZEN  │
