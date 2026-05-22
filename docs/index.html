@@ -4,773 +4,631 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>AI Virtual Mouse Controller — Controle gestual por webcam</title>
-  <meta name="description" content="Sistema gestual open-source que transforma movimentos da mão em comandos do mouse usando MediaPipe, OpenCV e Python." />
+  <title>AI Virtual Mouse Controller — pare de procurar o mouse</title>
+  <meta name="description" content="Um projeto que transforma a sua mão em mouse usando webcam, MediaPipe e Python. Open source, sem GPU, sem hardware, sem desculpas." />
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,700;0,9..144,900;1,9..144,400;1,9..144,700;1,9..144,900&family=Inter:wght@300;400;500;600;700&family=Caveat:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="assets/css/style.css" />
 </head>
 
 <body>
-  <div class="bg-grid" aria-hidden="true"></div>
-  <div class="bg-glow bg-glow-1" aria-hidden="true"></div>
-  <div class="bg-glow bg-glow-2" aria-hidden="true"></div>
+  <div class="paper-grain" aria-hidden="true"></div>
 
-  <header class="navbar">
+  <!-- TICKER -->
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker-track">
+      <span>★ projeto open source ★ roda em CPU ★ sem hardware extra ★ feito em python ★ alpha pública ★ MIT license ★ testado em webcam suja de notebook ★ ~58 FPS ★ menos de 30 ms ★ </span>
+      <span>★ projeto open source ★ roda em CPU ★ sem hardware extra ★ feito em python ★ alpha pública ★ MIT license ★ testado em webcam suja de notebook ★ ~58 FPS ★ menos de 30 ms ★ </span>
+    </div>
+  </div>
+
+  <header class="topbar">
     <a class="brand" href="index.html">
-      <span class="brand-mark">
-        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-          <path d="M5 14c0-1 .5-2 1.5-2.5L8 11V6a1.5 1.5 0 113 0v3.5L12 9V4a1.5 1.5 0 113 0v5l1-.2V6.5a1.5 1.5 0 113 0V12c0 4-2.5 8-7 8-3.5 0-6-2.5-6-5.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-          <circle cx="9" cy="13" r="1.2" fill="currentColor"/>
-          <circle cx="13" cy="13" r="1.2" fill="currentColor"/>
-        </svg>
-      </span>
-      <span class="brand-text">
+      <span class="brand-monogram">A<em>v</em>m</span>
+      <span class="brand-name">
         <strong>AI Virtual Mouse</strong>
-        <em>Controller</em>
+        <small>um projeto teimoso · 2024—</small>
       </span>
     </a>
 
-    <nav class="nav-links" aria-label="Navegação principal">
-      <a href="#visao-geral">Visão geral</a>
-      <a href="#funcionamento">Funcionamento</a>
-      <a href="#gestos">Gestos</a>
-      <a href="#instalacao">Instalação</a>
-      <a href="#solucoes">Soluções</a>
+    <nav class="topnav" aria-label="Navegação">
+      <a href="#manifesto">manifesto</a>
+      <span class="sep">·</span>
+      <a href="#funciona">como funciona</a>
+      <span class="sep">·</span>
+      <a href="#gestos">gestos</a>
+      <span class="sep">·</span>
+      <a href="#instalar">instalar</a>
+      <span class="sep">·</span>
+      <a href="#erros">quando der ruim</a>
     </nav>
 
-    <div class="nav-actions">
-      <a class="btn btn-ghost" href="usage.html">Guia completo</a>
-      <a class="btn btn-primary" href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">
-        <span>GitHub</span>
-        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
-      </a>
-    </div>
+    <a class="topbar-cta" href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">
+      <span>github</span>
+      <span class="arrow">↗</span>
+    </a>
 
     <button class="menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false">
-      <span></span>
-      <span></span>
-      <span></span>
+      <span></span><span></span><span></span>
     </button>
   </header>
 
   <main>
     <!-- HERO -->
     <section class="hero">
-      <div class="hero-text">
-        <span class="pill">
-          <span class="pill-dot"></span>
-          Projeto open-source · Alpha pública
-        </span>
-
-        <h1>
-          Controle o cursor
-          <span class="gradient-text">apenas com a sua mão.</span>
-        </h1>
-
-        <p class="hero-lead">
-          O <strong>AI Virtual Mouse Controller</strong> transforma a sua webcam em um dispositivo de entrada gestual. Movimentos naturais da mão são interpretados em tempo real e convertidos em comandos precisos do cursor — sem hardware extra, sem GPU dedicada e sem treinamento de modelos.
-        </p>
-
-        <div class="hero-actions">
-          <a class="btn btn-primary btn-lg" href="#instalacao">
-            <span>Começar instalação</span>
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
-          </a>
-          <a class="btn btn-outline btn-lg" href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">
-            Ver no GitHub
-          </a>
-        </div>
-
-        <dl class="hero-stats">
-          <div>
-            <dt>FPS médio</dt>
-            <dd>~58</dd>
-          </div>
-          <div>
-            <dt>Gestos canônicos</dt>
-            <dd>06</dd>
-          </div>
-          <div>
-            <dt>Latência</dt>
-            <dd>&lt; 30 ms</dd>
-          </div>
-        </dl>
+      <div class="hero-meta">
+        <span class="meta-num">01</span>
+        <span class="meta-text">uma webcam · duas mãos · zero hardware</span>
       </div>
 
-      <div class="hero-visual">
-        <div class="visual-card">
-          <div class="visual-header">
-            <div class="visual-dots">
-              <span></span><span></span><span></span>
-            </div>
-            <span class="visual-label">mediapipe · 21 pontos</span>
+      <h1 class="hero-headline">
+        <span class="line line-1">Pare de procurar</span>
+        <span class="line line-2"><em>o</em> mouse.</span>
+        <span class="line line-3">Você tem <span class="mark">mãos.</span></span>
+      </h1>
+
+      <div class="hero-grid">
+        <div class="hero-lead">
+          <p class="lead-drop">
+            <span class="dropcap">E</span>sse projeto pega o stream da sua webcam, joga em um modelo de visão computacional e transforma cada microgesto da mão em comando real do cursor. <em>Mover, clicar, arrastar, pausar.</em> Sem hardware extra. Sem GPU. Sem treinar modelo.
+          </p>
+
+          <p class="lead-second">
+            É menos mágico do que parece. E muito mais útil do que aparenta.
+          </p>
+
+          <div class="hero-cta">
+            <a class="btn btn-red" href="#instalar">
+              <span>quero testar</span>
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+            </a>
+            <a class="btn btn-ghost" href="#funciona">como funciona?</a>
           </div>
 
-          <svg class="hand-render" viewBox="0 0 420 420" role="img" aria-label="Renderização do rastreamento de 21 pontos da mão">
-            <defs>
-              <radialGradient id="palm-grad" cx="50%" cy="50%" r="55%">
-                <stop offset="0%" stop-color="#7c5cff" stop-opacity="0.45"/>
-                <stop offset="100%" stop-color="#7c5cff" stop-opacity="0"/>
-              </radialGradient>
-              <linearGradient id="bone-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#22d3ee"/>
-                <stop offset="100%" stop-color="#a855f7"/>
-              </linearGradient>
-            </defs>
-            <path d="M162 310 C145 276 118 241 92 210 C72 186 84 165 108 180 L149 211 L136 125 C132 101 160 94 169 118 L190 202 L198 94 C200 67 232 67 234 96 L238 200 L261 113 C268 88 299 95 295 122 L281 207 L314 155 C328 133 354 146 343 170 L303 253 C294 271 294 292 302 315 C279 347 205 356 162 310 Z" fill="url(#palm-grad)" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>
-            <g class="bones" stroke="url(#bone-grad)" stroke-width="2.5" stroke-linecap="round" fill="none">
-              <path d="M210 300 L190 245 L150 210 L110 185"/>
-              <path d="M190 245 L190 202 L169 118"/>
-              <path d="M205 246 L238 200 L234 96"/>
-              <path d="M220 250 L281 207 L295 122"/>
-              <path d="M235 263 L303 253 L343 170"/>
-            </g>
-            <g class="landmarks">
-              <circle cx="210" cy="300" r="6"/>
-              <circle cx="190" cy="245" r="5"/>
-              <circle cx="150" cy="210" r="5"/>
-              <circle cx="110" cy="185" r="5"/>
-              <circle cx="190" cy="202" r="5"/>
-              <circle cx="169" cy="118" r="5"/>
-              <circle cx="238" cy="200" r="5"/>
-              <circle cx="234" cy="96" r="5"/>
-              <circle cx="281" cy="207" r="5"/>
-              <circle cx="295" cy="122" r="5"/>
-              <circle cx="303" cy="253" r="5"/>
-              <circle cx="343" cy="170" r="5"/>
-            </g>
-          </svg>
+          <p class="hand-note">
+            <svg class="arrow-doodle" viewBox="0 0 80 60" aria-hidden="true">
+              <path d="M5 50 Q 25 45 45 30 T 70 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M62 8 L70 10 L68 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            funciona com a câmera <u>suja</u> do notebook. testado.
+          </p>
+        </div>
 
-          <div class="visual-footer">
-            <div class="visual-metric">
-              <span class="metric-label">Tracking</span>
-              <span class="metric-value">
-                <span class="status-dot"></span>
-                Ativo
-              </span>
+        <div class="hero-visual">
+          <div class="visual-frame">
+            <div class="frame-tape tape-tl"></div>
+            <div class="frame-tape tape-br"></div>
+            <div class="frame-label">
+              <span class="rec-dot"></span>
+              <span>FRAME 00231 · mediapipe hands · 21 pontos</span>
             </div>
-            <div class="visual-metric">
-              <span class="metric-label">Confiança</span>
-              <span class="metric-value">98.4%</span>
+            <svg class="hand-svg" viewBox="0 0 420 420" role="img" aria-label="Rastreamento de mão com 21 pontos">
+              <path class="hand-fill" d="M162 310 C145 276 118 241 92 210 C72 186 84 165 108 180 L149 211 L136 125 C132 101 160 94 169 118 L190 202 L198 94 C200 67 232 67 234 96 L238 200 L261 113 C268 88 299 95 295 122 L281 207 L314 155 C328 133 354 146 343 170 L303 253 C294 271 294 292 302 315 C279 347 205 356 162 310 Z"/>
+              <g class="bones">
+                <path d="M210 300 L190 245 L150 210 L110 185"/>
+                <path d="M190 245 L190 202 L169 118"/>
+                <path d="M205 246 L238 200 L234 96"/>
+                <path d="M220 250 L281 207 L295 122"/>
+                <path d="M235 263 L303 253 L343 170"/>
+              </g>
+              <g class="points">
+                <circle cx="210" cy="300" r="6"/>
+                <circle cx="190" cy="245" r="5"/>
+                <circle cx="150" cy="210" r="5"/>
+                <circle cx="110" cy="185" r="5"/>
+                <circle cx="190" cy="202" r="5"/>
+                <circle cx="169" cy="118" r="5"/>
+                <circle cx="238" cy="200" r="5"/>
+                <circle cx="234" cy="96" r="5"/>
+                <circle cx="281" cy="207" r="5"/>
+                <circle cx="295" cy="122" r="5"/>
+                <circle cx="303" cy="253" r="5"/>
+                <circle cx="343" cy="170" r="5"/>
+              </g>
+              <text class="svg-corner" x="22" y="36">live</text>
+              <text class="svg-corner" x="345" y="404">cursor</text>
+            </svg>
+            <div class="frame-stats">
+              <div><span>FPS</span><b>58.2</b></div>
+              <div><span>confiança</span><b>98%</b></div>
+              <div><span>latência</span><b>27 ms</b></div>
             </div>
           </div>
+
+          <span class="sticky-note">
+            obs.<br>experimente.<br>são 5 min, no máximo.
+          </span>
         </div>
       </div>
     </section>
 
-    <!-- OVERVIEW -->
-    <section id="visao-geral" class="section">
-      <div class="section-head">
-        <span class="kicker">Visão geral</span>
-        <h2>Uma interface natural entre você e o computador.</h2>
-        <p class="section-lead">
-          O projeto explora um novo paradigma de interação humano-máquina: substituir o periférico físico por gestos intencionais, capturados em tempo real e convertidos em ações precisas no sistema operacional. Tudo isso rodando em CPU comum, com qualidade de input comparável a um mouse físico.
-        </p>
+    <!-- MANIFESTO -->
+    <section id="manifesto" class="manifesto">
+      <div class="section-flag">
+        <span class="flag-num">02</span>
+        <span class="flag-text">manifesto curto</span>
       </div>
 
-      <div class="feature-grid">
-        <article class="feature-card">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-              <path d="M3 12a9 9 0 1018 0 9 9 0 00-18 0z" stroke="currentColor" stroke-width="1.5" fill="none"/>
-              <path d="M8 12l3 3 5-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-            </svg>
-          </div>
-          <h3>Sem hardware extra</h3>
-          <p>Usa qualquer webcam integrada ou USB. Dispensa luvas, sensores e câmeras de profundidade. O modelo roda em CPU.</p>
-        </article>
+      <h2 class="big-serif">
+        Três coisas que esse projeto <span class="strike">tenta</span> <em>se recusa</em> a ser.
+      </h2>
 
-        <article class="feature-card">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-              <path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
-            </svg>
+      <ol class="manifesto-list">
+        <li>
+          <span class="m-num">01.</span>
+          <div class="m-body">
+            <h3>“Mais uma demo bonita.”</h3>
+            <p>A maioria dos projetos de hand tracking morre no GIF do README. Esse continua de pé quando a luz está ruim, quando a câmera está suja, e quando a mão já cansou de demonstrar para você. <span class="hand-anno">↳ testado em sessões reais, não em vídeo promocional.</span></p>
           </div>
-          <h3>Latência mínima</h3>
-          <p>Press-to-click por detecção de borda no shape, filtragem OneEuro e threading da câmera mantêm ~58 FPS estáveis.</p>
-        </article>
-
-        <article class="feature-card">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-            </svg>
+        </li>
+        <li>
+          <span class="m-num">02.</span>
+          <div class="m-body">
+            <h3>“Dependente de GPU.”</h3>
+            <p>Roda a 58 FPS estáveis no processador que você já tem. Sem CUDA, sem placa dedicada, sem tensorrt. Se o seu notebook abre o Chrome com vinte abas, ele dá conta disso aqui também.</p>
           </div>
-          <h3>Calibração em runtime</h3>
-          <p>Quatro perfis pré-definidos e seis sliders ajustáveis em tempo de execução, sem necessidade de reiniciar a aplicação.</p>
-        </article>
-
-        <article class="feature-card">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-              <rect x="3" y="4" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/>
-              <path d="M3 9h18M8 4v14" stroke="currentColor" stroke-width="1.5" fill="none"/>
-            </svg>
+        </li>
+        <li>
+          <span class="m-num">03.</span>
+          <div class="m-body">
+            <h3>“Mais um wrapper de exemplo.”</h3>
+            <p>State machine própria, filtro adaptativo OneEuro implementado do paper original, decisões de âncora de cursor defendidas linha a linha. <em>Não é wrapper. É opinião feita em código.</em></p>
           </div>
-          <h3>Janela compacta</h3>
-          <p>Interface 480×270 always-on-top no canto da tela, no estilo de streamers. Não atrapalha o fluxo de trabalho.</p>
-        </article>
-
-        <article class="feature-card">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-              <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5" fill="none"/>
-              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" fill="none" stroke-dasharray="2 3"/>
-            </svg>
-          </div>
-          <h3>Aim assist inteligente</h3>
-          <p>Desaceleração proporcional em alvos pequenos e sticky targeting para reduzir overshoot em botões e links.</p>
-        </article>
-
-        <article class="feature-card">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-              <path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-            </svg>
-          </div>
-          <h3>Arquitetura limpa</h3>
-          <p>Separação clara entre core (algoritmos) e services (orquestração), totalmente documentada e testável.</p>
-        </article>
-      </div>
+        </li>
+      </ol>
     </section>
 
     <!-- HOW IT WORKS -->
-    <section id="funcionamento" class="section">
-      <div class="pipeline-wrap">
-        <div class="pipeline-text">
-          <span class="kicker">Como funciona</span>
-          <h2>Da câmera ao clique em milissegundos.</h2>
-          <p>
-            Cada frame capturado pela webcam atravessa um pipeline assíncrono composto por cinco estágios. O design prioriza estabilidade de FPS, baixa latência e robustez ao tremor natural da mão.
-          </p>
-
-          <ul class="pipeline-list">
-            <li>
-              <strong>01 · Captura assíncrona</strong>
-              <span>Thread dedicada lê frames da webcam com buffer mínimo, descartando frames atrasados para manter a taxa estável.</span>
-            </li>
-            <li>
-              <strong>02 · Detecção de landmarks</strong>
-              <span>MediaPipe Hands extrai 21 pontos 3D da mão a cada frame, com confiança individual por landmark.</span>
-            </li>
-            <li>
-              <strong>03 · Reconhecimento gestual</strong>
-              <span>State machine com histerese de 2/3 frames classifica o gesto em curso e elimina cliques fantasma.</span>
-            </li>
-            <li>
-              <strong>04 · Suavização adaptativa</strong>
-              <span>Filtro OneEuro reduz tremor em repouso e libera resposta rápida em movimento contínuo.</span>
-            </li>
-            <li>
-              <strong>05 · Comando do sistema</strong>
-              <span>PyAutoGUI traduz a intenção em movimento absoluto do cursor e em cliques nativos do sistema operacional.</span>
-            </li>
-          </ul>
-        </div>
-
-        <div class="pipeline-visual">
-          <div class="pipeline-card">
-            <div class="pipeline-node">
-              <div class="node-num">01</div>
-              <div class="node-body">
-                <strong>Webcam</strong>
-                <span>960×540 · 60 FPS</span>
-              </div>
-              <span class="node-pulse"></span>
-            </div>
-            <div class="pipeline-arrow"></div>
-            <div class="pipeline-node">
-              <div class="node-num">02</div>
-              <div class="node-body">
-                <strong>MediaPipe Hands</strong>
-                <span>21 landmarks 3D</span>
-              </div>
-              <span class="node-pulse"></span>
-            </div>
-            <div class="pipeline-arrow"></div>
-            <div class="pipeline-node">
-              <div class="node-num">03</div>
-              <div class="node-body">
-                <strong>Gesture Detector</strong>
-                <span>state machine</span>
-              </div>
-              <span class="node-pulse"></span>
-            </div>
-            <div class="pipeline-arrow"></div>
-            <div class="pipeline-node">
-              <div class="node-num">04</div>
-              <div class="node-body">
-                <strong>OneEuro Filter</strong>
-                <span>suavização adaptativa</span>
-              </div>
-              <span class="node-pulse"></span>
-            </div>
-            <div class="pipeline-arrow"></div>
-            <div class="pipeline-node node-final">
-              <div class="node-num">05</div>
-              <div class="node-body">
-                <strong>Cursor do sistema</strong>
-                <span>movimento + clique</span>
-              </div>
-              <span class="node-pulse"></span>
-            </div>
-          </div>
-        </div>
+    <section id="funciona" class="howitworks">
+      <div class="section-flag">
+        <span class="flag-num">03</span>
+        <span class="flag-text">como funciona</span>
       </div>
+
+      <div class="how-grid">
+        <h2 class="how-title">
+          Da palma da sua mão<br>
+          até o sistema operacional<br>
+          em <span class="ms-mark">30&nbsp;ms</span>.
+        </h2>
+
+        <p class="how-lead">
+          Cada frame da webcam passa por cinco estágios. Tudo assíncrono, tudo em CPU. O design prioriza FPS estável, latência baixa e sobrevivência a tremor natural da mão.
+        </p>
+
+        <ol class="pipeline-flow">
+          <li>
+            <span class="flow-step">passo 1</span>
+            <h4>Captura assíncrona</h4>
+            <p>Thread dedicada lê a webcam com buffer mínimo e descarta frames atrasados. Não dá pra trabalhar com 25 FPS bloqueante.</p>
+          </li>
+          <li>
+            <span class="flow-step">passo 2</span>
+            <h4>MediaPipe Hands</h4>
+            <p>21 pontos 3D da mão, com confiança por landmark. O modelo é da Google, a interpretação é nossa.</p>
+          </li>
+          <li>
+            <span class="flow-step">passo 3</span>
+            <h4>State machine de gestos</h4>
+            <p>Histerese de 2/3 frames na entrada e saída. Sem ela, qualquer ruído vira clique fantasma.</p>
+          </li>
+          <li>
+            <span class="flow-step">passo 4</span>
+            <h4>Filtro OneEuro</h4>
+            <p>Filtragem agressiva em repouso, liberada em movimento. EMA com α fixo é solução preguiçosa. Recomendamos não usar.</p>
+          </li>
+          <li>
+            <span class="flow-step">passo 5</span>
+            <h4>PyAutoGUI</h4>
+            <p>Comando absoluto de cursor. Press-to-click por edge detection no shape. O clique acontece no instante do toque dos dedos.</p>
+          </li>
+        </ol>
+      </div>
+
+      <aside class="design-note">
+        <div class="note-head">
+          <span class="note-icon">※</span>
+          <span>nota técnica do autor</span>
+        </div>
+        <p>O cursor segue o landmark 9 (base do dedo médio) — <strong>não</strong> a ponta do indicador. A ponta do indicador <em>mente</em> no momento do clique: ela se move quando os dedos se aproximam pra fazer a pinça, e isso faz o cursor pular bem no momento em que você quer precisão. Usar a base do médio resolve isso sem firula.</p>
+      </aside>
     </section>
 
     <!-- GESTURES -->
-    <section id="gestos" class="section">
-      <div class="section-head section-head-center">
-        <span class="kicker">Gestos</span>
-        <h2>O vocabulário gestual.</h2>
-        <p class="section-lead">
-          Seis gestos canônicos cobrem todas as operações básicas do cursor. A escolha foi guiada por ergonomia: cada movimento foi desenhado para minimizar fadiga em sessões longas e maximizar distância visual entre estados.
-        </p>
+    <section id="gestos" class="gestures">
+      <div class="section-flag">
+        <span class="flag-num">04</span>
+        <span class="flag-text">o vocabulário</span>
       </div>
 
-      <div class="gestures-grid">
-        <article class="gesture-card">
-          <div class="gesture-image">
-            <img src="assets/img/gesture_move_real.png" alt="Mão aberta com pontos de rastreamento para mover o cursor" loading="lazy">
-            <span class="gesture-tag">01</span>
+      <h2 class="big-serif">
+        Seis gestos.<br>
+        Foi <em>exatamente</em> o que coube.
+      </h2>
+
+      <p class="section-lede">
+        Cada um foi escolhido com dois critérios: deve sobreviver ao tremor da sua mão e não pode ser confundido com outro. Se você está pensando “e o gesto X”, a resposta é provavelmente: testamos, falhou, fora.
+      </p>
+
+      <div class="gesture-stack">
+        <article class="gesture-row gesture-1">
+          <span class="gesture-num">01</span>
+          <div class="gesture-photo">
+            <img src="assets/img/gesture_move_real.png" alt="Mão aberta com pontos de rastreamento" loading="lazy">
+            <span class="photo-corner photo-corner-tl"></span>
+            <span class="photo-corner photo-corner-br"></span>
           </div>
-          <div class="gesture-body">
-            <h3>Mover o cursor</h3>
-            <p>Mão aberta com a palma voltada para a câmera. O cursor segue a base do dedo médio (landmark 9), evitando saltos no instante do clique.</p>
+          <div class="gesture-info">
+            <h3>Mover</h3>
+            <p>Mão aberta, palma na câmera. O cursor segue um ponto estável da mão (a famosa base do médio). Movimentos lentos = controle fino. Amplos = travessia rápida da tela.</p>
+            <span class="gesture-meta">gesto padrão · sempre ativo</span>
           </div>
         </article>
 
-        <article class="gesture-card">
-          <div class="gesture-image">
-            <img src="assets/img/gesture_left_click_real.png" alt="Pinça entre polegar e indicador para clique esquerdo" loading="lazy">
-            <span class="gesture-tag">02</span>
+        <article class="gesture-row gesture-2">
+          <span class="gesture-num">02</span>
+          <div class="gesture-photo">
+            <img src="assets/img/gesture_left_click_real.png" alt="Pinça polegar e indicador" loading="lazy">
+            <span class="photo-corner photo-corner-tl"></span>
+            <span class="photo-corner photo-corner-br"></span>
           </div>
-          <div class="gesture-body">
+          <div class="gesture-info">
             <h3>Clique esquerdo</h3>
-            <p>Pinça curta entre polegar e indicador. A detecção ocorre por edge detection no shape, garantindo feedback imediato no momento do toque.</p>
+            <p>Encosta o polegar no indicador. <strong>O clique acontece no toque</strong>, não no release. Diferença prática: zero latência percebida.</p>
+            <span class="gesture-meta">edge detection · instantâneo</span>
           </div>
         </article>
 
-        <article class="gesture-card">
-          <div class="gesture-image">
-            <img src="assets/img/gesture_right_click_real.png" alt="Pinça entre polegar e dedo médio para clique direito" loading="lazy">
-            <span class="gesture-tag">03</span>
+        <article class="gesture-row gesture-3">
+          <span class="gesture-num">03</span>
+          <div class="gesture-photo">
+            <img src="assets/img/gesture_right_click_real.png" alt="Polegar e dedo médio" loading="lazy">
+            <span class="photo-corner photo-corner-tl"></span>
+            <span class="photo-corner photo-corner-br"></span>
           </div>
-          <div class="gesture-body">
+          <div class="gesture-info">
             <h3>Clique direito</h3>
-            <p>Pinça entre polegar e dedo médio, com indicador estendido. Aciona o menu de contexto sem ambiguidade com o clique esquerdo.</p>
+            <p>Polegar no médio, com indicador estendido. Abre o menu de contexto sem confundir com o clique esquerdo. Indicador é a chave da desambiguação.</p>
+            <span class="gesture-meta">menu de contexto</span>
           </div>
         </article>
 
-        <article class="gesture-card">
-          <div class="gesture-image">
-            <img src="assets/img/gesture_double_click_real.png" alt="Sinal de paz para duplo clique" loading="lazy">
-            <span class="gesture-tag">04</span>
+        <article class="gesture-row gesture-4">
+          <span class="gesture-num">04</span>
+          <div class="gesture-photo">
+            <img src="assets/img/gesture_double_click_real.png" alt="Sinal de paz" loading="lazy">
+            <span class="photo-corner photo-corner-tl"></span>
+            <span class="photo-corner photo-corner-br"></span>
           </div>
-          <div class="gesture-body">
+          <div class="gesture-info">
             <h3>Duplo clique</h3>
-            <p>Indicador e médio formando o sinal de paz, mantidos por aproximadamente 500 ms. Tempo dedicado evita ativação acidental.</p>
+            <p>Sinal de paz mantido por meio segundo. O delay é proposital: tem que ser intencional, senão dispara sozinho enquanto você só queria apontar.</p>
+            <span class="gesture-meta">~500 ms de hold</span>
           </div>
         </article>
 
-        <article class="gesture-card">
-          <div class="gesture-image">
-            <img src="assets/img/gesture_pause_real.png" alt="Punho fechado para pausar o cursor" loading="lazy">
-            <span class="gesture-tag">05</span>
+        <article class="gesture-row gesture-5">
+          <span class="gesture-num">05</span>
+          <div class="gesture-photo">
+            <img src="assets/img/gesture_pause_real.png" alt="Punho fechado" loading="lazy">
+            <span class="photo-corner photo-corner-tl"></span>
+            <span class="photo-corner photo-corner-br"></span>
           </div>
-          <div class="gesture-body">
+          <div class="gesture-info">
             <h3>Pausar</h3>
-            <p>Punho fechado congela o cursor instantaneamente. Útil ao ajustar a posição da mão sem deslocar o ponteiro na tela.</p>
+            <p>Punho fechado congela o cursor. Útil para reposicionar a mão (e o braço) sem o cursor surfar pela tela junto. Soltar o punho retoma o tracking.</p>
+            <span class="gesture-meta">freeze instantâneo</span>
           </div>
         </article>
 
-        <article class="gesture-card gesture-card-wide">
-          <div class="gesture-body">
-            <span class="gesture-tag gesture-tag-inline">06</span>
-            <h3>Arrastar (drag)</h3>
-            <p>Pinça polegar–indicador mantida por aproximadamente 3 segundos inicia o modo arrastar. Abrir a mão libera o item no destino.</p>
-            <ul class="gesture-bullets">
-              <li>Funciona com janelas, ícones e seleção de texto.</li>
-              <li>Indicador visual na janela confirma o estado ativo.</li>
-              <li>Cancelamento automático após 5 segundos sem movimento.</li>
-            </ul>
+        <article class="gesture-row gesture-6 no-photo">
+          <span class="gesture-num">06</span>
+          <div class="gesture-info gesture-info-wide">
+            <h3>Arrastar <span class="caveat">(o bônus)</span></h3>
+            <p>Pinça polegar–indicador mantida por aproximadamente 3 segundos inicia o modo arrastar. Funciona com janelas, ícones, seleção de texto. Abrir a mão libera no destino. Não tem cursor de seta puxando — tem a sua mão puxando.</p>
+            <span class="gesture-meta">hold de ~3s · indicador visual ativo</span>
           </div>
         </article>
       </div>
     </section>
 
-    <!-- INSTALLATION -->
-    <section id="instalacao" class="section">
-      <div class="section-head">
-        <span class="kicker">Guia de instalação</span>
-        <h2>Configure o projeto em menos de cinco minutos.</h2>
-        <p class="section-lead">
-          O processo é direto: prepare o ambiente, clone o repositório, instale as dependências e execute o ponto de entrada. Os passos abaixo cobrem a configuração recomendada em Windows 10 ou 11.
-        </p>
+    <!-- INSTALL -->
+    <section id="instalar" class="install">
+      <div class="section-flag">
+        <span class="flag-num">05</span>
+        <span class="flag-text">manual de instalação</span>
       </div>
 
-      <div class="install-grid">
-        <div class="install-prereqs">
-          <h3>Pré-requisitos</h3>
-          <ul class="prereq-list">
-            <li>
-              <span class="prereq-num">01</span>
-              <div>
-                <strong>Python 3.11 ou 3.12</strong>
-                <span>Versões 3.13 ou superiores ainda não são suportadas pelo MediaPipe.</span>
-              </div>
-            </li>
-            <li>
-              <span class="prereq-num">02</span>
-              <div>
-                <strong>Webcam funcional</strong>
-                <span>Integrada ou USB, com resolução mínima de 720p para tracking estável.</span>
-              </div>
-            </li>
-            <li>
-              <span class="prereq-num">03</span>
-              <div>
-                <strong>Git instalado</strong>
-                <span>Necessário para clonar o repositório. Alternativamente, baixe o ZIP do GitHub.</span>
-              </div>
-            </li>
-            <li>
-              <span class="prereq-num">04</span>
-              <div>
-                <strong>Windows 10 ou 11</strong>
-                <span>Plataforma principal de teste. macOS e Linux funcionam via fallback do OpenCV.</span>
-              </div>
-            </li>
-            <li>
-              <span class="prereq-num">05</span>
-              <div>
-                <strong>Iluminação adequada</strong>
-                <span>Ambientes bem iluminados melhoram a confiança de detecção do MediaPipe.</span>
-              </div>
-            </li>
+      <div class="install-header">
+        <h2 class="big-serif">
+          Cinco minutos.<br>
+          Quatro passos.<br>
+          <em>Um terminal.</em>
+        </h2>
+
+        <div class="install-checklist">
+          <p class="checklist-title">antes de começar, garante que:</p>
+          <ul>
+            <li><span class="check">✓</span> tem <b>Python 3.11 ou 3.12</b> (3.13+ ainda não rola com MediaPipe)</li>
+            <li><span class="check">✓</span> tem <b>uma webcam</b> (qualquer uma, sério)</li>
+            <li><span class="check">✓</span> tem <b>Git instalado</b> (ou baixa o ZIP do GitHub, vai)</li>
+            <li><span class="check">✓</span> tá em <b>Windows 10/11</b> (macOS/Linux funcionam via fallback)</li>
+            <li><span class="check">✓</span> a iluminação não tá <b>terrível</b></li>
           </ul>
         </div>
-
-        <div class="install-steps">
-          <div class="step">
-            <div class="step-header">
-              <span class="step-num">Passo 01</span>
-              <h4>Clone o repositório oficial</h4>
-            </div>
-            <p>Abra um terminal (PowerShell, CMD ou terminal integrado do VS Code) na pasta onde deseja manter o projeto e execute:</p>
-            <div class="code-block">
-              <div class="code-head">
-                <span>terminal</span>
-                <button class="copy-btn" type="button">Copiar</button>
-              </div>
-<pre><code>git clone https://github.com/ognistie/ai-virtual-mouse-controller.git
-cd ai-virtual-mouse-controller</code></pre>
-            </div>
-          </div>
-
-          <div class="step">
-            <div class="step-header">
-              <span class="step-num">Passo 02</span>
-              <h4>Crie e ative o ambiente virtual</h4>
-            </div>
-            <p>O ambiente virtual isola as dependências do projeto e evita conflitos com outras instalações Python no sistema:</p>
-            <div class="code-block">
-              <div class="code-head">
-                <span>powershell</span>
-                <button class="copy-btn" type="button">Copiar</button>
-              </div>
-<pre><code>py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1</code></pre>
-            </div>
-            <p class="note">No CMD use <code>.\.venv\Scripts\activate.bat</code>. Em macOS ou Linux, utilize <code>source .venv/bin/activate</code>.</p>
-          </div>
-
-          <div class="step">
-            <div class="step-header">
-              <span class="step-num">Passo 03</span>
-              <h4>Instale as dependências</h4>
-            </div>
-            <p>O arquivo <code>requirements.txt</code> contém todas as bibliotecas necessárias, com versões testadas e fixadas:</p>
-            <div class="code-block">
-              <div class="code-head">
-                <span>pip</span>
-                <button class="copy-btn" type="button">Copiar</button>
-              </div>
-<pre><code>pip install --upgrade pip
-pip install -r requirements.txt</code></pre>
-            </div>
-          </div>
-
-          <div class="step">
-            <div class="step-header">
-              <span class="step-num">Passo 04</span>
-              <h4>Execute a aplicação</h4>
-            </div>
-            <p>Com o ambiente preparado, inicie o ponto de entrada do projeto. Uma janela compacta de 480×270 aparecerá no canto inferior direito da tela:</p>
-            <div class="code-block">
-              <div class="code-head">
-                <span>python</span>
-                <button class="copy-btn" type="button">Copiar</button>
-              </div>
-<pre><code>python main.py</code></pre>
-            </div>
-            <p class="note">Posicione a mão a aproximadamente 50 cm da câmera, com a palma voltada para a frente. Pressione <code>ESC</code> a qualquer momento para encerrar.</p>
-          </div>
-        </div>
       </div>
 
-      <div class="shortcuts-card">
-        <div class="shortcuts-head">
-          <span class="kicker kicker-soft">Atalhos úteis</span>
-          <h3>Controle a aplicação pelo teclado.</h3>
-        </div>
+      <div class="install-steps">
+        <article class="step-card">
+          <header class="step-card-head">
+            <span class="step-card-num">passo 01</span>
+            <h3>Clone o repositório</h3>
+          </header>
+          <p>Abre um terminal (PowerShell, CMD, terminal do VS Code, tanto faz) na pasta onde quer guardar o projeto.</p>
+          <div class="code-block">
+            <div class="code-head"><span>terminal</span><button class="copy-btn" type="button">copiar</button></div>
+<pre><code>git clone https://github.com/ognistie/ai-virtual-mouse-controller.git
+cd ai-virtual-mouse-controller</code></pre>
+          </div>
+        </article>
 
-        <div class="shortcuts-grid">
-          <div class="shortcut"><kbd>S</kbd><span>Abre o painel de configurações</span></div>
-          <div class="shortcut"><kbd>T</kbd><span>Alterna o modo always-on-top</span></div>
-          <div class="shortcut"><kbd>1</kbd>–<kbd>4</kbd><span>Troca o perfil ativo</span></div>
-          <div class="shortcut"><kbd>D</kbd><span>Exibe a tabela de comparação</span></div>
-          <div class="shortcut"><kbd>R</kbd><span>Restaura os valores padrão do perfil</span></div>
-          <div class="shortcut"><kbd>A</kbd><span>Liga ou desliga o aim assist</span></div>
-          <div class="shortcut"><kbd>K</kbd><span>Liga ou desliga o sticky targeting</span></div>
-          <div class="shortcut"><kbd>ESC</kbd><span>Encerra a aplicação</span></div>
+        <article class="step-card">
+          <header class="step-card-head">
+            <span class="step-card-num">passo 02</span>
+            <h3>Cria o ambiente virtual</h3>
+          </header>
+          <p>Isola as dependências. Evita que esse projeto brigue com outros Python no seu sistema. Se você nunca usou venv, é literalmente uma pastinha local com seu próprio Python.</p>
+          <div class="code-block">
+            <div class="code-head"><span>powershell</span><button class="copy-btn" type="button">copiar</button></div>
+<pre><code>py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1</code></pre>
+          </div>
+          <p class="step-aside">no CMD: <code>.\.venv\Scripts\activate.bat</code> · no macOS/Linux: <code>source .venv/bin/activate</code></p>
+        </article>
+
+        <article class="step-card">
+          <header class="step-card-head">
+            <span class="step-card-num">passo 03</span>
+            <h3>Instala as dependências</h3>
+          </header>
+          <p>Versões fixadas e testadas. Não troca por “última versão” por sua conta — MediaPipe gosta de quebrar API entre minor versions.</p>
+          <div class="code-block">
+            <div class="code-head"><span>pip</span><button class="copy-btn" type="button">copiar</button></div>
+<pre><code>pip install --upgrade pip
+pip install -r requirements.txt</code></pre>
+          </div>
+        </article>
+
+        <article class="step-card">
+          <header class="step-card-head">
+            <span class="step-card-num">passo 04</span>
+            <h3>Roda</h3>
+          </header>
+          <p>Uma janela 480×270 abre no canto inferior direito da tela. Coloca a mão a uns 50 cm da câmera, palma pra frente. <kbd>ESC</kbd> sai quando você quiser.</p>
+          <div class="code-block">
+            <div class="code-head"><span>python</span><button class="copy-btn" type="button">copiar</button></div>
+<pre><code>python main.py</code></pre>
+          </div>
+        </article>
+      </div>
+
+      <div class="shortcuts">
+        <h3 class="shortcuts-title"><em>p.s.</em> atalhos que valem a pena memorizar</h3>
+        <div class="shortcut-grid">
+          <div><kbd>S</kbd><span>abre o painel</span></div>
+          <div><kbd>T</kbd><span>always-on-top</span></div>
+          <div><kbd>1</kbd>–<kbd>4</kbd><span>troca perfil</span></div>
+          <div><kbd>D</kbd><span>tabela comparativa</span></div>
+          <div><kbd>R</kbd><span>reset perfil</span></div>
+          <div><kbd>A</kbd><span>aim assist on/off</span></div>
+          <div><kbd>K</kbd><span>sticky on/off</span></div>
+          <div><kbd>ESC</kbd><span>sair</span></div>
         </div>
       </div>
     </section>
 
     <!-- TROUBLESHOOTING -->
-    <section id="solucoes" class="section">
-      <div class="section-head">
-        <span class="kicker kicker-warning">Solução de problemas</span>
-        <h2>Quando algo não funciona como esperado.</h2>
-        <p class="section-lead">
-          Mapeamos os incidentes mais frequentes em instalação e execução, junto com a causa raiz e o procedimento de resolução. Em caso de dúvida persistente, abra uma issue no repositório com a saída completa do terminal.
-        </p>
+    <section id="erros" class="trouble">
+      <div class="section-flag flag-red">
+        <span class="flag-num">06</span>
+        <span class="flag-text">quando der ruim</span>
+      </div>
+
+      <div class="trouble-intro">
+        <h2 class="big-serif">
+          E vai dar.<br>
+          <em>Bom designer reconhece isso.</em>
+        </h2>
+        <p>Mapeamos os incidentes mais comuns, com causa e antídoto. Se nada aqui resolve, abre uma issue no repositório — colado o erro completo do terminal, por favor.</p>
       </div>
 
       <div class="trouble-list">
         <details class="trouble-item">
           <summary>
-            <span class="trouble-tag">Instalação</span>
-            <strong>Erro no <code>pip install mediapipe</code> ou <code>ERROR: Could not find a version that satisfies the requirement mediapipe</code></strong>
-            <span class="trouble-toggle" aria-hidden="true"></span>
+            <span class="trouble-tag">erro 01 · instalação</span>
+            <strong><code>pip install mediapipe</code> falha com <code>Could not find a version that satisfies the requirement</code></strong>
           </summary>
           <div class="trouble-body">
-            <p><strong>Causa:</strong> a versão do Python instalada é incompatível com o MediaPipe. A biblioteca atualmente suporta apenas Python 3.8 a 3.12.</p>
-            <p><strong>Como resolver:</strong></p>
+            <p><strong>O que está acontecendo:</strong> sua versão de Python é nova demais (3.13+) ou velha demais. MediaPipe suporta 3.8 até 3.12 hoje.</p>
+            <p><strong>Antídoto:</strong></p>
             <ol>
-              <li>Verifique a versão ativa com <code>python --version</code>.</li>
-              <li>Instale Python 3.11 ou 3.12 a partir do site oficial <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org</a>.</li>
-              <li>Recrie o ambiente virtual apontando para a versão correta: <code>py -3.11 -m venv .venv</code>.</li>
-              <li>Ative o novo ambiente e execute <code>pip install -r requirements.txt</code> novamente.</li>
+              <li>Confere a versão atual: <code>python --version</code>.</li>
+              <li>Baixa Python 3.11 (estável) do site oficial: <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org/downloads</a>.</li>
+              <li>Recria o venv apontando pra ela: <code>py -3.11 -m venv .venv</code>.</li>
+              <li>Reativa e roda o <code>pip install -r requirements.txt</code> de novo.</li>
             </ol>
           </div>
         </details>
 
         <details class="trouble-item">
           <summary>
-            <span class="trouble-tag">Execução</span>
+            <span class="trouble-tag">erro 02 · execução</span>
             <strong><code>ModuleNotFoundError: No module named 'cv2'</code> ou <code>'mediapipe'</code></strong>
-            <span class="trouble-toggle" aria-hidden="true"></span>
           </summary>
           <div class="trouble-body">
-            <p><strong>Causa:</strong> o ambiente virtual não está ativo, ou as dependências foram instaladas em outro interpretador Python.</p>
-            <p><strong>Como resolver:</strong></p>
+            <p><strong>O que está acontecendo:</strong> ou o venv não está ativo, ou as deps foram instaladas em outro Python sem você notar.</p>
+            <p><strong>Antídoto:</strong></p>
             <ol>
-              <li>Confirme que o prompt do terminal exibe <code>(.venv)</code> antes do diretório.</li>
-              <li>Caso não exiba, reative o ambiente com <code>.\.venv\Scripts\Activate.ps1</code>.</li>
-              <li>Reexecute <code>pip install -r requirements.txt</code> dentro do ambiente.</li>
-              <li>Valide a instalação com <code>python -c "import cv2, mediapipe; print('ok')"</code>.</li>
+              <li>Verifica se o terminal mostra <code>(.venv)</code> antes do diretório. Se não mostra, ative: <code>.\.venv\Scripts\Activate.ps1</code>.</li>
+              <li>Reroda <code>pip install -r requirements.txt</code> com o venv ativo.</li>
+              <li>Testa: <code>python -c "import cv2, mediapipe; print('ok')"</code>.</li>
             </ol>
           </div>
         </details>
 
         <details class="trouble-item">
           <summary>
-            <span class="trouble-tag">Webcam</span>
-            <strong>A janela abre preta ou exibe <code>Cannot open camera</code></strong>
-            <span class="trouble-toggle" aria-hidden="true"></span>
+            <span class="trouble-tag">erro 03 · webcam</span>
+            <strong>A janela abre preta ou <code>Cannot open camera</code></strong>
           </summary>
           <div class="trouble-body">
-            <p><strong>Causa:</strong> outro aplicativo está utilizando a webcam, ou o sistema bloqueou o acesso por configurações de privacidade.</p>
-            <p><strong>Como resolver:</strong></p>
+            <p><strong>O que está acontecendo:</strong> outro aplicativo está segurando a câmera, ou o Windows bloqueou o acesso por privacidade.</p>
+            <p><strong>Antídoto:</strong></p>
             <ol>
-              <li>Encerre programas que possam estar utilizando a câmera: Microsoft Teams, Zoom, Discord, OBS, navegadores com chamadas ativas.</li>
-              <li>No Windows, acesse <em>Configurações → Privacidade e segurança → Câmera</em> e habilite o acesso para aplicativos desktop.</li>
-              <li>Se houver mais de uma câmera, altere <code>CAMERA_INDEX</code> em <code>config.py</code> (geralmente <code>0</code>, <code>1</code> ou <code>2</code>).</li>
-              <li>Reinicie a aplicação após cada alteração.</li>
+              <li>Fecha Teams, Zoom, Discord, OBS e qualquer aba do navegador em chamada.</li>
+              <li>Windows: <em>Configurações → Privacidade e segurança → Câmera</em> e libera para apps desktop.</li>
+              <li>Se você tem mais de uma webcam, muda <code>CAMERA_INDEX</code> no <code>config.py</code> pra <code>1</code> ou <code>2</code>.</li>
             </ol>
           </div>
         </details>
 
         <details class="trouble-item">
           <summary>
-            <span class="trouble-tag">PowerShell</span>
+            <span class="trouble-tag">erro 04 · powershell</span>
             <strong><code>Activate.ps1 cannot be loaded because running scripts is disabled</code></strong>
-            <span class="trouble-toggle" aria-hidden="true"></span>
           </summary>
           <div class="trouble-body">
-            <p><strong>Causa:</strong> a política de execução padrão do PowerShell impede a execução de scripts não assinados, incluindo o script de ativação do venv.</p>
-            <p><strong>Como resolver:</strong></p>
-            <ol>
-              <li>Abra o PowerShell como usuário comum e execute:</li>
-            </ol>
+            <p><strong>O que está acontecendo:</strong> política padrão do PowerShell bloqueia scripts não assinados. Inclui o de ativação do venv.</p>
+            <p><strong>Antídoto:</strong> abre o PowerShell e roda (confirma com <code>S</code> quando perguntar):</p>
             <div class="code-block code-block-inline">
-              <div class="code-head">
-                <span>powershell</span>
-                <button class="copy-btn" type="button">Copiar</button>
-              </div>
+              <div class="code-head"><span>powershell</span><button class="copy-btn" type="button">copiar</button></div>
 <pre><code>Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser</code></pre>
             </div>
-            <p>Confirme com <code>S</code> e reabra o terminal. A política altera somente o seu usuário, mantendo o sistema seguro.</p>
+            <p>Altera só o seu usuário. Sistema continua seguro. Reabre o terminal e tenta de novo.</p>
           </div>
         </details>
 
         <details class="trouble-item">
           <summary>
-            <span class="trouble-tag">Performance</span>
-            <strong>FPS abaixo de 30 ou atrasos perceptíveis entre o gesto e o cursor</strong>
-            <span class="trouble-toggle" aria-hidden="true"></span>
+            <span class="trouble-tag">erro 05 · performance</span>
+            <strong>FPS abaixo de 30, ou atraso visível entre gesto e cursor</strong>
           </summary>
           <div class="trouble-body">
-            <p><strong>Causa:</strong> o hardware está abaixo do recomendado ou a configuração do modelo está alta demais para o processador disponível.</p>
-            <p><strong>Como resolver:</strong></p>
+            <p><strong>O que está acontecendo:</strong> o modelo está configurado em qualidade máxima e o seu CPU não dá conta. Ou está em throttling térmico (notebook na bateria).</p>
+            <p><strong>Antídoto:</strong></p>
             <ol>
-              <li>Edite <code>config.py</code> e altere <code>MODEL_COMPLEXITY = 1</code> para <code>MODEL_COMPLEXITY = 0</code>.</li>
-              <li>Reduza a resolução de captura: <code>CAMERA_WIDTH = 640</code> e <code>CAMERA_HEIGHT = 360</code>.</li>
-              <li>Feche aplicações pesadas em segundo plano (navegadores com muitas abas, IDEs, jogos).</li>
-              <li>Conecte o notebook na tomada para evitar throttling térmico em modo bateria.</li>
+              <li>Em <code>config.py</code>, troca <code>MODEL_COMPLEXITY = 1</code> por <code>MODEL_COMPLEXITY = 0</code>.</li>
+              <li>Reduz a captura: <code>CAMERA_WIDTH = 640</code> e <code>CAMERA_HEIGHT = 360</code>.</li>
+              <li>Conecta o notebook na tomada. Sério, faz diferença.</li>
+              <li>Fecha Chrome com 80 abas, IDE pesada, joguinho rodando atrás.</li>
             </ol>
           </div>
         </details>
 
         <details class="trouble-item">
           <summary>
-            <span class="trouble-tag">Precisão</span>
-            <strong>O cursor treme parado, oscila ou faz cliques indesejados</strong>
-            <span class="trouble-toggle" aria-hidden="true"></span>
+            <span class="trouble-tag">erro 06 · precisão</span>
+            <strong>O cursor treme parado, oscila, ou faz cliques que você não pediu</strong>
           </summary>
           <div class="trouble-body">
-            <p><strong>Causa:</strong> ruído no tracking causado por iluminação irregular, fundo carregado ou perfil de suavização inadequado.</p>
-            <p><strong>Como resolver:</strong></p>
+            <p><strong>O que está acontecendo:</strong> ruído no tracking. Geralmente é iluminação ou fundo confuso.</p>
+            <p><strong>Antídoto:</strong></p>
             <ol>
-              <li>Pressione <code>S</code> para abrir o painel e selecione o perfil <em>stable</em>.</li>
-              <li>Aumente o slider de <em>Smoothness</em> em até 30%.</li>
-              <li>Eleve o <em>Pinch threshold</em> caso ocorram cliques fantasma.</li>
-              <li>Reposicione a câmera para enquadrar a mão com fundo neutro e contraste claro.</li>
-              <li>Garanta iluminação frontal — evite luz contra a câmera.</li>
+              <li>Aperta <code>S</code> e troca pro perfil <em>stable</em>.</li>
+              <li>Aumenta o slider de <em>Smoothness</em> em uns 30%.</li>
+              <li>Sobe o <em>Pinch threshold</em> se está clicando do nada.</li>
+              <li>Reposiciona a câmera: fundo neutro, luz na sua frente e não atrás.</li>
             </ol>
           </div>
         </details>
 
         <details class="trouble-item">
           <summary>
-            <span class="trouble-tag">PyAutoGUI</span>
-            <strong><code>pyautogui.FailSafeException</code> ao mover o cursor para o canto</strong>
-            <span class="trouble-toggle" aria-hidden="true"></span>
+            <span class="trouble-tag">erro 07 · pyautogui</span>
+            <strong><code>pyautogui.FailSafeException</code> ao mover pro canto</strong>
           </summary>
           <div class="trouble-body">
-            <p><strong>Causa:</strong> o PyAutoGUI possui um mecanismo de segurança que interrompe a execução quando o cursor atinge o canto superior esquerdo da tela.</p>
-            <p><strong>Como resolver:</strong></p>
-            <ol>
-              <li>O comportamento é intencional e protege contra loops descontrolados.</li>
-              <li>Reposicione a mão na área central da câmera e reinicie a aplicação.</li>
-              <li>Se necessário desativar o failsafe (não recomendado), adicione <code>pyautogui.FAILSAFE = False</code> em <code>main.py</code>.</li>
-            </ol>
+            <p><strong>O que está acontecendo:</strong> o PyAutoGUI tem um failsafe — se o cursor vai pro canto superior esquerdo, ele aborta. É proposital, protege contra loops descontrolados.</p>
+            <p><strong>Antídoto:</strong> reposiciona a mão no centro da câmera e reinicia. Se você está fazendo desenvolvimento e quer desativar (não recomendado pra uso normal), adiciona <code>pyautogui.FAILSAFE = False</code> no <code>main.py</code>.</p>
           </div>
         </details>
 
         <details class="trouble-item">
           <summary>
-            <span class="trouble-tag">MediaPipe</span>
+            <span class="trouble-tag">erro 08 · mediapipe</span>
             <strong><code>AttributeError: module 'mediapipe.solutions' has no attribute 'hands'</code></strong>
-            <span class="trouble-toggle" aria-hidden="true"></span>
           </summary>
           <div class="trouble-body">
-            <p><strong>Causa:</strong> versões 0.11 ou superiores do MediaPipe removeram a API legada <code>mp.solutions.hands</code> utilizada pelo projeto.</p>
-            <p><strong>Como resolver:</strong></p>
-            <ol>
-              <li>Force a instalação de uma versão compatível:</li>
-            </ol>
+            <p><strong>O que está acontecendo:</strong> a partir do MediaPipe 0.11 a API legada <code>mp.solutions.hands</code> foi removida. Você instalou uma versão nova demais.</p>
+            <p><strong>Antídoto:</strong> força a versão certa.</p>
             <div class="code-block code-block-inline">
-              <div class="code-head">
-                <span>pip</span>
-                <button class="copy-btn" type="button">Copiar</button>
-              </div>
+              <div class="code-head"><span>pip</span><button class="copy-btn" type="button">copiar</button></div>
 <pre><code>pip install "mediapipe>=0.10.9,&lt;0.11"</code></pre>
             </div>
-            <p>Confirme com <code>pip show mediapipe</code> que a versão instalada está entre 0.10.9 e 0.10.x.</p>
+            <p>Confere com <code>pip show mediapipe</code>.</p>
           </div>
         </details>
 
         <details class="trouble-item">
           <summary>
-            <span class="trouble-tag">Git</span>
-            <strong><code>git: command not found</code> ou <code>'git' is not recognized</code></strong>
-            <span class="trouble-toggle" aria-hidden="true"></span>
+            <span class="trouble-tag">erro 09 · git</span>
+            <strong><code>'git' is not recognized</code> ou <code>git: command not found</code></strong>
           </summary>
           <div class="trouble-body">
-            <p><strong>Causa:</strong> o Git não está instalado no sistema ou não está incluído na variável de ambiente <code>PATH</code>.</p>
-            <p><strong>Como resolver:</strong></p>
-            <ol>
-              <li>Faça o download em <a href="https://git-scm.com/downloads" target="_blank" rel="noopener">git-scm.com</a> e execute o instalador com as opções padrão.</li>
-              <li>Reabra o terminal para que a nova variável de ambiente seja carregada.</li>
-              <li>Alternativa: baixe o projeto como arquivo ZIP diretamente pela página do repositório no GitHub.</li>
-            </ol>
+            <p><strong>O que está acontecendo:</strong> você não tem Git instalado, ou ele não está no PATH.</p>
+            <p><strong>Antídoto:</strong> baixa em <a href="https://git-scm.com/downloads" target="_blank" rel="noopener">git-scm.com</a>, instala com as opções padrão, reabre o terminal. Alternativa rápida: baixa o ZIP direto da página do GitHub. Funciona igual.</p>
           </div>
         </details>
       </div>
     </section>
 
     <!-- CTA -->
-    <section class="cta-section">
-      <div class="cta-card">
-        <span class="kicker kicker-soft">Pronto para começar?</span>
-        <h2>Experimente o controle gestual agora.</h2>
-        <p>O projeto é totalmente open-source, licenciado sob MIT, e mantido com foco em qualidade de input. Contribuições, relatos e sugestões são bem-vindos no repositório oficial.</p>
-        <div class="hero-actions">
-          <a class="btn btn-primary btn-lg" href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">
-            <span>Acessar repositório</span>
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+    <section class="cta">
+      <div class="cta-inner">
+        <p class="cta-eyebrow">— e se você chegou até aqui</p>
+        <h2 class="cta-title">
+          Provavelmente vale<br>
+          a pena <em>testar.</em>
+        </h2>
+        <p class="cta-text">
+          O código está aberto. A licença é MIT. Se você achar um bug, é provável que a gente concorde com você. Se achar um gesto melhor, abre PR. Se rodar isso e quiser contar como foi — abre uma issue, vamos ler.
+        </p>
+        <div class="cta-actions">
+          <a class="btn btn-red" href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">
+            <span>ir pro repositório</span>
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
           </a>
-          <a class="btn btn-outline btn-lg" href="usage.html">Abrir guia detalhado</a>
+          <a class="btn btn-ghost" href="usage.html">guia detalhado</a>
         </div>
       </div>
     </section>
   </main>
 
   <footer class="site-footer">
-    <div class="footer-inner">
-      <div class="footer-brand">
-        <span class="brand-mark">
-          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-            <path d="M5 14c0-1 .5-2 1.5-2.5L8 11V6a1.5 1.5 0 113 0v3.5L12 9V4a1.5 1.5 0 113 0v5l1-.2V6.5a1.5 1.5 0 113 0V12c0 4-2.5 8-7 8-3.5 0-6-2.5-6-5.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-          </svg>
-        </span>
-        <div>
-          <strong>AI Virtual Mouse Controller</strong>
-          <span>Interface gestual por visão computacional</span>
-        </div>
+    <div class="footer-top">
+      <div class="footer-mark">
+        <span class="brand-monogram">A<em>v</em>m</span>
+        <p>
+          AI Virtual Mouse Controller<br>
+          <small>um projeto teimoso · licença MIT · python · mediapipe · opencv</small>
+        </p>
       </div>
-
-      <nav class="footer-nav" aria-label="Rodapé">
-        <a href="#visao-geral">Visão geral</a>
-        <a href="#gestos">Gestos</a>
-        <a href="#instalacao">Instalação</a>
-        <a href="#solucoes">Soluções</a>
-        <a href="usage.html">Guia completo</a>
-        <a href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">GitHub</a>
+      <nav aria-label="rodapé">
+        <a href="#manifesto">manifesto</a>
+        <a href="#funciona">como funciona</a>
+        <a href="#gestos">gestos</a>
+        <a href="#instalar">instalar</a>
+        <a href="#erros">quando der ruim</a>
+        <a href="usage.html">guia detalhado</a>
+        <a href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">github ↗</a>
       </nav>
     </div>
-
     <div class="footer-base">
-      <span>© AI Virtual Mouse Controller — Licença MIT</span>
-      <span>Construído com MediaPipe, OpenCV e Python</span>
+      <span>© AI Virtual Mouse Controller</span>
+      <span>feito à mão · literalmente</span>
     </div>
   </footer>
 

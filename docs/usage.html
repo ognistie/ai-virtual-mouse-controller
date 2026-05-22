@@ -5,109 +5,123 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <title>Guia detalhado — AI Virtual Mouse Controller</title>
-  <meta name="description" content="Guia completo para instalar, executar e dominar os gestos do AI Virtual Mouse Controller." />
+  <meta name="description" content="Guia completo, escrito à mão, para instalar e usar o AI Virtual Mouse Controller." />
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,700;0,9..144,900;1,9..144,400;1,9..144,700;1,9..144,900&family=Inter:wght@300;400;500;600;700&family=Caveat:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="assets/css/style.css" />
 </head>
 
 <body>
-  <div class="bg-grid" aria-hidden="true"></div>
-  <div class="bg-glow bg-glow-1" aria-hidden="true"></div>
-  <div class="bg-glow bg-glow-2" aria-hidden="true"></div>
+  <div class="paper-grain" aria-hidden="true"></div>
 
-  <header class="navbar">
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker-track">
+      <span>★ guia detalhado ★ leitura de 6 min ★ passo a passo ★ sem segredo ★ python · mediapipe · opencv ★ </span>
+      <span>★ guia detalhado ★ leitura de 6 min ★ passo a passo ★ sem segredo ★ python · mediapipe · opencv ★ </span>
+    </div>
+  </div>
+
+  <header class="topbar">
     <a class="brand" href="index.html">
-      <span class="brand-mark">
-        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-          <path d="M5 14c0-1 .5-2 1.5-2.5L8 11V6a1.5 1.5 0 113 0v3.5L12 9V4a1.5 1.5 0 113 0v5l1-.2V6.5a1.5 1.5 0 113 0V12c0 4-2.5 8-7 8-3.5 0-6-2.5-6-5.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-          <circle cx="9" cy="13" r="1.2" fill="currentColor"/>
-          <circle cx="13" cy="13" r="1.2" fill="currentColor"/>
-        </svg>
-      </span>
-      <span class="brand-text">
+      <span class="brand-monogram">A<em>v</em>m</span>
+      <span class="brand-name">
         <strong>AI Virtual Mouse</strong>
-        <em>Controller</em>
+        <small>um projeto teimoso · 2024—</small>
       </span>
     </a>
 
-    <nav class="nav-links" aria-label="Navegação principal">
-      <a href="index.html#visao-geral">Visão geral</a>
-      <a href="index.html#gestos">Gestos</a>
-      <a href="index.html#instalacao">Instalação</a>
-      <a href="index.html#solucoes">Soluções</a>
+    <nav class="topnav" aria-label="Navegação">
+      <a href="index.html#manifesto">manifesto</a>
+      <span class="sep">·</span>
+      <a href="index.html#funciona">como funciona</a>
+      <span class="sep">·</span>
+      <a href="index.html#gestos">gestos</a>
+      <span class="sep">·</span>
+      <a href="index.html#instalar">instalar</a>
+      <span class="sep">·</span>
+      <a href="index.html#erros">quando der ruim</a>
     </nav>
 
-    <div class="nav-actions">
-      <a class="btn btn-ghost" href="index.html">Início</a>
-      <a class="btn btn-primary" href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">
-        <span>GitHub</span>
-        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
-      </a>
-    </div>
+    <a class="topbar-cta" href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">
+      <span>github</span>
+      <span class="arrow">↗</span>
+    </a>
 
     <button class="menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false">
-      <span></span>
-      <span></span>
-      <span></span>
+      <span></span><span></span><span></span>
     </button>
   </header>
 
   <main>
     <section class="page-hero">
-      <span class="kicker">Guia detalhado</span>
-      <h1>Instale, execute e <span class="gradient-text">controle pela mão.</span></h1>
-      <p>Documentação passo a passo para preparar o ambiente, executar o projeto localmente e dominar cada gesto reconhecido pelo sistema. Recomendado para a primeira execução.</p>
+      <div class="hero-meta">
+        <span class="meta-num">∞</span>
+        <span class="meta-text">guia detalhado · leitura tranquila</span>
+      </div>
+
+      <h1>
+        Senta, pega um café,<br>
+        <em>vamos pelo começo.</em>
+      </h1>
+
+      <p>
+        Esse é o guia longo. Se você tá com pressa, volta pro <a href="index.html#instalar">manual rápido</a>. Aqui a gente explica cada coisa com calma, inclusive porque cada gesto foi escolhido do jeito que foi.
+      </p>
     </section>
 
-    <section class="section">
-      <div class="section-head">
-        <span class="kicker">Requisitos</span>
-        <h2>Antes de começar.</h2>
-        <p class="section-lead">Garanta que o ambiente atende a estes requisitos mínimos. Eles foram validados em Windows 10 e 11 com hardware moderno padrão.</p>
+    <section class="install">
+      <div class="section-flag">
+        <span class="flag-num">01</span>
+        <span class="flag-text">requisitos · o que você precisa</span>
       </div>
+
+      <h2 class="big-serif">Antes da gente <em>começar.</em></h2>
+      <p class="section-lede">
+        Lista honesta. Não tem GPU obrigatória, não tem hardware caro, não tem sensor mágico. Mas algumas coisas ajudam.
+      </p>
 
       <div class="requirements-grid">
         <article>
           <span>01</span>
           <h3>Python 3.11 ou 3.12</h3>
-          <p>Versões anteriores ou superiores podem apresentar incompatibilidade com o MediaPipe.</p>
+          <p>Versão 3.13+ ainda quebra com MediaPipe. Versões antigas (3.8–3.10) funcionam, mas não recomendamos.</p>
         </article>
-
         <article>
           <span>02</span>
-          <h3>Webcam funcional</h3>
-          <p>Integrada ou USB, preferencialmente com resolução de 720p ou superior.</p>
+          <h3>Webcam</h3>
+          <p>Integrada ou USB. 720p já basta. Se for 1080p, melhor — mas nada de gastar dinheiro novo.</p>
         </article>
-
         <article>
           <span>03</span>
-          <h3>Iluminação adequada</h3>
-          <p>Ambientes bem iluminados aumentam a confiança do tracking e reduzem ruído.</p>
+          <h3>Luz decente</h3>
+          <p>Frontal, sem contraluz. Se você consegue ver sua mão na tela, o modelo também consegue.</p>
         </article>
-
         <article>
           <span>04</span>
-          <h3>Terminal moderno</h3>
-          <p>PowerShell, CMD ou terminal integrado do VS Code. macOS e Linux suportados.</p>
+          <h3>Terminal</h3>
+          <p>PowerShell, CMD, terminal do VS Code, iTerm, qualquer um. Não importa, sério.</p>
         </article>
       </div>
     </section>
 
-    <section class="section">
-      <div class="section-head">
-        <span class="kicker">Instalação</span>
-        <h2>Comandos completos.</h2>
-        <p class="section-lead">Execute o bloco abaixo na pasta onde deseja manter o projeto. Cada comando é independente e pode ser revisado individualmente.</p>
+    <section class="install">
+      <div class="section-flag">
+        <span class="flag-num">02</span>
+        <span class="flag-text">comandos · cola e roda</span>
       </div>
+
+      <h2 class="big-serif">Os comandos, <em>todos juntos.</em></h2>
+      <p class="section-lede">
+        Se você confia em mim, cola tudo de uma vez. Se não confia (faz sentido), abre o <a href="index.html#instalar">passo a passo da home</a> que tem explicação por linha.
+      </p>
 
       <div class="code-block">
         <div class="code-head">
-          <span>powershell</span>
-          <button class="copy-btn" type="button">Copiar</button>
+          <span>powershell · cola tudo</span>
+          <button class="copy-btn" type="button">copiar</button>
         </div>
 <pre><code>git clone https://github.com/ognistie/ai-virtual-mouse-controller.git
 cd ai-virtual-mouse-controller
@@ -119,114 +133,126 @@ python main.py</code></pre>
       </div>
     </section>
 
-    <section class="section">
-      <div class="section-head">
-        <span class="kicker">Como executar os gestos</span>
-        <h2>Aprenda o vocabulário gestual.</h2>
-        <p class="section-lead">Cada gesto foi desenhado para ser distinguível por uma câmera comum em iluminação convencional. Pratique em frente ao espelho da janela compacta antes de utilizar em aplicações reais.</p>
+    <section class="gestures">
+      <div class="section-flag">
+        <span class="flag-num">03</span>
+        <span class="flag-text">os gestos · em detalhe</span>
       </div>
+
+      <h2 class="big-serif">
+        Cinco gestos.<br>
+        <em>O sexto é bônus.</em>
+      </h2>
+      <p class="section-lede">
+        Cada um foi desenhado para ser inequívoco e durar uma sessão inteira sem cansar a mão. Pratica em frente ao espelho da janelinha antes de usar na rotina.
+      </p>
 
       <div class="guide-gestures">
         <article>
-          <div class="gesture-image">
-            <img src="assets/img/gesture_move_real.png" alt="Mão aberta com pontos de rastreamento para mover o cursor" loading="lazy">
-            <span class="gesture-tag">01</span>
+          <div class="gesture-photo">
+            <img src="assets/img/gesture_move_real.png" alt="Mão aberta movendo o cursor" loading="lazy">
+            <span class="photo-corner photo-corner-tl"></span>
+            <span class="photo-corner photo-corner-br"></span>
           </div>
           <div>
             <h3>Mover o cursor</h3>
-            <p>Abra a mão com a palma voltada para a câmera. Movimentos lentos resultam em controle mais preciso; movimentos amplos cobrem maior distância na tela. O cursor segue a base do dedo médio para evitar saltos no momento do clique.</p>
+            <p>Abre a mão com a palma virada pra câmera. Movimento lento = controle preciso. Movimento amplo = travessia rápida da tela. O cursor segue a base do dedo médio — não a ponta do indicador — pra não pular no momento do clique.</p>
           </div>
         </article>
 
         <article>
-          <div class="gesture-image">
-            <img src="assets/img/gesture_left_click_real.png" alt="Pinça entre polegar e indicador para clique esquerdo" loading="lazy">
-            <span class="gesture-tag">02</span>
+          <div class="gesture-photo">
+            <img src="assets/img/gesture_left_click_real.png" alt="Pinça polegar e indicador" loading="lazy">
+            <span class="photo-corner photo-corner-tl"></span>
+            <span class="photo-corner photo-corner-br"></span>
           </div>
           <div>
             <h3>Clique esquerdo</h3>
-            <p>Encoste rapidamente o polegar no indicador, formando uma pinça. O clique acontece no instante exato do toque entre os dedos, com feedback imediato e sem latência perceptível.</p>
+            <p>Pinça rápida entre polegar e indicador. O clique dispara <strong>no instante do toque</strong>, não no release. Diferença real: zero latência percebida — porque é literalmente zero, não “quase zero”.</p>
           </div>
         </article>
 
         <article>
-          <div class="gesture-image">
-            <img src="assets/img/gesture_right_click_real.png" alt="Pinça entre polegar e dedo médio para clique direito" loading="lazy">
-            <span class="gesture-tag">03</span>
+          <div class="gesture-photo">
+            <img src="assets/img/gesture_right_click_real.png" alt="Polegar e médio com indicador estendido" loading="lazy">
+            <span class="photo-corner photo-corner-tl"></span>
+            <span class="photo-corner photo-corner-br"></span>
           </div>
           <div>
             <h3>Clique direito</h3>
-            <p>Encoste o polegar no dedo médio, mantendo o indicador estendido. Esse gesto aciona o menu de contexto do sistema operacional, sem ambiguidade com o clique esquerdo.</p>
+            <p>Polegar encosta no médio, com o indicador estendido. O indicador estendido é o que evita confusão com o clique esquerdo. Aciona o menu de contexto do sistema operacional.</p>
           </div>
         </article>
 
         <article>
-          <div class="gesture-image">
-            <img src="assets/img/gesture_double_click_real.png" alt="Sinal de paz para duplo clique" loading="lazy">
-            <span class="gesture-tag">04</span>
+          <div class="gesture-photo">
+            <img src="assets/img/gesture_double_click_real.png" alt="Sinal de paz" loading="lazy">
+            <span class="photo-corner photo-corner-tl"></span>
+            <span class="photo-corner photo-corner-br"></span>
           </div>
           <div>
             <h3>Duplo clique</h3>
-            <p>Faça o sinal de paz com indicador e dedo médio. Mantenha o gesto por aproximadamente 500 ms para confirmar a intenção e disparar o duplo clique nativo do sistema.</p>
+            <p>Sinal de paz (indicador + médio) mantido por aproximadamente 500 ms. O delay é proposital. Sem ele, o duplo clique virava acidente toda vez que você apontava com dois dedos.</p>
           </div>
         </article>
 
         <article>
-          <div class="gesture-image">
-            <img src="assets/img/gesture_pause_real.png" alt="Punho fechado para pausar o cursor" loading="lazy">
-            <span class="gesture-tag">05</span>
+          <div class="gesture-photo">
+            <img src="assets/img/gesture_pause_real.png" alt="Punho fechado" loading="lazy">
+            <span class="photo-corner photo-corner-tl"></span>
+            <span class="photo-corner photo-corner-br"></span>
           </div>
           <div>
             <h3>Pausar o cursor</h3>
-            <p>Feche a mão em punho para congelar instantaneamente a posição do cursor. Útil para reposicionar a mão sem deslocar o ponteiro, especialmente ao alternar entre regiões distantes da tela.</p>
+            <p>Fecha a mão em punho. O cursor congela na hora. Útil quando você quer reposicionar a mão sem o cursor surfar pela tela junto. Abre a mão = volta a rastrear.</p>
           </div>
         </article>
       </div>
     </section>
 
-    <section class="cta-section">
-      <div class="cta-card">
-        <span class="kicker kicker-soft">Continue explorando</span>
-        <h2>Veja a documentação completa.</h2>
-        <p>A página inicial reúne pré-requisitos, atalhos de teclado, soluções para problemas comuns e detalhes da arquitetura interna do projeto.</p>
-        <div class="hero-actions">
-          <a class="btn btn-primary btn-lg" href="index.html#instalacao">
-            <span>Voltar ao guia principal</span>
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+    <section class="cta">
+      <div class="cta-inner">
+        <p class="cta-eyebrow">— deu pra entender?</p>
+        <h2 class="cta-title">
+          Agora é prática.<br>
+          <em>Boa sorte.</em>
+        </h2>
+        <p class="cta-text">
+          Em alguns minutos de uso você vai parar de pensar nos gestos. Eles viram instinto. Promete.
+        </p>
+        <div class="cta-actions">
+          <a class="btn btn-red" href="index.html#instalar">
+            <span>voltar pro manual</span>
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
           </a>
-          <a class="btn btn-outline btn-lg" href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">Acessar repositório</a>
+          <a class="btn btn-ghost" href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">ir pro github</a>
         </div>
       </div>
     </section>
   </main>
 
   <footer class="site-footer">
-    <div class="footer-inner">
-      <div class="footer-brand">
-        <span class="brand-mark">
-          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-            <path d="M5 14c0-1 .5-2 1.5-2.5L8 11V6a1.5 1.5 0 113 0v3.5L12 9V4a1.5 1.5 0 113 0v5l1-.2V6.5a1.5 1.5 0 113 0V12c0 4-2.5 8-7 8-3.5 0-6-2.5-6-5.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-          </svg>
-        </span>
-        <div>
-          <strong>AI Virtual Mouse Controller</strong>
-          <span>Interface gestual por visão computacional</span>
-        </div>
+    <div class="footer-top">
+      <div class="footer-mark">
+        <span class="brand-monogram">A<em>v</em>m</span>
+        <p>
+          AI Virtual Mouse Controller<br>
+          <small>um projeto teimoso · licença MIT · python · mediapipe · opencv</small>
+        </p>
       </div>
-
-      <nav class="footer-nav" aria-label="Rodapé">
-        <a href="index.html">Início</a>
-        <a href="index.html#visao-geral">Visão geral</a>
-        <a href="index.html#gestos">Gestos</a>
-        <a href="index.html#instalacao">Instalação</a>
-        <a href="index.html#solucoes">Soluções</a>
-        <a href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">GitHub</a>
+      <nav aria-label="rodapé">
+        <a href="index.html">início</a>
+        <a href="index.html#manifesto">manifesto</a>
+        <a href="index.html#funciona">como funciona</a>
+        <a href="index.html#gestos">gestos</a>
+        <a href="index.html#instalar">instalar</a>
+        <a href="index.html#erros">quando der ruim</a>
+        <a href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">github ↗</a>
       </nav>
     </div>
-
     <div class="footer-base">
-      <span>© AI Virtual Mouse Controller — Licença MIT</span>
-      <span>Construído com MediaPipe, OpenCV e Python</span>
+      <span>© AI Virtual Mouse Controller</span>
+      <span>feito à mão · literalmente</span>
     </div>
   </footer>
 
