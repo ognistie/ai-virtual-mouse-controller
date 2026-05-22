@@ -4,44 +4,52 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>Guia de Uso — AI Virtual Mouse Controller</title>
-  <meta name="description" content="Guia para instalar, executar e usar os gestos do AI Virtual Mouse Controller." />
+  <title>Guia detalhado — AI Virtual Mouse Controller</title>
+  <meta name="description" content="Guia completo para instalar, executar e dominar os gestos do AI Virtual Mouse Controller." />
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;500;700&family=Special+Elite&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="assets/css/style.css" />
 </head>
 
 <body>
-  <div class="site-noise"></div>
-  <div class="scanlines"></div>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-glow bg-glow-1" aria-hidden="true"></div>
+  <div class="bg-glow bg-glow-2" aria-hidden="true"></div>
 
-  <header class="topbar">
-    <div class="window-buttons">
-      <span></span>
-      <span></span>
-      <span></span>
-    </div>
-
-    <a class="logo" href="index.html">
-      <span class="logo-vertical">AIVM</span>
-      <strong>AI VIRTUAL MOUSE</strong>
+  <header class="navbar">
+    <a class="brand" href="index.html">
+      <span class="brand-mark">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+          <path d="M5 14c0-1 .5-2 1.5-2.5L8 11V6a1.5 1.5 0 113 0v3.5L12 9V4a1.5 1.5 0 113 0v5l1-.2V6.5a1.5 1.5 0 113 0V12c0 4-2.5 8-7 8-3.5 0-6-2.5-6-5.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          <circle cx="9" cy="13" r="1.2" fill="currentColor"/>
+          <circle cx="13" cy="13" r="1.2" fill="currentColor"/>
+        </svg>
+      </span>
+      <span class="brand-text">
+        <strong>AI Virtual Mouse</strong>
+        <em>Controller</em>
+      </span>
     </a>
 
-    <nav class="main-nav">
-      <a href="index.html" data-pt="início" data-en="home">início</a>
-      <a href="usage.html" data-pt="guia" data-en="guide">guia</a>
-      <a href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">github ↗</a>
+    <nav class="nav-links" aria-label="Navegação principal">
+      <a href="index.html#visao-geral">Visão geral</a>
+      <a href="index.html#gestos">Gestos</a>
+      <a href="index.html#instalacao">Instalação</a>
+      <a href="index.html#solucoes">Soluções</a>
     </nav>
 
-    <div class="lang-toggle">
-      <button type="button" data-lang="pt">PT</button>
-      <button type="button" data-lang="en">EN</button>
+    <div class="nav-actions">
+      <a class="btn btn-ghost" href="index.html">Início</a>
+      <a class="btn btn-primary" href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">
+        <span>GitHub</span>
+        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+      </a>
     </div>
 
-    <button class="menu-btn" type="button" aria-label="Abrir menu">
+    <button class="menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false">
       <span></span>
       <span></span>
       <span></span>
@@ -49,165 +57,176 @@
   </header>
 
   <main>
-    <section class="page-hero oldweb-frame">
-      <p class="section-tag">// guia de uso</p>
-
-      <h1 data-pt="instale e controle" data-en="install and control">instale e controle</h1>
-
-      <p data-pt="Siga os passos abaixo para instalar o projeto, executar localmente e entender como realizar cada gesto na frente da webcam."
-         data-en="Follow the steps below to install the project, run it locally and understand how to perform each gesture in front of the webcam.">
-        Siga os passos abaixo para instalar o projeto, executar localmente e entender como realizar cada gesto na frente da webcam.
-      </p>
+    <section class="page-hero">
+      <span class="kicker">Guia detalhado</span>
+      <h1>Instale, execute e <span class="gradient-text">controle pela mão.</span></h1>
+      <p>Documentação passo a passo para preparar o ambiente, executar o projeto localmente e dominar cada gesto reconhecido pelo sistema. Recomendado para a primeira execução.</p>
     </section>
 
-    <section>
+    <section class="section">
       <div class="section-head">
-        <p class="section-tag">// requisitos</p>
-        <h2 data-pt="antes de começar" data-en="before starting">antes de começar</h2>
+        <span class="kicker">Requisitos</span>
+        <h2>Antes de começar.</h2>
+        <p class="section-lead">Garanta que o ambiente atende a estes requisitos mínimos. Eles foram validados em Windows 10 e 11 com hardware moderno padrão.</p>
       </div>
 
       <div class="requirements-grid">
         <article>
           <span>01</span>
-          <h3>Python</h3>
-          <p>Use Python 3.11 ou superior.</p>
+          <h3>Python 3.11 ou 3.12</h3>
+          <p>Versões anteriores ou superiores podem apresentar incompatibilidade com o MediaPipe.</p>
         </article>
 
         <article>
           <span>02</span>
-          <h3>Webcam</h3>
-          <p>Use webcam integrada ou USB, preferencialmente 720p ou 1080p.</p>
+          <h3>Webcam funcional</h3>
+          <p>Integrada ou USB, preferencialmente com resolução de 720p ou superior.</p>
         </article>
 
         <article>
           <span>03</span>
-          <h3>Ambiente</h3>
-          <p>Use boa iluminação para melhorar o rastreamento da mão.</p>
+          <h3>Iluminação adequada</h3>
+          <p>Ambientes bem iluminados aumentam a confiança do tracking e reduzem ruído.</p>
         </article>
 
         <article>
           <span>04</span>
-          <h3>Terminal</h3>
-          <p>Execute os comandos pelo PowerShell, CMD ou terminal do VS Code.</p>
+          <h3>Terminal moderno</h3>
+          <p>PowerShell, CMD ou terminal integrado do VS Code. macOS e Linux suportados.</p>
         </article>
       </div>
     </section>
 
-    <section class="install-section">
-      <div>
-        <p class="section-tag">// instalação</p>
-        <h2 data-pt="comandos" data-en="commands">comandos</h2>
-
-        <p data-pt="Copie e execute estes comandos na pasta onde deseja salvar o projeto."
-           data-en="Copy and run these commands in the folder where you want to save the project.">
-          Copie e execute estes comandos na pasta onde deseja salvar o projeto.
-        </p>
+    <section class="section">
+      <div class="section-head">
+        <span class="kicker">Instalação</span>
+        <h2>Comandos completos.</h2>
+        <p class="section-lead">Execute o bloco abaixo na pasta onde deseja manter o projeto. Cada comando é independente e pode ser revisado individualmente.</p>
       </div>
 
-      <div class="terminal">
-        <div class="terminal-title">
+      <div class="code-block">
+        <div class="code-head">
           <span>powershell</span>
-          <button class="copy-trigger" type="button">copy</button>
+          <button class="copy-btn" type="button">Copiar</button>
         </div>
-
 <pre><code>git clone https://github.com/ognistie/ai-virtual-mouse-controller.git
 cd ai-virtual-mouse-controller
-python -3.11 -m venv .venv
+py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
+pip install --upgrade pip
 pip install -r requirements.txt
 python main.py</code></pre>
       </div>
     </section>
 
-    <section>
+    <section class="section">
       <div class="section-head">
-        <p class="section-tag">// como fazer os gestos</p>
-        <h2 data-pt="aprenda os gestos" data-en="learn the gestures">aprenda os gestos</h2>
+        <span class="kicker">Como executar os gestos</span>
+        <h2>Aprenda o vocabulário gestual.</h2>
+        <p class="section-lead">Cada gesto foi desenhado para ser distinguível por uma câmera comum em iluminação convencional. Pratique em frente ao espelho da janela compacta antes de utilizar em aplicações reais.</p>
       </div>
 
       <div class="guide-gestures">
         <article>
-          <div class="gesture-img">
-            <img src="assets/img/gesture_move_real.png" alt="Mão aberta com rastreamento para mover cursor">
+          <div class="gesture-image">
+            <img src="assets/img/gesture_move_real.png" alt="Mão aberta com pontos de rastreamento para mover o cursor" loading="lazy">
+            <span class="gesture-tag">01</span>
           </div>
-
           <div>
-            <h3 data-pt="Mover cursor" data-en="Move cursor">Mover cursor</h3>
-            <p data-pt="Abra a mão com a palma voltada para a câmera. Movimente a mão lentamente para guiar o cursor."
-               data-en="Open your hand with your palm facing the camera. Move your hand slowly to guide the cursor.">
-              Abra a mão com a palma voltada para a câmera. Movimente a mão lentamente para guiar o cursor.
-            </p>
+            <h3>Mover o cursor</h3>
+            <p>Abra a mão com a palma voltada para a câmera. Movimentos lentos resultam em controle mais preciso; movimentos amplos cobrem maior distância na tela. O cursor segue a base do dedo médio para evitar saltos no momento do clique.</p>
           </div>
         </article>
 
         <article>
-          <div class="gesture-img">
-            <img src="assets/img/gesture_left_click_real.png" alt="Pinça com polegar e indicador para clique esquerdo">
+          <div class="gesture-image">
+            <img src="assets/img/gesture_left_click_real.png" alt="Pinça entre polegar e indicador para clique esquerdo" loading="lazy">
+            <span class="gesture-tag">02</span>
           </div>
-
           <div>
-            <h3 data-pt="Clique esquerdo" data-en="Left click">Clique esquerdo</h3>
-            <p data-pt="Encoste o polegar no indicador. O clique acontece no momento do toque entre os dedos."
-               data-en="Touch your thumb to your index finger. The click happens when the fingers touch.">
-              Encoste o polegar no indicador. O clique acontece no momento do toque entre os dedos.
-            </p>
+            <h3>Clique esquerdo</h3>
+            <p>Encoste rapidamente o polegar no indicador, formando uma pinça. O clique acontece no instante exato do toque entre os dedos, com feedback imediato e sem latência perceptível.</p>
           </div>
         </article>
 
         <article>
-          <div class="gesture-img">
-            <img src="assets/img/gesture_right_click_real.png" alt="Gesto com polegar e dedo médio para clique direito">
+          <div class="gesture-image">
+            <img src="assets/img/gesture_right_click_real.png" alt="Pinça entre polegar e dedo médio para clique direito" loading="lazy">
+            <span class="gesture-tag">03</span>
           </div>
-
           <div>
-            <h3 data-pt="Clique direito" data-en="Right click">Clique direito</h3>
-            <p data-pt="Encoste o polegar no dedo médio. Esse gesto abre o menu de contexto."
-               data-en="Touch your thumb to your middle finger. This gesture opens the context menu.">
-              Encoste o polegar no dedo médio. Esse gesto abre o menu de contexto.
-            </p>
+            <h3>Clique direito</h3>
+            <p>Encoste o polegar no dedo médio, mantendo o indicador estendido. Esse gesto aciona o menu de contexto do sistema operacional, sem ambiguidade com o clique esquerdo.</p>
           </div>
         </article>
 
         <article>
-          <div class="gesture-img">
-            <img src="assets/img/gesture_pause_real.png" alt="Punho fechado para pausar cursor">
+          <div class="gesture-image">
+            <img src="assets/img/gesture_double_click_real.png" alt="Sinal de paz para duplo clique" loading="lazy">
+            <span class="gesture-tag">04</span>
           </div>
-
           <div>
-            <h3 data-pt="Pausar cursor" data-en="Pause cursor">Pausar cursor</h3>
-            <p data-pt="Feche a mão em punho para congelar temporariamente o cursor e evitar movimentos acidentais."
-               data-en="Close your hand into a fist to temporarily freeze the cursor and avoid accidental movement.">
-              Feche a mão em punho para congelar temporariamente o cursor e evitar movimentos acidentais.
-            </p>
+            <h3>Duplo clique</h3>
+            <p>Faça o sinal de paz com indicador e dedo médio. Mantenha o gesto por aproximadamente 500 ms para confirmar a intenção e disparar o duplo clique nativo do sistema.</p>
           </div>
         </article>
 
         <article>
-          <div class="gesture-img">
-            <img src="assets/img/gesture_double_click_real.png" alt="Sinal de paz para duplo clique">
+          <div class="gesture-image">
+            <img src="assets/img/gesture_pause_real.png" alt="Punho fechado para pausar o cursor" loading="lazy">
+            <span class="gesture-tag">05</span>
           </div>
-
           <div>
-            <h3 data-pt="Duplo clique" data-en="Double click">Duplo clique</h3>
-            <p data-pt="Faça o sinal de paz com indicador e dedo médio. Mantenha o gesto por um instante para executar o duplo clique."
-               data-en="Make the peace sign with index and middle finger. Hold the gesture briefly to perform a double click.">
-              Faça o sinal de paz com indicador e dedo médio. Mantenha o gesto por um instante para executar o duplo clique.
-            </p>
+            <h3>Pausar o cursor</h3>
+            <p>Feche a mão em punho para congelar instantaneamente a posição do cursor. Útil para reposicionar a mão sem deslocar o ponteiro, especialmente ao alternar entre regiões distantes da tela.</p>
           </div>
         </article>
+      </div>
+    </section>
+
+    <section class="cta-section">
+      <div class="cta-card">
+        <span class="kicker kicker-soft">Continue explorando</span>
+        <h2>Veja a documentação completa.</h2>
+        <p>A página inicial reúne pré-requisitos, atalhos de teclado, soluções para problemas comuns e detalhes da arquitetura interna do projeto.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary btn-lg" href="index.html#instalacao">
+            <span>Voltar ao guia principal</span>
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+          </a>
+          <a class="btn btn-outline btn-lg" href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">Acessar repositório</a>
+        </div>
       </div>
     </section>
   </main>
 
   <footer class="site-footer">
-    <div class="marquee">
-      <span>USAGE GUIDE // HAND TRACKING // MEDIAPIPE // PYTHON // WEBCAM INPUT //</span>
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <span class="brand-mark">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+            <path d="M5 14c0-1 .5-2 1.5-2.5L8 11V6a1.5 1.5 0 113 0v3.5L12 9V4a1.5 1.5 0 113 0v5l1-.2V6.5a1.5 1.5 0 113 0V12c0 4-2.5 8-7 8-3.5 0-6-2.5-6-5.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <div>
+          <strong>AI Virtual Mouse Controller</strong>
+          <span>Interface gestual por visão computacional</span>
+        </div>
+      </div>
+
+      <nav class="footer-nav" aria-label="Rodapé">
+        <a href="index.html">Início</a>
+        <a href="index.html#visao-geral">Visão geral</a>
+        <a href="index.html#gestos">Gestos</a>
+        <a href="index.html#instalacao">Instalação</a>
+        <a href="index.html#solucoes">Soluções</a>
+        <a href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">GitHub</a>
+      </nav>
     </div>
 
-    <div class="footer-content">
-      <p>© AI Virtual Mouse Controller</p>
-      <a href="index.html">início</a>
-      <a href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">github</a>
+    <div class="footer-base">
+      <span>© AI Virtual Mouse Controller — Licença MIT</span>
+      <span>Construído com MediaPipe, OpenCV e Python</span>
     </div>
   </footer>
 
