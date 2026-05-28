@@ -26,6 +26,7 @@ from core.camera import ThreadedCamera
 from core.cursor_controller import CursorController
 from core.gesture_detector import Gesture, GestureDetector
 from core.hand_tracker import HandTracker
+from core.hologram_overlay import HologramOverlay
 from core.runtime_settings import RuntimeSettings
 from core.smoothing import make_smoother
 from core.ui_overlay import UICallbacks, UIOverlay
@@ -101,6 +102,34 @@ class VirtualMouseService:
         self._ui_callbacks = _ServiceUICallbacks(self)
         self.ui = UIOverlay(self._ui_callbacks)
         self._sync_ui_from_settings()
+
+        # Hologram overlay (mao virtual desenhada sobre o desktop).
+        # Falha silenciosamente se a plataforma nao suportar - o resto do
+        # programa nao depende dele.
+        self.hologram: Optional[HologramOverlay] = None
+        self._hologram_toggle_key: str = (
+            getattr(config, "HOLOGRAM_TOGGLE_KEY", "h") or "h"
+        ).lower()
+        try:
+            self.hologram = HologramOverlay(
+                hand_size_px=getattr(config, "HOLOGRAM_HAND_SIZE_PX", 180),
+                opacity=getattr(config, "HOLOGRAM_OPACITY", 0.40),
+                target_fps=getattr(config, "HOLOGRAM_FPS", 30),
+                bone_color=getattr(config, "HOLOGRAM_COLOR_BONE", "#d92626"),
+                point_color=getattr(config, "HOLOGRAM_COLOR_POINT", "#f6efe2"),
+                transparent_color=getattr(
+                    config, "HOLOGRAM_TRANSPARENT_COLOR", "#010203"
+                ),
+            )
+            if getattr(config, "HOLOGRAM_ENABLED", False) and self.hologram.available:
+                self.hologram.set_enabled(True)
+                logger.info(
+                    "Hologram ativo no startup (click-through=%s)",
+                    self.hologram.click_through_active,
+                )
+        except Exception as e:
+            logger.warning("Falha ao iniciar HologramOverlay: %s", e)
+            self.hologram = None
 
     # -----------------------------------------------------------------
     # Factory (todas as chamadas verificadas contra core/)
@@ -319,6 +348,11 @@ class VirtualMouseService:
         events = self.gesture_detector.update(hand)
         self._handle_events(events)
 
+        # Holograma: alimenta a pose atual (barato, sempre que possivel)
+        # e bomba os eventos do Tk pra janela continuar responsiva.
+        # Toda a logica acima (smoother, cursor, deteccao) NAO eh afetada.
+        self._update_hologram(hand)
+
         if self.enable_preview:
             self._draw_overlays(frame, hand, raw_results)
             cv2.imshow(self.window_name, frame)
@@ -333,12 +367,52 @@ class VirtualMouseService:
                     self._apply_always_on_top(on=not self._always_on_top)
                     logger.info("ALWAYS_ON_TOP = %s", self._always_on_top)
                     return
+                # NOVO: tecla H alterna o holograma (mao na tela) em runtime
+                hkey = self._hologram_toggle_key
+                if key_masked in (ord(hkey), ord(hkey.upper())):
+                    if self.hologram is not None and self.hologram.available:
+                        new_state = self.hologram.toggle()
+                        logger.info("HOLOGRAM = %s", new_state)
+                    else:
+                        logger.info(
+                            "Hologram indisponivel (plataforma ou inicializacao falhou)"
+                        )
+                    return
                 # NOVO v6.9: detecta toggle do painel para redimensionar janela
                 panel_was_visible = self.ui.state.panel_visible
                 self.ui.handle_key(key_masked)
                 panel_now_visible = self.ui.state.panel_visible
                 if panel_was_visible != panel_now_visible:
                     self._apply_window_size(panel_visible=panel_now_visible)
+
+    # -----------------------------------------------------------------
+    # Hologram (mao virtual na tela)
+    # -----------------------------------------------------------------
+
+    def _update_hologram(self, hand) -> None:
+        """
+        Atualiza a pose no holograma e bomba os eventos do Tk.
+
+        Chamado a cada _tick(). Custo desprezivel quando hologram esta off
+        (apenas dois ifs e um return).
+        """
+        h = self.hologram
+        if h is None or not h.available:
+            return
+
+        # update_pose so importa quando ligado, mas a chamada e barata
+        if h.enabled:
+            if hand is not None and self.cursor._last_x is not None:
+                # usa a posicao real onde o cursor parou (pos-margin, pos-dead-zone)
+                screen_x = self.cursor._last_x
+                screen_y = self.cursor._last_y
+                h.update_pose(hand.landmarks, screen_x, screen_y)
+            else:
+                # mao saiu do frame OU cursor ainda nao se mexeu
+                h.update_pose(None, 0, 0)
+
+        # pump sempre que ligado, mesmo sem mao — mantem janela responsiva
+        h.pump()
 
     # -----------------------------------------------------------------
     # Event handlers (API real do CursorController)
@@ -554,5 +628,11 @@ class VirtualMouseService:
                 cv2.destroyAllWindows()
                 for _ in range(3):
                     cv2.waitKey(1)
+            except Exception:
+                pass
+        # Fecha o holograma (idempotente, sem efeito se nao foi criado)
+        if self.hologram is not None:
+            try:
+                self.hologram.close()
             except Exception:
                 pass

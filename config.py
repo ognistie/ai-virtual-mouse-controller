@@ -279,6 +279,50 @@ DISPLAY_TOPMOST_TOGGLE_KEY: str = "t"
 """Tecla para alternar always-on-top em runtime. Use 't'."""
 
 # ---------------------------------------------------------------------
+# HOLOGRAMA (mao virtual desenhada na tela)
+# ---------------------------------------------------------------------
+
+HOLOGRAM_ENABLED: bool = False
+"""
+Se True, abre uma janela fullscreen transparente sobre o desktop e desenha
+uma mao "holografica" pequena seguindo o cursor. Pode ser ligada em runtime
+pela tecla H.
+
+Default False porque adiciona overhead visual. Em modo demonstracao/onboarding
+ela faz a experiencia parecer mais magica; em uso prolongado pode distrair.
+"""
+
+HOLOGRAM_TOGGLE_KEY: str = "h"
+"""Tecla pra alternar o holograma em runtime."""
+
+HOLOGRAM_OPACITY: float = 0.40
+"""
+Opacidade global do desenho (0.0 = invisivel, 1.0 = solido). 0.40 deixa
+o que esta abaixo da mao ainda legivel.
+"""
+
+HOLOGRAM_HAND_SIZE_PX: int = 180
+"""Tamanho do "bounding box" da mao desenhada, em pixels da tela."""
+
+HOLOGRAM_FPS: int = 30
+"""
+Taxa de redesenho do overlay. Independente do FPS de captura/deteccao
+(que continua em ~58). 30 e' suficiente pro olho e libera CPU.
+"""
+
+HOLOGRAM_COLOR_BONE: str = "#d92626"
+"""Cor das linhas (bones) entre landmarks. Combina com o site."""
+
+HOLOGRAM_COLOR_POINT: str = "#f6efe2"
+"""Cor dos pontos (landmarks). Tom cream warm que contrasta com o vermelho."""
+
+HOLOGRAM_TRANSPARENT_COLOR: str = "#010203"
+"""
+Cor "magica" pintada como fundo do canvas que vira transparente no compositor
+do Windows. Tem que ser uma cor que nao apareca em mais nada desenhado.
+"""
+
+# ---------------------------------------------------------------------
 # SEGURANCA
 # ---------------------------------------------------------------------
 
