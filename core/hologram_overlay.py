@@ -67,6 +67,35 @@ def _apply_click_through_win32(root: tk.Tk) -> bool:
         return False
 
 
+def _force_topmost_win32(root: tk.Tk) -> bool:
+    """
+    Forca a janela pro topo via SetWindowPos. Mais confiavel que o
+    attributes('-topmost', True) do Tk quando overrideredirect=True.
+    """
+    if sys.platform != "win32":
+        return False
+    try:
+        import ctypes
+
+        HWND_TOPMOST = -1
+        SWP_NOMOVE = 0x0002
+        SWP_NOSIZE = 0x0001
+        SWP_NOACTIVATE = 0x0010
+
+        user32 = ctypes.windll.user32
+        hwnd = user32.GetParent(root.winfo_id())
+        if not hwnd:
+            return False
+        user32.SetWindowPos(
+            hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        )
+        return True
+    except Exception as e:  # pragma: no cover
+        logger.warning("Falha ao forcar topmost Win32: %s", e)
+        return False
+
+
 def _make_color_with_alpha(hex_color: str, alpha: float, bg: str) -> str:
     """
     Tk Canvas nao suporta alpha em fill de items individuais (so de imagens).
@@ -142,6 +171,7 @@ class HologramOverlay:
         self._canvas: Optional[tk.Canvas] = None
         self._bone_ids: list[int] = []
         self._point_ids: list[int] = []
+        self._idle_id: Optional[int] = None
         self._last_draw_ts: float = 0.0
 
         # estado da mao atual
@@ -151,6 +181,10 @@ class HologramOverlay:
         self._pose_x: float = 0.0
         self._pose_y: float = 0.0
         self._pose_visible: bool = False
+        # posicao do cursor pra desenhar o idle indicator quando nao tem mao
+        self._cursor_x: float = 0.0
+        self._cursor_y: float = 0.0
+        self._has_cursor: bool = False
 
         try:
             self._build_window()
@@ -184,11 +218,17 @@ class HologramOverlay:
         # cria primitivas vazias que serao atualizadas em vez de recriadas
         self._bone_ids = []
         self._point_ids = []
+        self._idle_id = None
 
         root.update_idletasks()
         self.click_through_active = _apply_click_through_win32(root)
-        # comeca escondida ate set_enabled(True)
-        root.withdraw()
+        _force_topmost_win32(root)
+
+        # NAO usa withdraw aqui: na pratica, em alguns Windows com
+        # overrideredirect=True, deiconify nao re-mostra a janela direito,
+        # ou perde estilos extendidos. Como o canvas e' transparente e
+        # click-through, deixar a janela sempre viva e' inofensivo.
+        # Pra "esconder", apagamos os items do canvas em set_enabled(False).
 
         self._root = root
         self._canvas = canvas
@@ -203,15 +243,24 @@ class HologramOverlay:
         self._enabled = enabled
         try:
             if enabled:
-                self._root.deiconify()
-                self._root.lift()
+                # Re-aplica topmost de forma agressiva. A janela ja esta
+                # visivel (transparente), so estamos garantindo z-order.
                 self._root.attributes("-topmost", True)
+                self._root.lift()
+                _force_topmost_win32(self._root)
+                # Re-aplica click-through (defesa contra estilos perdidos)
+                _apply_click_through_win32(self._root)
             else:
-                self._root.withdraw()
+                # Esconde TODO conteudo desenhado (deixa o canvas vazio,
+                # totalmente transparente).
                 if self._canvas is not None:
-                    self._canvas.delete("all")
-                    self._bone_ids = []
-                    self._point_ids = []
+                    for bid in self._bone_ids:
+                        self._canvas.itemconfigure(bid, state="hidden")
+                    for pid in self._point_ids:
+                        self._canvas.itemconfigure(pid, state="hidden")
+                    if self._idle_id is not None:
+                        self._canvas.itemconfigure(self._idle_id, state="hidden")
+                self._pose_visible = False
         except tk.TclError as e:
             logger.debug("Falha ao alternar overlay: %s", e)
 
@@ -233,7 +282,7 @@ class HologramOverlay:
         """
         Atualiza o estado da pose. Nao desenha. Barato.
 
-        Passe landmarks=None pra esconder temporariamente (mao saiu do frame).
+        Passe landmarks=None pra esconder a mao (mao saiu do frame).
         """
         if landmarks is None or len(landmarks) < 21:
             self._pose_visible = False
@@ -243,6 +292,16 @@ class HologramOverlay:
         self._pose_landmarks = landmarks
         self._pose_x = screen_x
         self._pose_y = screen_y
+
+    def update_cursor(self, screen_x: float, screen_y: float) -> None:
+        """
+        Informa onde o cursor do sistema esta. Usado pra desenhar o idle
+        indicator (anel pequeno) quando o overlay esta ligado mas nenhuma
+        mao foi detectada ainda.
+        """
+        self._cursor_x = screen_x
+        self._cursor_y = screen_y
+        self._has_cursor = True
 
     def pump(self) -> None:
         """
@@ -285,12 +344,18 @@ class HologramOverlay:
             return
 
         if not self._pose_visible or self._pose_landmarks is None:
-            # esconde tudo
+            # Sem mao: esconde a mao e mostra um anel pequeno no cursor
+            # pro usuario saber que o overlay esta ligado e procurando uma mao.
             for bid in self._bone_ids:
                 canvas.itemconfigure(bid, state="hidden")
             for pid in self._point_ids:
                 canvas.itemconfigure(pid, state="hidden")
+            self._draw_idle_ring(canvas)
             return
+
+        # Tem mao: esconde o idle indicator e desenha a mao completa
+        if self._idle_id is not None:
+            canvas.itemconfigure(self._idle_id, state="hidden")
 
         primitives = compute_hand_primitives(
             self._pose_landmarks,
@@ -335,3 +400,26 @@ class HologramOverlay:
             canvas.itemconfigure(pid, state="normal")
         for pid in self._point_ids[len(primitives.points):]:
             canvas.itemconfigure(pid, state="hidden")
+
+    def _draw_idle_ring(self, canvas: tk.Canvas) -> None:
+        """
+        Desenha um anel pequeno na posicao do cursor pra indicar que o overlay
+        esta ligado mas ainda nao detectou nenhuma mao. Sem isso, ligar o
+        overlay sem mao na camera parece nao fazer nada.
+        """
+        if not self._has_cursor:
+            if self._idle_id is not None:
+                canvas.itemconfigure(self._idle_id, state="hidden")
+            return
+
+        r = 14
+        x, y = self._cursor_x, self._cursor_y
+        if self._idle_id is None:
+            self._idle_id = canvas.create_oval(
+                0, 0, 0, 0,
+                outline=self._bone_color,
+                width=2,
+                fill="",
+            )
+        canvas.coords(self._idle_id, x - r, y - r, x + r, y + r)
+        canvas.itemconfigure(self._idle_id, state="normal")

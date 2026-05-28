@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import signal
+import sys
 from typing import Optional
 
 import cv2
@@ -372,10 +373,20 @@ class VirtualMouseService:
                 if key_masked in (ord(hkey), ord(hkey.upper())):
                     if self.hologram is not None and self.hologram.available:
                         new_state = self.hologram.toggle()
-                        logger.info("HOLOGRAM = %s", new_state)
-                    else:
                         logger.info(
-                            "Hologram indisponivel (plataforma ou inicializacao falhou)"
+                            "HOLOGRAM = %s | click_through=%s | mao_visivel=%s | cursor=(%s,%s)",
+                            new_state,
+                            self.hologram.click_through_active,
+                            hand is not None,
+                            self.cursor._last_x,
+                            self.cursor._last_y,
+                        )
+                    else:
+                        logger.warning(
+                            "Hologram indisponivel: hologram=%s available=%s plataforma=%s",
+                            self.hologram is not None,
+                            self.hologram.available if self.hologram else None,
+                            sys.platform,
                         )
                     return
                 # NOVO v6.9: detecta toggle do painel para redimensionar janela
@@ -393,25 +404,34 @@ class VirtualMouseService:
         """
         Atualiza a pose no holograma e bomba os eventos do Tk.
 
-        Chamado a cada _tick(). Custo desprezivel quando hologram esta off
-        (apenas dois ifs e um return).
+        Chamado a cada _tick(). Mantem a janela Tk responsiva mesmo quando
+        desligada (precisa pumpar pra Windows nao marcar como travada).
         """
         h = self.hologram
         if h is None or not h.available:
             return
 
-        # update_pose so importa quando ligado, mas a chamada e barata
         if h.enabled:
-            if hand is not None and self.cursor._last_x is not None:
-                # usa a posicao real onde o cursor parou (pos-margin, pos-dead-zone)
-                screen_x = self.cursor._last_x
-                screen_y = self.cursor._last_y
-                h.update_pose(hand.landmarks, screen_x, screen_y)
+            # 1. Posicao do cursor: prefere _last_x do controller (real),
+            #    fallback pra pyautogui.position() pra desenhar o idle ring
+            #    antes da primeira deteccao de mao.
+            sx = self.cursor._last_x
+            sy = self.cursor._last_y
+            if sx is None or sy is None:
+                try:
+                    import pyautogui
+                    sx, sy = pyautogui.position()
+                except Exception:
+                    sx, sy = self.cursor.screen_width // 2, self.cursor.screen_height // 2
+            h.update_cursor(sx, sy)
+
+            # 2. Pose da mao (ou None se nao detectada nesse frame)
+            if hand is not None:
+                h.update_pose(hand.landmarks, sx, sy)
             else:
-                # mao saiu do frame OU cursor ainda nao se mexeu
                 h.update_pose(None, 0, 0)
 
-        # pump sempre que ligado, mesmo sem mao — mantem janela responsiva
+        # Bomba eventos do Tk sempre — janela existe mesmo quando "off"
         h.pump()
 
     # -----------------------------------------------------------------

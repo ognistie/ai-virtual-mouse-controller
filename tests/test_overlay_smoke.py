@@ -95,6 +95,69 @@ def test_pump_after_close_is_safe():
     h.pump()
 
 
+def test_idle_ring_drawn_without_pose():
+    """
+    Quando o overlay esta ligado, com cursor conhecido mas sem mao,
+    deve desenhar o idle ring (anel pequeno). Validamos que o id existe
+    e que esta no estado 'normal' no canvas.
+    """
+    from core.hologram_overlay import HologramOverlay
+
+    h = HologramOverlay(target_fps=120)  # FPS alto pra forcar redraw rapido
+    try:
+        if not h.available:
+            pytest.skip()
+
+        h.set_enabled(True)
+        h.update_cursor(500, 400)
+        h.update_pose(None, 0, 0)
+        # Forca alguns pumps pra disparar o redraw
+        for _ in range(5):
+            h.pump()
+            time.sleep(0.02)
+
+        assert h._idle_id is not None
+        state = h._canvas.itemcget(h._idle_id, "state")
+        assert state in ("normal", "")
+
+    finally:
+        h.close()
+
+
+def test_idle_ring_hidden_when_pose_present():
+    """
+    Quando uma pose chega, o idle ring deve ser escondido (mao toma o lugar).
+    """
+    from core.hologram_overlay import HologramOverlay
+
+    h = HologramOverlay(target_fps=120)
+    try:
+        if not h.available:
+            pytest.skip()
+
+        h.set_enabled(True)
+        h.update_cursor(500, 400)
+
+        # 1. Sem mao -> idle ring deve aparecer
+        h.update_pose(None, 0, 0)
+        for _ in range(3):
+            h.pump()
+            time.sleep(0.02)
+        assert h._idle_id is not None
+
+        # 2. Com mao -> idle ring some
+        pose = _hand_at(0.5, 0.5)
+        h.update_pose(pose, 500, 400)
+        for _ in range(3):
+            h.pump()
+            time.sleep(0.02)
+        state = h._canvas.itemcget(h._idle_id, "state")
+        assert state == "hidden"
+
+    finally:
+        h.close()
+
+
 def test_set_enabled_idempotent():
     from core.hologram_overlay import HologramOverlay
 
