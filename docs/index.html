@@ -17,14 +17,6 @@
 <body>
   <div class="paper-grain" aria-hidden="true"></div>
 
-  <!-- TICKER -->
-  <div class="ticker" aria-hidden="true">
-    <div class="ticker-track">
-      <span>★ projeto open source ★ roda em CPU ★ sem hardware extra ★ feito em python ★ alpha pública ★ MIT license ★ testado em webcam suja de notebook ★ ~58 FPS ★ menos de 30 ms ★ </span>
-      <span>★ projeto open source ★ roda em CPU ★ sem hardware extra ★ feito em python ★ alpha pública ★ MIT license ★ testado em webcam suja de notebook ★ ~58 FPS ★ menos de 30 ms ★ </span>
-    </div>
-  </div>
-
   <header class="topbar">
     <a class="brand" href="index.html">
       <span class="brand-monogram">A<em>v</em>m</span>
@@ -287,14 +279,41 @@
 
         <article class="gesture-row gesture-3">
           <span class="gesture-num">03</span>
-          <div class="gesture-photo">
-            <img src="assets/img/gesture_right_click_real.png" alt="Polegar e dedo médio" loading="lazy">
+          <div class="gesture-photo gesture-svg-photo">
+            <svg viewBox="0 0 300 300" class="gesture-illustration" aria-label="Polegar tocando o dedo médio com indicador estendido">
+              <!-- palm base -->
+              <path d="M 100 200 Q 95 175 105 155 Q 130 150 165 152 Q 200 154 215 180 Q 215 220 195 240 Q 165 250 135 248 Q 110 240 100 220 Z"
+                    fill="rgba(217,38,38,0.10)" stroke="#d92626" stroke-width="2"/>
+              <!-- indicador estendido (vertical) -->
+              <path d="M 118 152 L 115 75 Q 117 60 128 60 Q 138 60 140 75 L 138 152 Z"
+                    fill="rgba(217,38,38,0.10)" stroke="#d92626" stroke-width="2"/>
+              <!-- medio FECHADO (curvado pra baixo, encontra polegar) -->
+              <path d="M 145 150 Q 148 125 158 115 Q 175 110 185 125 Q 188 145 175 155 Q 160 158 145 150 Z"
+                    fill="rgba(217,38,38,0.15)" stroke="#d92626" stroke-width="2"/>
+              <!-- anelar FECHADO -->
+              <path d="M 175 158 Q 188 150 200 150 Q 213 155 213 170 Q 210 185 195 188 Q 180 185 175 175 Z"
+                    fill="rgba(217,38,38,0.10)" stroke="#d92626" stroke-width="2"/>
+              <!-- mindinho FECHADO -->
+              <path d="M 200 188 Q 210 188 215 195 Q 220 205 215 215 Q 205 220 198 215 Z"
+                    fill="rgba(217,38,38,0.10)" stroke="#d92626" stroke-width="2"/>
+              <!-- polegar tocando o medio (PINCH point) -->
+              <path d="M 95 180 Q 75 175 65 188 Q 60 205 75 215 Q 95 218 110 205 Q 120 195 115 180 Z"
+                    fill="rgba(217,38,38,0.15)" stroke="#d92626" stroke-width="2"/>
+              <!-- PINCH highlight: anel onde polegar+medio se tocam -->
+              <circle cx="135" cy="190" r="14" fill="none" stroke="#ff3838" stroke-width="2.5"/>
+              <circle cx="135" cy="190" r="6" fill="#ff3838" fill-opacity="0.35"/>
+              <!-- label: indicador estendido -->
+              <text x="128" y="55" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#d92626">indicador</text>
+              <text x="128" y="68" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#d92626">estendido</text>
+              <!-- label: pinch point -->
+              <text x="180" y="195" font-family="JetBrains Mono, monospace" font-size="10" fill="#ff3838">← pinch</text>
+            </svg>
             <span class="photo-corner photo-corner-tl"></span>
             <span class="photo-corner photo-corner-br"></span>
           </div>
           <div class="gesture-info">
             <h3>Clique direito</h3>
-            <p>Polegar no médio, com indicador estendido. Abre o menu de contexto sem confundir com o clique esquerdo. Indicador é a chave da desambiguação.</p>
+            <p>Polegar encosta no <strong>dedo médio</strong>, com <strong>indicador estendido</strong>. Abre o menu de contexto sem confundir com o clique esquerdo. O indicador é a chave da desambiguação.</p>
             <span class="gesture-meta">menu de contexto</span>
           </div>
         </article>
@@ -387,34 +406,95 @@
               <span class="holo-dot"></span>
               <span>holograma · azul ciano</span>
             </div>
-            <svg viewBox="0 0 320 320" class="holo-svg" aria-label="Mão holográfica azul ciano com glow">
+            <svg viewBox="0 0 320 320" class="holo-svg" aria-label="Mão holográfica azul ciano">
               <defs>
-                <radialGradient id="holoGrad" cx="50%" cy="50%" r="50%">
-                  <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.5"/>
+                <radialGradient id="holoGrad" cx="50%" cy="50%" r="55%">
+                  <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.35"/>
                   <stop offset="100%" stop-color="#00d4ff" stop-opacity="0"/>
                 </radialGradient>
-                <filter id="holoGlow">
-                  <feGaussianBlur stdDeviation="3"/>
-                </filter>
+                <linearGradient id="palmGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.30"/>
+                  <stop offset="100%" stop-color="#00d4ff" stop-opacity="0.06"/>
+                </linearGradient>
               </defs>
-              <!-- glow background -->
-              <circle cx="160" cy="160" r="120" fill="url(#holoGrad)"/>
-              <!-- palm -->
-              <path d="M 120 230 Q 110 200 110 170 Q 110 145 125 130 Q 145 120 165 125 Q 195 125 205 145 Q 215 175 200 215 Q 180 240 150 240 Q 130 240 120 230 Z"
-                    fill="rgba(0,212,255,0.15)" stroke="#00d4ff" stroke-width="2" filter="url(#holoGlow)"/>
-              <!-- fingers as elongated shapes -->
-              <path d="M 135 130 Q 130 100 125 75 Q 130 65 140 65 Q 150 65 152 80 Q 155 105 150 130" fill="rgba(0,212,255,0.12)" stroke="#00d4ff" stroke-width="2"/>
-              <path d="M 155 128 Q 152 95 152 65 Q 155 55 165 55 Q 175 55 177 70 Q 180 100 175 130" fill="rgba(0,212,255,0.12)" stroke="#00d4ff" stroke-width="2"/>
-              <path d="M 180 128 Q 180 100 182 75 Q 188 65 198 65 Q 207 65 207 80 Q 207 110 200 132" fill="rgba(0,212,255,0.12)" stroke="#00d4ff" stroke-width="2"/>
-              <path d="M 200 132 Q 205 115 212 100 Q 222 92 230 100 Q 233 110 225 130 Q 218 145 208 148" fill="rgba(0,212,255,0.12)" stroke="#00d4ff" stroke-width="2"/>
-              <!-- thumb -->
-              <path d="M 112 165 Q 95 165 85 178 Q 80 192 90 200 Q 105 205 115 195" fill="rgba(0,212,255,0.12)" stroke="#00d4ff" stroke-width="2"/>
-              <!-- fingertips bright -->
-              <circle cx="140" cy="68" r="4" fill="#e0f7ff"/>
-              <circle cx="165" cy="58" r="4" fill="#e0f7ff"/>
-              <circle cx="197" cy="68" r="4" fill="#e0f7ff"/>
-              <circle cx="225" cy="105" r="4" fill="#e0f7ff"/>
-              <circle cx="92" cy="190" r="4" fill="#e0f7ff"/>
+
+              <!-- ambient halo -->
+              <circle cx="160" cy="170" r="130" fill="url(#holoGrad)"/>
+
+              <!-- PALMA (forma anatomica natural, mais redonda na base) -->
+              <path d="M 105 175
+                       Q 100 145 115 130
+                       L 200 130
+                       Q 220 132 225 155
+                       Q 230 200 215 240
+                       Q 195 265 160 265
+                       Q 125 263 110 240
+                       Q 100 215 105 175 Z"
+                    fill="url(#palmGrad)" stroke="#00d4ff" stroke-width="2" stroke-linejoin="round"/>
+
+              <!-- POLEGAR (lateral esquerda) -->
+              <path d="M 110 195
+                       Q 90 198 78 210
+                       Q 68 224 76 240
+                       Q 88 252 105 244
+                       Q 116 234 115 220 Z"
+                    fill="url(#palmGrad)" stroke="#00d4ff" stroke-width="2" stroke-linejoin="round"/>
+
+              <!-- INDICADOR -->
+              <path d="M 122 135
+                       L 120 75
+                       Q 122 60 132 60
+                       Q 142 60 144 75
+                       L 142 135 Z"
+                    fill="url(#palmGrad)" stroke="#00d4ff" stroke-width="2" stroke-linejoin="round"/>
+
+              <!-- MEDIO (mais longo) -->
+              <path d="M 148 132
+                       L 148 55
+                       Q 150 40 160 40
+                       Q 170 40 172 55
+                       L 172 132 Z"
+                    fill="url(#palmGrad)" stroke="#00d4ff" stroke-width="2" stroke-linejoin="round"/>
+
+              <!-- ANELAR -->
+              <path d="M 176 132
+                       L 178 60
+                       Q 180 45 190 45
+                       Q 200 45 202 60
+                       L 200 134 Z"
+                    fill="url(#palmGrad)" stroke="#00d4ff" stroke-width="2" stroke-linejoin="round"/>
+
+              <!-- MINDINHO -->
+              <path d="M 204 138
+                       L 208 88
+                       Q 210 75 218 75
+                       Q 226 75 226 88
+                       L 222 140 Z"
+                    fill="url(#palmGrad)" stroke="#00d4ff" stroke-width="2" stroke-linejoin="round"/>
+
+              <!-- KNUCKLE line (subtle anatomical detail) -->
+              <path d="M 122 132 Q 165 130 222 138"
+                    fill="none" stroke="#00d4ff" stroke-width="1" stroke-opacity="0.35" stroke-dasharray="2 4"/>
+
+              <!-- FINGERTIPS (bright dots with halo) -->
+              <circle cx="132" cy="62" r="6" fill="#00d4ff" fill-opacity="0.25"/>
+              <circle cx="132" cy="62" r="3" fill="#e0f7ff"/>
+
+              <circle cx="160" cy="44" r="6" fill="#00d4ff" fill-opacity="0.25"/>
+              <circle cx="160" cy="44" r="3" fill="#e0f7ff"/>
+
+              <circle cx="190" cy="49" r="6" fill="#00d4ff" fill-opacity="0.25"/>
+              <circle cx="190" cy="49" r="3" fill="#e0f7ff"/>
+
+              <circle cx="218" cy="78" r="6" fill="#00d4ff" fill-opacity="0.25"/>
+              <circle cx="218" cy="78" r="3" fill="#e0f7ff"/>
+
+              <circle cx="78" cy="220" r="6" fill="#00d4ff" fill-opacity="0.25"/>
+              <circle cx="78" cy="220" r="3" fill="#e0f7ff"/>
+
+              <!-- CURSOR marker no centro da palma (anchor landmark 9) -->
+              <circle cx="165" cy="190" r="10" fill="none" stroke="#00d4ff" stroke-width="1.5" stroke-opacity="0.7"/>
+              <circle cx="165" cy="190" r="3" fill="#e0f7ff"/>
             </svg>
             <div class="holo-caption">
               <span>click-through</span>

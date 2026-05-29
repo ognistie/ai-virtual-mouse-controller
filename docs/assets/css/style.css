@@ -1966,6 +1966,25 @@ kbd {
   }
 }
 
+/* Gesture SVG illustration (clean diagram instead of photo) */
+.gesture-svg-photo {
+  position: relative;
+  background: var(--bg-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.gesture-illustration {
+  width: 100%;
+  height: auto;
+  max-width: 280px;
+  display: block;
+}
+
 /* ============================================================ */
 /* HOLOGRAM SECTION — clean modern, cyan accent                  */
 /* ============================================================ */
