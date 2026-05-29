@@ -412,6 +412,11 @@ class VirtualMouseService:
         with prof.stage("hologram"):
             self._update_hologram(hand)
 
+        # Holograma: alimenta a pose atual (barato, sempre que possivel)
+        # e bomba os eventos do Tk pra janela continuar responsiva.
+        # Toda a logica acima (smoother, cursor, deteccao) NAO eh afetada.
+        self._update_hologram(hand)
+
         if self.enable_preview:
             with prof.stage("preview"):
                 self._draw_overlays(frame, hand, raw_results)
@@ -462,6 +467,44 @@ class VirtualMouseService:
 
         # Marca fim do frame pro report periodico de perf
         prof.tick()
+
+    # -----------------------------------------------------------------
+    # Hologram (mao virtual na tela)
+    # -----------------------------------------------------------------
+
+    def _update_hologram(self, hand) -> None:
+        """
+        Atualiza a pose no holograma e bomba os eventos do Tk.
+
+        Chamado a cada _tick(). Mantem a janela Tk responsiva mesmo quando
+        desligada (precisa pumpar pra Windows nao marcar como travada).
+        """
+        h = self.hologram
+        if h is None or not h.available:
+            return
+
+        if h.enabled:
+            # 1. Posicao do cursor: prefere _last_x do controller (real),
+            #    fallback pra pyautogui.position() pra desenhar o idle ring
+            #    antes da primeira deteccao de mao.
+            sx = self.cursor._last_x
+            sy = self.cursor._last_y
+            if sx is None or sy is None:
+                try:
+                    import pyautogui
+                    sx, sy = pyautogui.position()
+                except Exception:
+                    sx, sy = self.cursor.screen_width // 2, self.cursor.screen_height // 2
+            h.update_cursor(sx, sy)
+
+            # 2. Pose da mao (ou None se nao detectada nesse frame)
+            if hand is not None:
+                h.update_pose(hand.landmarks, sx, sy)
+            else:
+                h.update_pose(None, 0, 0)
+
+        # Bomba eventos do Tk sempre — janela existe mesmo quando "off"
+        h.pump()
 
     # -----------------------------------------------------------------
     # Hologram (mao virtual na tela)
