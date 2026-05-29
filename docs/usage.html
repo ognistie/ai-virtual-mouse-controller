@@ -91,6 +91,7 @@
           <li><span class="check">10</span><a href="#encerrar" style="color:inherit;text-decoration:none">Encerrar o programa direito</a></li>
           <li><span class="check">11</span><a href="#proxima-vez" style="color:inherit;text-decoration:none">Como abrir da pr&oacute;xima vez</a></li>
           <li><span class="check">12</span><a href="#customizar" style="color:inherit;text-decoration:none">Customizar (s&oacute; se voc&ecirc; quiser)</a></li>
+          <li><span class="check">13</span><a href="#holograma-extra" style="color:inherit;text-decoration:none">Ligar o holograma da m&atilde;o</a></li>
         </ul>
       </div>
     </section>
@@ -719,6 +720,74 @@ CAMERA_HEIGHT = 360</code></pre>
 # CURSOR_ANCHOR_LANDMARK = 0   # pulso</code></pre>
           </div>
           <p>Sai do padr&atilde;o por sua conta e risco. A escolha do 9 &eacute; defendida no <a href="index.html#funciona">manifesto t&eacute;cnico da home</a>.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- HOLOGRAMA EXTRA -->
+    <section id="holograma-extra" class="install">
+      <div class="section-flag">
+        <span class="flag-num">13</span>
+        <span class="flag-text">holograma &middot; opcional</span>
+      </div>
+
+      <h2 class="big-serif">Quer ver sua m&atilde;o<br><em>na tela?</em></h2>
+      <p class="section-lede">
+        O projeto tem um modo opt-in: uma m&atilde;o holografica azul-ciano que aparece sobreposta ao desktop e segue seus movimentos em tempo real. <strong>Click-through</strong> &mdash; n&atilde;o bloqueia nada que voc&ecirc; tenha na tela.
+      </p>
+
+      <div class="install-steps" style="grid-template-columns:1fr">
+        <article class="step-card">
+          <header class="step-card-head">
+            <span class="step-card-num">passo 1</span>
+            <h3>Instala o PySide6</h3>
+          </header>
+          <p>O holograma usa PySide6 (Qt for Python) pra renderizar. &Eacute; uma depend&ecirc;ncia <strong>opcional</strong> &mdash; o projeto roda normalmente sem ele.</p>
+          <div class="code-block">
+            <div class="code-head"><span>pip &middot; com venv ativo</span><button class="copy-btn" type="button">copiar</button></div>
+<pre><code>pip install PySide6</code></pre>
+          </div>
+        </article>
+
+        <article class="step-card">
+          <header class="step-card-head">
+            <span class="step-card-num">passo 2</span>
+            <h3>Roda o projeto e aperta <kbd>H</kbd></h3>
+          </header>
+          <p>No log do startup, voc&ecirc; deve ver:</p>
+          <div class="code-block">
+            <div class="code-head"><span>terminal</span><button class="copy-btn" type="button">copiar</button></div>
+<pre><code>[AVM] HologramOverlay criado: available=True, click_through=True</code></pre>
+          </div>
+          <p>Aperta <kbd>H</kbd> em runtime. A m&atilde;o aparece em ~1s.</p>
+        </article>
+
+        <article class="step-card">
+          <header class="step-card-head">
+            <span class="step-card-num">passo 3</span>
+            <h3>O que voc&ecirc; vai ver</h3>
+          </header>
+          <ul style="padding-left:1.2rem;line-height:1.7;color:var(--ink-2)">
+            <li><strong>Silhueta azul-ciano</strong> da mão sobre o desktop, seguindo cada movimento</li>
+            <li><strong>Anel pulsante</strong> no ponto onde os dedos v&atilde;o se tocar (o cursor)</li>
+            <li><strong>Bursts no clique:</strong> anel ciano expande quando voc&ecirc; pinca (esquerdo), azul pro direito</li>
+            <li><strong>Click-through:</strong> voc&ecirc; continua clicando, selecionando, navegando normal &mdash; o overlay n&atilde;o intercepta nada</li>
+          </ul>
+        </article>
+
+        <article class="step-card">
+          <header class="step-card-head">
+            <span class="step-card-num">passo 4</span>
+            <h3>Customizar (opcional)</h3>
+          </header>
+          <p>Em <code>config.py</code>:</p>
+          <div class="code-block">
+            <div class="code-head"><span>config.py</span><button class="copy-btn" type="button">copiar</button></div>
+<pre><code>HOLOGRAM_ENABLED = True              # liga no startup (sem precisar H)
+HOLOGRAM_HAND_SIZE_PX = 180          # tamanho da mao em px
+HOLOGRAM_VIEW_DORSAL = False         # palm view (alinhado com webcam)
+HOLOGRAM_PARTICLES_ENABLED = False   # nuvem de particles (default off)</code></pre>
+          </div>
         </article>
       </div>
     </section>

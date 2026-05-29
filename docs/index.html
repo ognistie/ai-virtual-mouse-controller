@@ -40,6 +40,8 @@
       <span class="sep">·</span>
       <a href="#gestos">gestos</a>
       <span class="sep">·</span>
+      <a href="#holograma">holograma</a>
+      <span class="sep">·</span>
       <a href="#instalar">instalar</a>
       <span class="sep">·</span>
       <a href="#erros">quando der ruim</a>
@@ -329,17 +331,107 @@
           <span class="gesture-num">06</span>
           <div class="gesture-info gesture-info-wide">
             <h3>Arrastar <span class="caveat">(o bônus)</span></h3>
-            <p>Pinça polegar–indicador mantida por aproximadamente 3 segundos inicia o modo arrastar. Funciona com janelas, ícones, seleção de texto. Abrir a mão libera no destino. Não tem cursor de seta puxando — tem a sua mão puxando.</p>
-            <span class="gesture-meta">hold de ~3s · indicador visual ativo</span>
+            <p>Pinça polegar–indicador mantida por 1.5 segundos inicia o modo arrastar. Funciona com janelas, ícones, seleção de texto. Abrir a mão libera no destino. Não tem cursor de seta puxando — tem a sua mão puxando.</p>
+            <span class="gesture-meta">hold de 1.5s · indicador visual ativo</span>
           </div>
         </article>
+      </div>
+    </section>
+
+    <!-- HOLOGRAM -->
+    <section id="holograma" class="hologram-section">
+      <div class="section-flag">
+        <span class="flag-num">05</span>
+        <span class="flag-text">novo · holograma da mão</span>
+      </div>
+
+      <div class="hologram-grid">
+        <div>
+          <h2 class="big-serif">
+            A sua mão,<br>
+            <em>na tela.</em>
+          </h2>
+
+          <p class="section-lede">
+            Aperta <kbd>H</kbd> em runtime e uma mão holográfica azul-ciano aparece sobreposta ao desktop. Acompanha cada movimento da sua mão real captado pela webcam. Click-through nativo — não bloqueia nenhuma interação.
+          </p>
+
+          <ul class="hologram-features">
+            <li>
+              <strong>OneEuro per landmark.</strong>
+              <span>Mesmo filtro adaptativo do cursor. Estável parado, responsivo em movimento.</span>
+            </li>
+            <li>
+              <strong>Click bursts no pinch.</strong>
+              <span>Anel ciano expande no ponto exato onde os dedos se tocaram. Cyan = clique esquerdo, azul = direito.</span>
+            </li>
+            <li>
+              <strong>Pseudo-3D com gradient direcional.</strong>
+              <span>Luz vinda do canto superior-esquerdo + curvas Catmull-Rom + wireframe interno. Volume sem OpenGL.</span>
+            </li>
+            <li>
+              <strong>~0.4 ms por frame.</strong>
+              <span>Negligenciável no budget. Roda em 24 FPS dedicado, não compete com a inferência.</span>
+            </li>
+          </ul>
+
+          <div class="hologram-meta">
+            <span class="hologram-pill">opcional · liga e desliga com <kbd>H</kbd></span>
+            <span class="hologram-pill">requer <code>pip install PySide6</code></span>
+          </div>
+        </div>
+
+        <div class="hologram-viz">
+          <div class="holo-frame">
+            <div class="holo-label">
+              <span class="holo-dot"></span>
+              <span>holograma · azul ciano</span>
+            </div>
+            <svg viewBox="0 0 320 320" class="holo-svg" aria-label="Mão holográfica azul ciano com glow">
+              <defs>
+                <radialGradient id="holoGrad" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.5"/>
+                  <stop offset="100%" stop-color="#00d4ff" stop-opacity="0"/>
+                </radialGradient>
+                <filter id="holoGlow">
+                  <feGaussianBlur stdDeviation="3"/>
+                </filter>
+              </defs>
+              <!-- glow background -->
+              <circle cx="160" cy="160" r="120" fill="url(#holoGrad)"/>
+              <!-- palm -->
+              <path d="M 120 230 Q 110 200 110 170 Q 110 145 125 130 Q 145 120 165 125 Q 195 125 205 145 Q 215 175 200 215 Q 180 240 150 240 Q 130 240 120 230 Z"
+                    fill="rgba(0,212,255,0.15)" stroke="#00d4ff" stroke-width="2" filter="url(#holoGlow)"/>
+              <!-- fingers as elongated shapes -->
+              <path d="M 135 130 Q 130 100 125 75 Q 130 65 140 65 Q 150 65 152 80 Q 155 105 150 130" fill="rgba(0,212,255,0.12)" stroke="#00d4ff" stroke-width="2"/>
+              <path d="M 155 128 Q 152 95 152 65 Q 155 55 165 55 Q 175 55 177 70 Q 180 100 175 130" fill="rgba(0,212,255,0.12)" stroke="#00d4ff" stroke-width="2"/>
+              <path d="M 180 128 Q 180 100 182 75 Q 188 65 198 65 Q 207 65 207 80 Q 207 110 200 132" fill="rgba(0,212,255,0.12)" stroke="#00d4ff" stroke-width="2"/>
+              <path d="M 200 132 Q 205 115 212 100 Q 222 92 230 100 Q 233 110 225 130 Q 218 145 208 148" fill="rgba(0,212,255,0.12)" stroke="#00d4ff" stroke-width="2"/>
+              <!-- thumb -->
+              <path d="M 112 165 Q 95 165 85 178 Q 80 192 90 200 Q 105 205 115 195" fill="rgba(0,212,255,0.12)" stroke="#00d4ff" stroke-width="2"/>
+              <!-- fingertips bright -->
+              <circle cx="140" cy="68" r="4" fill="#e0f7ff"/>
+              <circle cx="165" cy="58" r="4" fill="#e0f7ff"/>
+              <circle cx="197" cy="68" r="4" fill="#e0f7ff"/>
+              <circle cx="225" cy="105" r="4" fill="#e0f7ff"/>
+              <circle cx="92" cy="190" r="4" fill="#e0f7ff"/>
+            </svg>
+            <div class="holo-caption">
+              <span>click-through</span>
+              <span>·</span>
+              <span>30 FPS</span>
+              <span>·</span>
+              <span>~0.4 ms</span>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
     <!-- INSTALL -->
     <section id="instalar" class="install">
       <div class="section-flag">
-        <span class="flag-num">05</span>
+        <span class="flag-num">06</span>
         <span class="flag-text">manual de instalação</span>
       </div>
 
@@ -435,7 +527,7 @@ pip install -r requirements.txt</code></pre>
     <!-- TROUBLESHOOTING -->
     <section id="erros" class="trouble">
       <div class="section-flag flag-red">
-        <span class="flag-num">06</span>
+        <span class="flag-num">07</span>
         <span class="flag-text">quando der ruim</span>
       </div>
 
@@ -584,6 +676,24 @@ pip install -r requirements.txt</code></pre>
             <p><strong>Antídoto:</strong> baixa em <a href="https://git-scm.com/downloads" target="_blank" rel="noopener">git-scm.com</a>, instala com as opções padrão, reabre o terminal. Alternativa rápida: baixa o ZIP direto da página do GitHub. Funciona igual.</p>
           </div>
         </details>
+
+        <details class="trouble-item">
+          <summary>
+            <span class="trouble-tag">erro 10 · holograma</span>
+            <strong>Apertei <kbd>H</kbd> e nenhuma mão holográfica aparece</strong>
+          </summary>
+          <div class="trouble-body">
+            <p><strong>O que está acontecendo:</strong> o PySide6 não está instalado. O holograma é opt-in — sem ele, o projeto roda normal, mas a tecla H não tem efeito visual.</p>
+            <p><strong>Antídoto:</strong></p>
+            <ol>
+              <li>Com o venv ativo: <code>pip install PySide6</code>.</li>
+              <li>Roda <code>python main.py</code> de novo.</li>
+              <li>Olha o log do startup. Deve aparecer <code>[AVM] HologramOverlay criado: available=True</code>.</li>
+              <li>Aperta <kbd>H</kbd>. A mão aparece em ~1s.</li>
+            </ol>
+            <p>Se <code>available=False</code> aparecer mesmo com PySide6 instalado, copia o WARNING completo e abre uma issue.</p>
+          </div>
+        </details>
       </div>
     </section>
 
@@ -622,6 +732,7 @@ pip install -r requirements.txt</code></pre>
         <a href="#manifesto">Sobre</a>
         <a href="#funciona">como funciona</a>
         <a href="#gestos">gestos</a>
+        <a href="#holograma">holograma</a>
         <a href="#instalar">instalar</a>
         <a href="#erros">quando der ruim</a>
         <a href="usage.html">guia detalhado</a>
