@@ -98,6 +98,24 @@ class CursorController:
         except Exception as e:
             logger.warning("Falha ao clicar: %s", e)
 
+    def click_at(self, x: int, y: int) -> None:
+        """
+        Clica em coordenada absoluta da tela (sem usar a posicao do cursor).
+
+        Usado pelo holograma: o clique acontece no ponto de pinch entre os
+        dedos (nao na posicao do cursor anchor), de forma que a mao realmente
+        substitui o cursor pro evento de clique.
+        """
+        try:
+            x_clamped = clamp(int(x), 0, self.screen_width - 1)
+            y_clamped = clamp(int(y), 0, self.screen_height - 1)
+            pyautogui.click(x=x_clamped, y=y_clamped, _pause=False)
+            self._last_x = x_clamped
+            self._last_y = y_clamped
+            logger.debug("CLICK_AT (%s, %s)", x_clamped, y_clamped)
+        except Exception as e:
+            logger.warning("Falha em click_at(%s, %s): %s", x, y, e)
+
     def double_click(self) -> None:
         """
         FIX v6.1: Faz duplo clique MANUALMENTE com interval explicito.
@@ -114,6 +132,21 @@ class CursorController:
             logger.debug("DOUBLE_CLICK executado (interval=%.2fs)", self.double_click_interval)
         except Exception as e:
             logger.warning("Falha no duplo clique: %s", e)
+
+    def double_click_at(self, x: int, y: int) -> None:
+        """Duplo clique em coordenada absoluta."""
+        try:
+            x_clamped = clamp(int(x), 0, self.screen_width - 1)
+            y_clamped = clamp(int(y), 0, self.screen_height - 1)
+            pyautogui.moveTo(x_clamped, y_clamped, _pause=False)
+            pyautogui.click(_pause=False)
+            time.sleep(self.double_click_interval)
+            pyautogui.click(_pause=False)
+            self._last_x = x_clamped
+            self._last_y = y_clamped
+            logger.debug("DOUBLE_CLICK_AT (%s, %s)", x_clamped, y_clamped)
+        except Exception as e:
+            logger.warning("Falha em double_click_at: %s", e)
 
     def right_click(self) -> None:
         """
@@ -132,6 +165,18 @@ class CursorController:
         except Exception as e:
             logger.warning("Falha em right_click: %s", e)
 
+    def right_click_at(self, x: int, y: int) -> None:
+        """Clique direito em coordenada absoluta."""
+        try:
+            x_clamped = clamp(int(x), 0, self.screen_width - 1)
+            y_clamped = clamp(int(y), 0, self.screen_height - 1)
+            pyautogui.rightClick(x=x_clamped, y=y_clamped, _pause=False)
+            self._last_x = x_clamped
+            self._last_y = y_clamped
+            logger.debug("RIGHT_CLICK_AT (%s, %s)", x_clamped, y_clamped)
+        except Exception as e:
+            logger.warning("Falha em right_click_at: %s", e)
+
     def drag_start(self) -> None:
         if self._dragging:
             return
@@ -141,6 +186,21 @@ class CursorController:
             logger.debug("DRAG_START")
         except Exception as e:
             logger.warning("Falha em drag_start: %s", e)
+
+    def drag_start_at(self, x: int, y: int) -> None:
+        """Inicia drag em coordenada absoluta."""
+        if self._dragging:
+            return
+        try:
+            x_clamped = clamp(int(x), 0, self.screen_width - 1)
+            y_clamped = clamp(int(y), 0, self.screen_height - 1)
+            pyautogui.mouseDown(x=x_clamped, y=y_clamped, _pause=False)
+            self._dragging = True
+            self._last_x = x_clamped
+            self._last_y = y_clamped
+            logger.debug("DRAG_START_AT (%s, %s)", x_clamped, y_clamped)
+        except Exception as e:
+            logger.warning("Falha em drag_start_at: %s", e)
 
     def drag_end(self) -> None:
         if not self._dragging:

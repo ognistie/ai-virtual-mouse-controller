@@ -3,3 +3,8 @@ mediapipe>=0.10.18,<0.11.0
 pyautogui>=0.9.54,<1.0.0
 numpy>=1.26.0,<2.2.0
 pytest>=8.0.0
+
+# Opcional: holograma da mao na tela (tecla H em runtime).
+# Sem PySide6 o projeto roda normalmente; so o overlay holografico fica
+# indisponivel — a funcionalidade core (tracking, cursor, gestos) NAO depende dele.
+PySide6>=6.6.0

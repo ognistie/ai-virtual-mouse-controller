@@ -41,7 +41,37 @@ CAMERA_FPS_TARGET: int = 60
 MAX_NUM_HANDS: int = 1
 MIN_DETECTION_CONFIDENCE: float = 0.6
 MIN_TRACKING_CONFIDENCE: float = 0.4
-MODEL_COMPLEXITY: int = 1
+MODEL_COMPLEXITY: int = 0
+"""
+0=lite, 1=full.
+
+PERF: lite reduz inference em ~40-50% vs full. Gesture pinch e' robusto
+o suficiente pra rodar com lite sem perda perceptivel. Volta pra 1 se
+notar drop na deteccao em iluminacao ruim ou mao longe da camera.
+"""
+
+INFERENCE_PRE_RESIZE_ENABLED: bool = False
+"""
+PERF: redimensiona o frame BGR antes de enviar pro MediaPipe.
+MediaPipe rescale internamente — fazer antes corta memcpy + acelera.
+
+Default False (compatibilidade). Liga pra testar ganho.
+"""
+
+INFERENCE_PRE_RESIZE_WIDTH: int = 320
+"""Largura alvo do resize. Altura calculada mantendo aspect ratio."""
+
+CV2_USE_POLLKEY: bool = True
+"""
+PERF: usa cv2.pollKey() (non-blocking) em vez de cv2.waitKeyEx(1).
+
+waitKeyEx(1) no Windows respeita o timer default de 15.6 ms → cap em
+~64 FPS na pratica. pollKey() (disponivel em opencv >= 4.7) nao tem
+esse cap.
+
+Fallback automatico pra waitKeyEx se pollKey nao existir na versao
+de cv2 instalada. Coloca False se notar problema de window refresh.
+"""
 
 # ---------------------------------------------------------------------
 # CURSOR — PONTO DE ANCORA
@@ -53,7 +83,11 @@ CURSOR_ANCHOR_LANDMARK: int = 9
 # POSITION HOLD
 # ---------------------------------------------------------------------
 
-POSITION_HOLD_FRAMES: int = 3
+POSITION_HOLD_FRAMES: int = 2
+"""
+PERF/UX: 3 → 2 frames. Cursor reage 1 frame mais rapido a mudanca de
+posicao. Pequeno mas perceptivel. Volta pra 3 se notar instabilidade.
+"""
 
 # ---------------------------------------------------------------------
 # AIM ASSIST
@@ -167,7 +201,7 @@ Mesmo valor da pinca normal (PINCH_DISTANCE_THRESHOLD) para manter
 sensacao consistente entre os dois gestos.
 """
 
-PINCH_MIDDLE_INDEX_GUARD: float = 0.110
+PINCH_MIDDLE_INDEX_GUARD: float = 0.090
 """
 v6.9: distancia MINIMA polegar → indicador (lm 4 → lm 8) para
 permitir o clique direito.
@@ -184,12 +218,14 @@ Resultado: pinca normal e clique direito ficam mutuamente exclusivos.
 # DRAG
 # ---------------------------------------------------------------------
 
-DRAG_HOLD_SECONDS: float = 3.0
+DRAG_HOLD_SECONDS: float = 1.5
 """
-v6.9.1: 2.0 -> 3.0 (menos conflito acidental com clique).
-Combinado com press-to-click, o usuario que apenas quer clicar agora
-solta a pinca rapido e o click ja foi disparado. Drag exige manter
-a pinca por 3 segundos completos = intencao explicita.
+1.5s = aggressive: drag dispara rapido.
+
+Compat: press-to-click ja disparou em ~0ms. Quem so quer clicar
+solta antes de 1.5s → sem drag acidental. Mas pinch sustentado >1.5s
+sem mover muito ja entra em drag — risco maior se voce hesitar
+durante um clique.
 """
 
 # ---------------------------------------------------------------------
@@ -213,7 +249,11 @@ GESTURE_EXIT_FRAMES: int = 3
 # TELA E MAPEAMENTO
 # ---------------------------------------------------------------------
 
-SCREEN_MARGIN_PERCENTAGE: float = 0.20
+SCREEN_MARGIN_PERCENTAGE: float = 0.18
+"""
+UX: 0.20 → 0.18. Zona morta menor nas bordas → mesma area de mao cobre
+mais tela. Cursor sente "mais grudado" no movimento. Sutil.
+"""
 
 # ---------------------------------------------------------------------
 # DEBUG E PREVIEW
@@ -277,6 +317,100 @@ T para alternar em runtime, ou mude esta constante para False.
 
 DISPLAY_TOPMOST_TOGGLE_KEY: str = "t"
 """Tecla para alternar always-on-top em runtime. Use 't'."""
+
+# ---------------------------------------------------------------------
+# HOLOGRAMA (mao virtual desenhada na tela)
+# ---------------------------------------------------------------------
+
+HOLOGRAM_ENABLED: bool = False
+"""
+Se True, abre uma janela fullscreen transparente sobre o desktop e desenha
+uma mao "holografica" pequena seguindo o cursor. Pode ser ligada em runtime
+pela tecla H.
+
+Default False porque adiciona overhead visual. Em modo demonstracao/onboarding
+ela faz a experiencia parecer mais magica; em uso prolongado pode distrair.
+"""
+
+HOLOGRAM_TOGGLE_KEY: str = "h"
+"""Tecla pra alternar o holograma em runtime."""
+
+HOLOGRAM_OPACITY: float = 0.70
+"""
+Opacidade base. Camadas (palm/finger outline, particles, tips) usam
+fracoes desse valor. 0.70 + paleta azul ciano da contraste suficiente
+sem virar barulho.
+"""
+
+HOLOGRAM_HAND_SIZE_PX: int = 180
+"""
+Tamanho do bounding box da mao em pixels. 180 da presenca visual sem
+estorvar — com curvas Catmull-Rom + glow PySide6 a mao ja parece anatomica.
+"""
+
+HOLOGRAM_FPS: int = 30
+"""Taxa de redesenho. 30 Hz e' suave + economico em CPU."""
+
+HOLOGRAM_COLOR_BONE: str = "#00d4ff"
+"""
+Cor primaria do holograma — azul neon ciano. Estilo HUD futurista.
+Usado nas linhas/contornos da mao. Substitui o vermelho do MVP.
+"""
+
+HOLOGRAM_COLOR_POINT: str = "#e0f7ff"
+"""
+Cor dos pontos brilhantes (tips, particulas). Branco azulado para
+contraste com o azul ciano do contorno.
+"""
+
+HOLOGRAM_PARTICLES_ENABLED: bool = False
+"""
+Liga nuvem densa de particles dentro da silhueta. Default False = visual
+clean moderno (sem ruido visual). True = particle cloud densa.
+"""
+
+HOLOGRAM_PARTICLE_COUNT: int = 180
+"""
+Numero de particles na nuvem. 180 = densidade boa sem custo de FPS.
+Aumentar pra ~300 da look mais "particle cloud". Acima disso pode
+comecar a impactar perceptivelmente.
+"""
+
+HOLOGRAM_VIEW_DORSAL: bool = False
+"""
+Vista anatomica do holograma.
+
+True  = dorsal (costas da mao na tela) — espelha X dos landmarks
+False = palm view — segue webcam mirroreada (sua mao real "transmitida"
+        na tela em 3a pessoa)
+
+Default False = visual coerente com a imagem da webcam.
+"""
+
+HOLOGRAM_TRANSPARENT_COLOR: str = "#010203"
+"""
+Cor "magica" pintada como fundo do canvas que vira transparente no compositor
+do Windows. Tem que ser uma cor que nao apareca em mais nada desenhado.
+"""
+
+# ---------------------------------------------------------------------
+# PERFORMANCE TELEMETRY (instrumentation per estagio do tick loop)
+# ---------------------------------------------------------------------
+
+PERF_TELEMETRY_ENABLED: bool = True
+"""
+Liga timing por estagio (camera/inference/gesture/events/hologram/preview/
+waitkey). Reporta p50/p99 a cada N ticks via logger.info.
+
+Custo: ~100ns por entry/exit (desprezivel). Coloca False em producao se
+quiser zero overhead.
+"""
+
+PERF_TELEMETRY_WINDOW: int = 120
+"""Tamanho do rolling window de samples por estagio (= 2s a 60 FPS)."""
+
+PERF_TELEMETRY_REPORT_EVERY: int = 120
+"""Logar report a cada N ticks (= 2s a 60 FPS)."""
 
 # ---------------------------------------------------------------------
 # SEGURANCA

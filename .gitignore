@@ -13,6 +13,9 @@ htmlcov/
 *.log
 calibration.json
 
+# Claude session data (local dev only)
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
