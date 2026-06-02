@@ -267,7 +267,7 @@ MIT © [@ognistie](https://github.com/ognistie)
 - **OneEuroFilter** — Casiez, Roussel & Vogel, 2012
 - **OpenCV** — captura e renderização
 - **PyAutoGUI** — interface com o cursor do sistema
-- **PySide6** — overlay holográfico (opcional)
+- **ModernGL** — overlay holográfico (opcional)
 
 ---
 
