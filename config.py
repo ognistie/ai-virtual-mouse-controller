@@ -332,6 +332,21 @@ Default False porque adiciona overhead visual. Em modo demonstracao/onboarding
 ela faz a experiencia parecer mais magica; em uso prolongado pode distrair.
 """
 
+HOLOGRAM_BACKEND: str = "auto"
+"""
+Backend de renderizacao do holograma (v6.9.8):
+- "auto"     : tenta GL primeiro; cai pra QPainter se ModernGL/driver falhar
+- "gl"       : forca ModernGL (mesh 3D + GLSL shader, look hologram real)
+- "qpainter" : forca pipeline 2D vetorial original (compatibilidade/debug)
+
+ModernGL backend renderiza a mao como mesh 3D real (palm ellipsoide +
+finger capsules) com shader holografico (fresnel rim, depth fade, cyan
+volumetric). Visualmente proximo de "mao 3D translucida projetada".
+
+Tradeoff: requer driver OpenGL 3.3+. Em ambientes sem GPU/driver (RDP,
+VM sem aceleracao), usar "qpainter" pra forcar fallback.
+"""
+
 HOLOGRAM_TOGGLE_KEY: str = "h"
 """Tecla pra alternar o holograma em runtime."""
 

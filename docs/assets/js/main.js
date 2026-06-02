@@ -6,7 +6,7 @@
 
   function initMenu() {
     const toggle = $(".menu-toggle");
-    const nav = $(".nav-links");
+    const nav = $(".topnav");
 
     if (!toggle || !nav) return;
 
@@ -15,7 +15,7 @@
       toggle.setAttribute("aria-expanded", String(isOpen));
     });
 
-    $$(".nav-links a").forEach((link) => {
+    $$(".topnav a").forEach((link) => {
       link.addEventListener("click", () => {
         nav.classList.remove("open");
         toggle.setAttribute("aria-expanded", "false");
@@ -24,7 +24,7 @@
   }
 
   function initActiveNav() {
-    const navLinks = $$(".nav-links a[href^='#']");
+    const navLinks = $$(".topnav a[href^='#']");
 
     if (!navLinks.length) return;
 

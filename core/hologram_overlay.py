@@ -223,6 +223,56 @@ class HologramOverlay:
         self._app: Optional["QApplication"] = None
         self._widget: Optional["_HologramWidget"] = None
 
+        # v6.9.8 — backend dispatch.
+        # Se HOLOGRAM_BACKEND for "gl" ou "auto", tenta ModernGL primeiro.
+        # Quando GL bem-sucedido, _gl_backend != None e toda a API publica
+        # delega pra ele; pipeline QPainter abaixo NAO inicializa.
+        self._gl_backend = None
+        try:
+            import config as _cfg
+            _backend_pref = getattr(_cfg, "HOLOGRAM_BACKEND", "qpainter").lower()
+        except Exception:
+            _backend_pref = "qpainter"
+
+        if _backend_pref in ("gl", "auto"):
+            try:
+                from .hologram_gl_backend import HologramGLBackend
+                gl = HologramGLBackend(
+                    hand_size_px=hand_size_px,
+                    opacity=opacity,
+                    target_fps=target_fps,
+                )
+                if gl.available:
+                    self._gl_backend = gl
+                    self.available = True
+                    self.click_through_active = True
+                    logger.info(
+                        "HologramOverlay: backend GL ativo (ModernGL 3D)",
+                    )
+                    return
+                else:
+                    if _backend_pref == "gl":
+                        logger.error(
+                            "HOLOGRAM_BACKEND='gl' forcado mas GL backend "
+                            "falhou no init. Holograma desativado.",
+                        )
+                        return
+                    logger.info(
+                        "HologramOverlay: GL backend indisponivel "
+                        "(auto), caindo pra QPainter.",
+                    )
+            except Exception as e:
+                if _backend_pref == "gl":
+                    logger.error(
+                        "HOLOGRAM_BACKEND='gl' forcado mas import/init "
+                        "falhou (%s). Holograma desativado.", e,
+                    )
+                    return
+                logger.info(
+                    "HologramOverlay: GL backend import falhou (%s), "
+                    "fallback QPainter.", e,
+                )
+
         if not _PYSIDE_OK:
             logger.warning(
                 "HologramOverlay: PySide6 nao instalado (%s). "
@@ -266,6 +316,11 @@ class HologramOverlay:
     # ───────────────────────────────────────────────────────── public API
 
     def set_enabled(self, enabled: bool) -> None:
+        # v6.9.8: delega pra GL backend se ativo
+        if self._gl_backend is not None:
+            self._gl_backend.set_enabled(enabled)
+            self._enabled = self._gl_backend.enabled
+            return
         if not self.available or self._widget is None:
             return
         if enabled == self._enabled:
@@ -280,11 +335,17 @@ class HologramOverlay:
             self._pose_visible = False
 
     def toggle(self) -> bool:
+        if self._gl_backend is not None:
+            new_state = self._gl_backend.toggle()
+            self._enabled = new_state
+            return new_state
         self.set_enabled(not self._enabled)
         return self._enabled
 
     @property
     def enabled(self) -> bool:
+        if self._gl_backend is not None:
+            return self._gl_backend.enabled
         return self._enabled
 
     def update_pose(
@@ -293,6 +354,10 @@ class HologramOverlay:
         screen_x: float,
         screen_y: float,
     ) -> None:
+        # v6.9.8: delega pra GL backend se ativo
+        if self._gl_backend is not None:
+            self._gl_backend.update_pose(landmarks, screen_x, screen_y)
+            return
         if landmarks is None or len(landmarks) < 21:
             self._pose_visible = False
             self._pose_landmarks = None
@@ -344,12 +409,20 @@ class HologramOverlay:
         return out
 
     def update_cursor(self, screen_x: float, screen_y: float) -> None:
+        # v6.9.8: delega pra GL backend se ativo
+        if self._gl_backend is not None:
+            self._gl_backend.update_cursor(screen_x, screen_y)
+            return
         self._cursor_x = screen_x
         self._cursor_y = screen_y
         self._has_cursor = True
 
     def fire_burst(self, kind: str = "click") -> None:
         """Dispara burst na posicao do pinch correspondente ao gesto."""
+        # v6.9.8: delega pra GL backend (no-op por enquanto no GL — futuro pass)
+        if self._gl_backend is not None:
+            self._gl_backend.fire_burst(kind)
+            return
         if not self._enabled:
             return
         if self._pose_visible:
@@ -367,6 +440,10 @@ class HologramOverlay:
 
     def pump(self) -> None:
         """Bomba o event loop do Qt. Chamado do _tick do service."""
+        # v6.9.8: delega pra GL backend se ativo
+        if self._gl_backend is not None:
+            self._gl_backend.pump()
+            return
         if not self.available or self._app is None:
             return
         try:
@@ -375,6 +452,13 @@ class HologramOverlay:
             logger.debug("Erro em pump: %s", e)
 
     def close(self) -> None:
+        # v6.9.8: fecha GL backend tambem (se existir)
+        if self._gl_backend is not None:
+            try:
+                self._gl_backend.close()
+            except Exception:
+                pass
+            self._gl_backend = None
         if self._widget is not None:
             try:
                 self._widget.close()

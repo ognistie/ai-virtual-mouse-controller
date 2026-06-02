@@ -154,10 +154,21 @@ def classify_shape(
 
     # NOVO v6.9: clique direito tem prioridade
     # So dispara se: medio junto AO polegar E indicador AFASTADO do polegar
+    #
+    # v6.9.1.1 — disambiguacao por proximidade relativa:
+    # quando o usuario transita PINCH -> PINCH_MIDDLE (ex: depois de
+    # segurar pinch pra drag e tentar abrir menu de contexto), o
+    # indicador ainda fica naturalmente perto do polegar (na zona da
+    # pinca anterior). O guard absoluto rejeita. Fix: se medio esta
+    # CLARAMENTE mais proximo do polegar que indicador (30%+ closer),
+    # confirma PINCH_MIDDLE mesmo com guard falhando.
     if pinch_middle_threshold > 0:
         dist_thumb_middle = _distance_2d(lm[LM_THUMB_TIP], lm[LM_MIDDLE_TIP])
-        if (dist_thumb_middle < pinch_middle_threshold
-                and dist_thumb_index > pinch_middle_index_guard):
+        middle_clearly_closer = dist_thumb_middle < dist_thumb_index * 0.70
+        if dist_thumb_middle < pinch_middle_threshold and (
+            dist_thumb_index > pinch_middle_index_guard
+            or middle_clearly_closer
+        ):
             return HandShape.PINCH_MIDDLE
 
     # Pinch normal (mantido identico ao v6.5)
@@ -501,6 +512,9 @@ class GestureDetector:
         hand: HandLandmarks,
         effective_pinch_threshold: float,
         now: float,
+        *,
+        effective_pinch_middle_threshold: Optional[float] = None,
+        effective_pinch_middle_index_guard: Optional[float] = None,
     ) -> HandShape:
         pinch_dist = _distance_2d(
             hand.landmarks[LM_THUMB_TIP],
@@ -508,11 +522,24 @@ class GestureDetector:
         )
         self._pinch_dist_history.append((now, pinch_dist))
 
+        # v6.9.1.2: usa effective scaled se passados, fallback pra self.*
+        # (backward compat com callers antigos / testes).
+        mid_th = (
+            effective_pinch_middle_threshold
+            if effective_pinch_middle_threshold is not None
+            else self.pinch_middle_threshold
+        )
+        mid_guard = (
+            effective_pinch_middle_index_guard
+            if effective_pinch_middle_index_guard is not None
+            else self.pinch_middle_index_guard
+        )
+
         raw_shape = classify_shape(
             hand,
             effective_pinch_threshold,
-            pinch_middle_threshold=self.pinch_middle_threshold,
-            pinch_middle_index_guard=self.pinch_middle_index_guard,
+            pinch_middle_threshold=mid_th,
+            pinch_middle_index_guard=mid_guard,
         )
 
         if not self.pinch_dual_detection:
@@ -562,20 +589,41 @@ class GestureDetector:
 
         # Pinch threshold adaptativo (v6.5: com FLOOR minimo)
         effective_pinch_threshold = self.pinch_threshold
+        # v6.9.1.2: pinch_middle tambem precisa escalar com hand_size.
+        # Sem isso, mao GRANDE no frame (perto da camera ou angulo
+        # lateral/perfil tipo OK-sign) tem distancias normalizadas
+        # maiores que o threshold fixo 0.075 -> PINCH_MIDDLE rejeitado
+        # mesmo com polegar+medio em contato real.
+        effective_pinch_middle_threshold = self.pinch_middle_threshold
+        effective_pinch_middle_index_guard = self.pinch_middle_index_guard
         if self.pinch_adaptive and self.hand_size_reference > 0:
             scale = self._last_hand_size / self.hand_size_reference
-            effective_pinch_threshold = self.pinch_threshold * max(0.5, min(2.0, scale))
-            # v6.5: FLOOR garante que threshold nunca cai abaixo do minimo
-            # Sem isso: mao longe fazia threshold virar absurdamente apertado
-            effective_pinch_threshold = max(self.pinch_threshold_floor, effective_pinch_threshold)
+            scale_clamped = max(0.5, min(2.0, scale))
+            effective_pinch_threshold = max(
+                self.pinch_threshold_floor,
+                self.pinch_threshold * scale_clamped,
+            )
+            # Mesma logica adaptive aplicada ao middle threshold + guard.
+            # Floor compartilhado (pinch_threshold_floor) pro middle.
+            effective_pinch_middle_threshold = max(
+                self.pinch_threshold_floor,
+                self.pinch_middle_threshold * scale_clamped,
+            )
+            effective_pinch_middle_index_guard = (
+                self.pinch_middle_index_guard * scale_clamped
+            )
 
         self._last_pinch_dist = _distance_2d(
             hand.landmarks[LM_THUMB_TIP],
             hand.landmarks[LM_INDEX_TIP],
         )
 
-        # Classificacao DUAL (v6.4)
-        raw_shape = self._classify_shape_dual(hand, effective_pinch_threshold, now)
+        # Classificacao DUAL (v6.4) — passa effective middle params (v6.9.1.2)
+        raw_shape = self._classify_shape_dual(
+            hand, effective_pinch_threshold, now,
+            effective_pinch_middle_threshold=effective_pinch_middle_threshold,
+            effective_pinch_middle_index_guard=effective_pinch_middle_index_guard,
+        )
 
         # ===========================================================
         # NOVO v6.9.1: PRESS-TO-CLICK

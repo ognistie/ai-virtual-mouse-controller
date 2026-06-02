@@ -2173,3 +2173,214 @@ kbd {
     max-width: 320px;
   }
 }
+
+/* ============================================================ */
+/* MOBILE FIXES v2 — endereca quebras observadas em < 600px      */
+/* ============================================================ */
+
+/* Anti-overflow global pra qualquer browser mobile */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+img, video, svg, iframe {
+  max-width: 100%;
+  height: auto;
+}
+
+@media (max-width: 600px) {
+  /* Topbar — encolher e priorizar marca + menu */
+  .topbar {
+    grid-template-columns: auto auto;
+    gap: 12px;
+    padding: 10px 14px;
+  }
+
+  .topbar-cta {
+    display: none; /* sumir CTA — disponivel via menu */
+  }
+
+  /* Hero — reduzir paddings horizontais */
+  .hero,
+  .install,
+  .gestures,
+  .how,
+  .trouble,
+  .hologram-section {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  /* Hero typography — clamp ja existe, mas garantir wrapping */
+  .hero-headline {
+    line-height: 1.05;
+  }
+
+  .hero-headline .line {
+    display: block;
+  }
+
+  /* Gesture rows — colapsar pra single column SEM grid lateral */
+  .gesture-row,
+  .gesture-row:nth-child(even),
+  .gesture-row.no-photo {
+    grid-template-columns: 1fr !important;
+    gap: 0.8rem;
+    padding: 1.6rem 0;
+  }
+
+  .gesture-row:nth-child(even) .gesture-info,
+  .gesture-row:nth-child(even) .gesture-info p {
+    text-align: left;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .gesture-num {
+    font-size: 2rem;
+  }
+
+  .gesture-photo {
+    margin-top: 0.6rem;
+  }
+
+  .gesture-info h3 {
+    font-size: 1.45rem;
+  }
+
+  .gesture-info p {
+    font-size: 0.95rem;
+  }
+
+  /* Install steps — single column */
+  .install-steps,
+  .install-header {
+    grid-template-columns: 1fr !important;
+    gap: 1.5rem !important;
+  }
+
+  .install-checklist {
+    transform: none; /* tira rotacao em mobile pra nao cortar texto */
+    padding: 1.2rem 1.4rem;
+  }
+
+  .step-card {
+    padding: 1.4rem 1.4rem 1.2rem;
+  }
+
+  .step-card h3 {
+    font-size: 1.3rem;
+  }
+
+  /* Code blocks — scroll horizontal se necessario, sem quebrar layout */
+  .code-block {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .code-block pre,
+  .code-block code {
+    white-space: pre;
+    font-size: 0.78rem;
+  }
+
+  /* Hologram section — viz compacta */
+  .hologram-grid {
+    gap: 2rem;
+  }
+
+  .holo-frame {
+    max-width: 100%;
+  }
+
+  .hologram-features li {
+    padding: 0.8rem 0 0.8rem 1rem;
+  }
+
+  /* Footer — ja era column em 600px, garantir padding */
+  .footer-base {
+    padding: 1rem 14px;
+    gap: 0.6rem;
+  }
+
+  /* Trouble (FAQ) — summary nao deve cortar */
+  .trouble-item summary {
+    font-size: 0.95rem;
+    padding: 0.9rem 0;
+  }
+
+  .trouble-item[open] {
+    padding-bottom: 0.6rem;
+  }
+
+  /* Headlines secao — proporcoes mobile-friendly */
+  .section-num,
+  .meta-num,
+  .m-num {
+    font-size: 1.8rem;
+  }
+
+  /* Tabela/lista de meta info do hero */
+  .hero-meta {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Sticky notes — esconder em mobile (quebram layout) */
+  .sticky-note {
+    display: none;
+  }
+
+  /* Drop cap — encolhe se necessario */
+  .dropcap {
+    font-size: 3rem;
+    line-height: 0.9;
+  }
+
+  /* Pipeline flow — full width em mobile */
+  .pipeline-flow {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Menu mobile aberto — full screen */
+  .topnav.open {
+    top: 56px;
+    max-height: calc(100vh - 70px);
+    overflow-y: auto;
+  }
+}
+
+/* Breakpoint EXTRA pequeno (< 380px) — phones pequenos */
+@media (max-width: 380px) {
+  .topbar {
+    padding: 8px 10px;
+  }
+
+  .brand-monogram {
+    font-size: 1.4rem;
+  }
+
+  .hero,
+  .install,
+  .gestures,
+  .how,
+  .trouble,
+  .hologram-section {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .hero-headline {
+    font-size: clamp(2.2rem, 12vw, 3.4rem);
+  }
+
+  .gesture-info h3 {
+    font-size: 1.25rem;
+  }
+
+  .code-block pre,
+  .code-block code {
+    font-size: 0.72rem;
+  }
+}

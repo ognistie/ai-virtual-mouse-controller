@@ -8,3 +8,8 @@ pytest>=8.0.0
 # Sem PySide6 o projeto roda normalmente; so o overlay holografico fica
 # indisponivel — a funcionalidade core (tracking, cursor, gestos) NAO depende dele.
 PySide6>=6.6.0
+
+# Opcional: backend ModernGL 3D pro holograma (v6.9.8+).
+# HOLOGRAM_BACKEND="auto" no config tenta GL e cai pra QPainter se nao
+# disponivel — projeto funciona normalmente sem moderngl instalado.
+moderngl>=5.10.0
