@@ -1,33 +1,67 @@
 /* ─────────────────────────────────────────────
-   AI VIRTUAL MOUSE — editorial / preto e vermelho
-   feito a quatro mãos. de propósito imperfeito.
+   AI VIRTUAL MOUSE — clean modern (lanes-inspired)
+   Light default + dark toggle. Functional minimalism.
    ───────────────────────────────────────────── */
 
 :root {
-  --ink: #f6efe2;
-  --ink-2: #e9dfcc;
-  --mute: #948876;
-  --low:  #5a5145;
+  /* LIGHT THEME (default) */
+  --ink:    #0f1419;       /* primary text quase preto */
+  --ink-2:  #2d3748;       /* secondary text */
+  --mute:   #6b7280;       /* muted */
+  --low:    #a0aec0;       /* low contrast */
 
-  --bg:    #0b0908;
-  --bg-2:  #131110;
-  --bg-3:  #1a1715;
-  --bg-card: #14110f;
-  --line:  rgba(246, 239, 226, 0.12);
-  --line-2: rgba(246, 239, 226, 0.22);
+  --bg:     #ffffff;       /* main canvas */
+  --bg-2:   #f9fafb;       /* subtle alt */
+  --bg-3:   #f3f4f6;       /* card/section bg */
+  --bg-card:#ffffff;
+  --line:   rgba(15, 20, 25, 0.08);
+  --line-2: rgba(15, 20, 25, 0.16);
 
-  --red:        #d92626;
-  --red-bright: #ff3838;
-  --red-deep:   #7a1414;
-  --red-soft:   rgba(217, 38, 38, 0.12);
+  /* Accent — cyan/teal modern */
+  --red:        #0891b2;       /* primary accent (CSS var name kept p/ compat) */
+  --red-bright: #06b6d4;       /* hover/bright */
+  --red-deep:   #0e7490;       /* deep accent */
+  --red-soft:   rgba(8, 145, 178, 0.08);
 
-  --serif: "Fraunces", "Iowan Old Style", "Georgia", serif;
+  /* Typography — sans dominante + mono p/ technical */
+  --serif: "Inter", system-ui, -apple-system, sans-serif;
   --sans:  "Inter", system-ui, -apple-system, sans-serif;
-  --hand:  "Caveat", "Bradley Hand", cursive;
-  --mono:  "JetBrains Mono", ui-monospace, monospace;
+  --hand:  "Inter", system-ui, sans-serif;
+  --mono:  "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
-  --maxw: 1180px;
-  --ease: cubic-bezier(0.34, 0.72, 0.36, 1);
+  --maxw: 1200px;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Radii + shadows */
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow-sm: 0 1px 2px rgba(15, 20, 25, 0.04);
+  --shadow:    0 1px 3px rgba(15, 20, 25, 0.08), 0 1px 2px rgba(15, 20, 25, 0.04);
+  --shadow-lg: 0 4px 12px rgba(15, 20, 25, 0.06), 0 2px 4px rgba(15, 20, 25, 0.04);
+}
+
+/* DARK THEME (toggle via data-theme="dark" no <html>) */
+[data-theme="dark"] {
+  --ink:    #f8fafc;
+  --ink-2:  #cbd5e1;
+  --mute:   #94a3b8;
+  --low:    #64748b;
+
+  --bg:     #0a0e13;
+  --bg-2:   #111720;
+  --bg-3:   #161e2a;
+  --bg-card:#111720;
+  --line:   rgba(248, 250, 252, 0.08);
+  --line-2: rgba(248, 250, 252, 0.16);
+
+  --red:        #22d3ee;
+  --red-bright: #67e8f9;
+  --red-deep:   #06b6d4;
+  --red-soft:   rgba(34, 211, 238, 0.10);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow:    0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.5);
 }
 
 * {
@@ -55,47 +89,39 @@ body {
 }
 
 ::selection {
-  background: var(--red);
-  color: var(--ink);
+  background: var(--red-soft);
+  color: var(--red-deep);
 }
 
 ::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--bg);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--red-deep);
-  border: 2px solid var(--bg);
+  background: var(--line-2);
+  border-radius: 5px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--red);
+  background: var(--mute);
 }
 
-/* ─────────── paper grain (texture) ─────────── */
-.paper-grain {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0.045;
-  mix-blend-mode: screen;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
-}
+/* paper-grain — desativado no novo design clean */
+.paper-grain { display: none; }
 
-/* ─────────── ticker ─────────── */
+/* ticker — minimal monospace strip, sem cor agressiva */
 .ticker {
   position: relative;
   z-index: 5;
   overflow: hidden;
-  background: var(--red);
-  color: var(--bg);
-  border-bottom: 2px solid var(--bg);
+  background: var(--bg-2);
+  color: var(--mute);
+  border-bottom: 1px solid var(--line);
   font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 400;
   letter-spacing: 0.02em;
   text-transform: lowercase;
 }
@@ -126,10 +152,14 @@ body {
   align-items: center;
   gap: 1.5rem;
   padding: 14px 28px;
-  background: rgba(11, 9, 8, 0.92);
-  backdrop-filter: blur(10px) saturate(1.2);
-  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px) saturate(1.6);
+  -webkit-backdrop-filter: blur(12px) saturate(1.6);
   border-bottom: 1px solid var(--line);
+}
+
+[data-theme="dark"] .topbar {
+  background: rgba(10, 14, 19, 0.85);
 }
 
 .brand {
@@ -141,17 +171,17 @@ body {
 }
 
 .brand-monogram {
-  font-family: var(--serif);
-  font-weight: 900;
-  font-size: 1.7rem;
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 1.4rem;
   line-height: 1;
-  letter-spacing: -0.06em;
+  letter-spacing: -0.04em;
   color: var(--red);
   font-feature-settings: "ss01" on;
 }
 
 .brand-monogram em {
-  font-style: italic;
+  font-style: normal;
   color: var(--ink);
   font-weight: 500;
 }
@@ -225,28 +255,27 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 9px 18px;
+  padding: 8px 16px;
   background: var(--red);
-  color: var(--bg);
+  color: #ffffff;
   text-decoration: none;
   font-family: var(--sans);
   font-size: 0.86rem;
   font-weight: 600;
   letter-spacing: 0.01em;
-  border-radius: 0;
-  border: 2px solid var(--red);
-  transition: transform 0.15s var(--ease), background 0.15s var(--ease);
-  transform: skewX(-6deg);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--red);
+  transition: background 0.15s var(--ease), border-color 0.15s var(--ease);
 }
 
 .topbar-cta > span {
   display: inline-block;
-  transform: skewX(6deg);
 }
 
 .topbar-cta:hover {
-  background: var(--bg);
-  color: var(--red);
+  background: var(--red-bright);
+  border-color: var(--red-bright);
+  color: #ffffff;
   transform: skewX(-6deg) translateY(-2px);
 }
 
@@ -2383,4 +2412,244 @@ img, video, svg, iframe {
   .code-block code {
     font-size: 0.72rem;
   }
+}
+
+/* ============================================================ */
+/* MODERN MINIMAL OVERRIDES — aplicacao global lanes-inspired    */
+/* Flattens editorial (rotations/skews/serifs) → clean product  */
+/* ============================================================ */
+
+/* Drop editorial transforms globalmente */
+.sticky-note,
+.install-checklist,
+.checklist-title,
+.gesture-row::before,
+.hero-meta,
+.section-header,
+.lead-drop,
+.lead-second,
+.step-card,
+.trouble-item,
+.requirements-grid > *,
+.shortcut-grid > * {
+  transform: none !important;
+}
+
+/* Replace editorial serif/hand fonts por sans modernizado */
+.hero-headline,
+.hero-headline em,
+.section-header h2,
+.section-header h3,
+.checklist-title,
+.step-card h3,
+.gesture-info h3,
+.holo-title,
+.trouble-item summary,
+.brand-name strong,
+.hand-script,
+.handwritten,
+[class*="title"],
+[class*="heading"] {
+  font-family: var(--sans) !important;
+}
+
+/* Editorial number callouts → clean monospace muted */
+.gesture-num,
+.meta-num,
+.m-num,
+.section-num,
+.step-card-num {
+  font-family: var(--mono) !important;
+  font-style: normal !important;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--mute);
+}
+
+/* Flat cards everywhere — drop heavy borders/shadows editorial */
+.step-card,
+.install-checklist,
+.gesture-photo,
+.trouble-item,
+.shortcut-grid > *,
+.requirements-grid > *,
+.holo-frame,
+.holo-card {
+  border-radius: var(--radius) !important;
+  border-top-color: var(--line) !important;
+  border-left-color: var(--line) !important;
+  box-shadow: var(--shadow-sm);
+  background: var(--bg-card);
+  transition: box-shadow 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.step-card:hover,
+.trouble-item:hover {
+  box-shadow: var(--shadow);
+  border-color: var(--line-2) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Buttons clean modern com radius + sem skew */
+.btn,
+.btn-red,
+.btn-ghost,
+.btn-outline,
+button[class*="btn"] {
+  border-radius: var(--radius-sm) !important;
+  transform: none !important;
+  font-family: var(--sans);
+  font-weight: 600;
+  padding: 10px 20px;
+  letter-spacing: 0;
+  transition: background 0.15s var(--ease),
+              border-color 0.15s var(--ease),
+              color 0.15s var(--ease);
+}
+
+.btn:hover,
+.btn-red:hover {
+  transform: none !important;
+}
+
+/* Hero typography — clean modern */
+.hero {
+  padding: 5rem 0 6rem;
+}
+
+.hero-headline {
+  font-family: var(--sans) !important;
+  font-weight: 700 !important;
+  font-style: normal !important;
+  letter-spacing: -0.03em !important;
+  line-height: 1.05 !important;
+}
+
+.hero-headline em,
+.hero-headline .mark {
+  font-style: normal !important;
+  color: var(--red);
+  background: none !important;
+  font-weight: 700;
+}
+
+.hero-headline .dropcap,
+.dropcap {
+  font-family: var(--sans) !important;
+  color: var(--red);
+  font-weight: 700;
+  font-size: 1em !important;
+  float: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lead-drop,
+.lead-second {
+  font-family: var(--sans);
+  color: var(--ink-2);
+  font-size: 1.1rem;
+  line-height: 1.7;
+}
+
+/* Section headers — clean hierarchy */
+.section-header {
+  margin-bottom: 2rem;
+}
+
+.section-header h2 {
+  font-weight: 700 !important;
+  letter-spacing: -0.025em !important;
+}
+
+/* Code blocks — clean dark surface (mesmo em light theme) */
+.code-block {
+  border-radius: var(--radius-sm) !important;
+  border: 1px solid var(--line);
+  background: #0f1419;
+  box-shadow: var(--shadow-sm);
+}
+
+.code-block pre,
+.code-block code {
+  color: #e2e8f0;
+  font-family: var(--mono) !important;
+}
+
+/* Topnav — minimal */
+.topnav a {
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+
+.topnav a::after {
+  background: var(--red);
+}
+
+/* Sticky notes — display none in clean mode */
+.sticky-note {
+  display: none;
+}
+
+/* Ticker — minimal mode */
+.ticker-track {
+  animation-duration: 60s;
+}
+
+/* Footer — clean horizontal */
+.footer-base {
+  border-top: 1px solid var(--line);
+  padding-top: 2rem;
+}
+
+/* Hologram section — preserve cyan vibe que ja combina com novo accent */
+.hologram-section {
+  background: var(--bg-2);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+/* Theme toggle button (HTML pode adicionar futuramente) */
+.theme-toggle {
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  cursor: pointer;
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  transition: background 0.15s var(--ease);
+}
+
+.theme-toggle:hover {
+  background: var(--bg-2);
+  color: var(--ink);
+}
+
+/* Links em texto */
+a {
+  color: var(--red);
+  text-decoration: none;
+  transition: color 0.15s var(--ease);
+}
+
+a:hover {
+  color: var(--red-bright);
+}
+
+/* Mute text contrast adequado em light */
+.mute,
+.muted,
+small,
+.meta-text {
+  color: var(--mute);
+}
+
+/* Selection style já está acima — ok */
+
+/* Print-friendly cleanup */
+@media print {
+  .paper-grain, .ticker, .sticky-note, .topbar-cta { display: none; }
+  body { background: white; color: black; }
 }

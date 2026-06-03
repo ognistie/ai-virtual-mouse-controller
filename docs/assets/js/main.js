@@ -164,7 +164,37 @@
     });
   }
 
+  function initThemeToggle() {
+    const root = document.documentElement;
+    const STORAGE_KEY = "avm-theme";
+
+    // Aplica tema inicial: localStorage > preferencia do OS > light (default)
+    const stored = localStorage.getItem(STORAGE_KEY);
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const initial = stored || (prefersDark ? "dark" : "light");
+    root.setAttribute("data-theme", initial);
+
+    const toggle = $(".theme-toggle");
+    if (!toggle) return;
+
+    function syncLabel() {
+      const current = root.getAttribute("data-theme");
+      toggle.textContent = current === "dark" ? "claro" : "escuro";
+      toggle.setAttribute("aria-label", current === "dark" ? "Mudar para claro" : "Mudar para escuro");
+    }
+    syncLabel();
+
+    toggle.addEventListener("click", () => {
+      const current = root.getAttribute("data-theme");
+      const next = current === "dark" ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      localStorage.setItem(STORAGE_KEY, next);
+      syncLabel();
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
+    initThemeToggle();
     initMenu();
     initActiveNav();
     initCopyButtons();

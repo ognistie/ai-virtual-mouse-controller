@@ -606,6 +606,82 @@ def _build_anatomical_palm(
     return verts, normals, indices
 
 
+def _build_finger_palm_bridges(
+    all_verts: List,
+    finger_mcp_starts: List[int],
+    palm_top_ring_start: int,
+    finger_segments: int,
+    palm_segments: int,
+) -> List[int]:
+    """
+    v6.9.9.0 — MANO-inspired CONTINUITY GEOMETRY.
+
+    Cria triangulos conectando cada MCP ring dos dedos com a arc
+    correspondente da palm top ring. Resultado: mesh CONTINUA palm↔
+    fingers (sem seam visivel).
+
+    Algoritmo:
+    1. Para cada vert do MCP ring do dedo, encontra o palm top vert
+       MAIS PROXIMO (3D euclidean distance).
+    2. Triangle strip:
+       - mcp[s], palm_near[s], mcp[(s+1)%N]
+       - palm_near[s], palm_near[(s+1)%N], mcp[(s+1)%N]
+
+    Sem alocar verts novos — apenas indices conectando existentes.
+    Custo: ~10 triangles por dedo × 4 dedos = 40 tris extras.
+
+    Args:
+        all_verts: lista mutavel sendo construida (precisa pra np.array)
+        finger_mcp_starts: indices base de cada finger (skipping thumb)
+        palm_top_ring_start: indice base do palm top ring
+        finger_segments: 10
+        palm_segments: 16
+
+    Returns:
+        Lista de indices triangles pra extend em all_indices.
+    """
+    if not finger_mcp_starts:
+        return []
+
+    # Converte verts pra numpy pra busca eficiente
+    verts_arr = np.array(all_verts, dtype=np.float32)
+    palm_top_verts = verts_arr[
+        palm_top_ring_start:palm_top_ring_start + palm_segments
+    ]
+
+    indices: List[int] = []
+
+    for finger_start in finger_mcp_starts:
+        mcp_verts = verts_arr[finger_start:finger_start + finger_segments]
+
+        # Para cada MCP vert, indice do palm top mais proximo
+        # Distancias 2D (X, Y) suficientes pra anatomia — z aproximado
+        dists = np.linalg.norm(
+            palm_top_verts[None, :, :2] - mcp_verts[:, None, :2],
+            axis=2,
+        )  # shape (finger_segs, palm_segs)
+        nearest_palm = np.argmin(dists, axis=1)  # shape (finger_segs,)
+
+        # Triangle strip MCP → palm_top
+        for s in range(finger_segments):
+            s_next = (s + 1) % finger_segments
+            mcp_a = finger_start + s
+            mcp_b = finger_start + s_next
+            palm_a = palm_top_ring_start + int(nearest_palm[s])
+            palm_b = palm_top_ring_start + int(nearest_palm[s_next])
+
+            # Skip degenerate (se ambos MCP verts mapeiam pro mesmo palm)
+            if palm_a == palm_b:
+                # Single tri: mcp_a, mcp_b, palm_a
+                indices.extend([mcp_a, palm_a, mcp_b])
+            else:
+                # Quad → 2 triangles
+                indices.extend([mcp_a, palm_a, mcp_b])
+                indices.extend([mcp_b, palm_a, palm_b])
+
+    return indices
+
+
 def generate_hand_mesh(
     landmarks: Sequence[Tuple[float, float, float]],
     center_x: float,
@@ -662,16 +738,16 @@ def generate_hand_mesh(
         (max(palm_zs) + min(palm_zs)) * 0.5,
     ], dtype=np.float32)
 
+    # v6.9.9.0 — MANO-inspired: track ring boundaries pra bridge geometry.
+    # Salvamos start index dos MCP rings de cada dedo + start index do top
+    # ring da palma. Depois conectamos com triangles pra criar mesh
+    # CONTINUA (sem seam visivel entre dedos e palma).
+    finger_mcp_starts: List[int] = []
+
     # ----------- DEDOS: swept cylinder unico por dedo, com tip cap -----------
-    # v6.9.8.2: cada dedo agora e' UMA superficie continua (4 rings + cap)
-    # em vez de 3 cilindros separados ("dominos"). Knuckle bulge no PIP
-    # via SEGMENT_TAPER. MCP deslocado pra dentro do palm = fusao visual.
     for chain_idx, (chain, w_factor) in enumerate(
         zip(FINGER_CHAINS, FINGER_WIDTH_FACTOR),
     ):
-        # Polegar tem taper + inset proprios — anatomia distinta:
-        # 1) taper THUMB_TAPER (base musculosa)
-        # 2) inset 30% (CMC fica enterrado no thenar do palm, nao na borda)
         is_thumb = (chain_idx == 0)
         taper = THUMB_TAPER if is_thumb else SEGMENT_TAPER
         inset_frac = THUMB_MCP_INSET_FRAC if is_thumb else MCP_INSET_FRAC
@@ -683,16 +759,15 @@ def generate_hand_mesh(
             palm_center=palm_center, add_tip_cap=True,
             mcp_inset_frac=inset_frac,
         )
+        # MCP ring (primeiro ring deste dedo) = primeiros FINGER_RING_SEGMENTS verts
+        finger_mcp_starts.append(base_idx)
         all_verts.extend(verts)
         all_norms.extend(norms)
         all_indices.extend(idx)
         base_idx += len(verts)
 
     # ----------- PALMA: lofted surface ANATOMICA -----------
-    # v6.9.8.3: substitui UV sphere (egg-shape) por lofted surface
-    # com rings eliticos variaveis ao longo do eixo wrist→MCPs.
-    # Resultado: silhueta de palma humana (wrist taper + thenar bulge
-    # + body cheio + leve rollover no topo), nao um ovo.
+    palm_base_idx = base_idx
     verts, norms, idx = _build_anatomical_palm(
         pts_3d, size_px, base_idx,
     )
@@ -700,6 +775,23 @@ def generate_hand_mesh(
     all_norms.extend(norms)
     all_indices.extend(idx)
     base_idx += len(verts)
+
+    # Palm top ring (ultimo ring antes dos caps) começa em:
+    palm_top_ring_start = palm_base_idx + (PALM_RING_COUNT - 1) * PALM_RING_SEGMENTS
+
+    # v6.9.9.0 — BRIDGES palm↔fingers: cria triangulos conectando cada
+    # MCP ring (10 verts) com a arc correspondente da palm top ring
+    # (16 verts). Por dedo: triangle strip de ~10 triangles.
+    # SKIP THUMB porque seu CMC esta MUITO offset lateral pro polegar
+    # (anatomia distinta — thenar absorption ja resolve).
+    bridge_indices = _build_finger_palm_bridges(
+        all_verts,
+        finger_mcp_starts=finger_mcp_starts[1:],  # skip thumb
+        palm_top_ring_start=palm_top_ring_start,
+        finger_segments=FINGER_RING_SEGMENTS,
+        palm_segments=PALM_RING_SEGMENTS,
+    )
+    all_indices.extend(bridge_indices)
 
     # Conversao final
     vertices = np.array(all_verts, dtype=np.float32)
