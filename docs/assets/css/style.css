@@ -1500,6 +1500,214 @@ section { position: relative; z-index: 1; }
 .legend-icon[data-glyph="fist"] i { width: 8px; height: 8px; border-radius: 2px; background: var(--ink-3); }
 
 /* ============================================================ */
+/* HERO IMMERSIVE LAYER — radial HUD, globe, particles, telemetry */
+/* Stark-style holographic depth wrapping the hand                */
+/* ============================================================ */
+
+/* Stage becomes layer host with explicit stacking */
+.hand-stage { isolation: isolate; }
+.hand-stage canvas { position: relative; z-index: 2; }
+
+/* Backdrop radial SVG (rings, radar, crosshair) — behind canvas */
+.holo-radial {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+  overflow: visible;
+}
+.holo-radial * { transform-box: fill-box; }
+.holo-radial .hr-rotate-slow,
+.holo-radial .hr-rotate-rev,
+.holo-radial .hr-rotate-mid,
+.holo-radial .hr-radar {
+  transform-origin: 260px 320px;
+  transform-box: view-box;
+}
+.holo-radial .hr-rotate-slow { animation: hrSpin 28s linear infinite; }
+.holo-radial .hr-rotate-rev  { animation: hrSpin 18s linear infinite reverse; }
+.holo-radial .hr-rotate-mid  { animation: hrSpin 12s linear infinite; }
+.holo-radial .hr-radar       { animation: hrSpin 6s linear infinite; }
+.holo-radial .hr-ring        { animation: hrBreath 4.2s ease-in-out infinite; }
+
+@keyframes hrSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes hrBreath {
+  0%, 100% { opacity: 0.7; }
+  50%      { opacity: 1; }
+}
+
+/* Wireframe globe — upper area, slowly tilting */
+.holo-globe {
+  position: absolute;
+  top: 6%;
+  right: 38%;
+  width: 64px;
+  height: 64px;
+  z-index: 3;
+  pointer-events: none;
+  filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.5));
+  animation: hgFloat 6s ease-in-out infinite;
+}
+.holo-globe svg {
+  width: 100%;
+  height: 100%;
+  animation: hgSpin 14s linear infinite;
+}
+.holo-globe-label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translate(-50%, 4px);
+  font-size: 0.5rem;
+  letter-spacing: 0.18em;
+  color: rgba(34, 211, 238, 0.8);
+  white-space: nowrap;
+}
+@keyframes hgSpin {
+  from { transform: rotateY(0deg); }
+  to   { transform: rotateY(360deg); }
+}
+@keyframes hgFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+
+/* Telemetry pills — floating readouts scattered around */
+.holo-readouts {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  font-size: 0.55rem;
+  letter-spacing: 0.06em;
+  color: rgba(207, 250, 254, 0.8);
+}
+.hr-pill {
+  position: absolute;
+  padding: 3px 7px;
+  background: rgba(8, 14, 18, 0.55);
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  border-radius: 100px;
+  white-space: nowrap;
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.18);
+  backdrop-filter: blur(4px);
+  animation: hrPillDrift 5s ease-in-out infinite;
+}
+.hr-pill b {
+  color: var(--cyan);
+  font-weight: 600;
+  margin-left: 4px;
+}
+.hr-pill.pill-a { top: 30%; left: 3%;  animation-delay: 0s; }
+.hr-pill.pill-b { top: 56%; left: 4%;  animation-delay: -1.2s; }
+.hr-pill.pill-c { top: 25%; right: 4%; animation-delay: -2.4s; }
+.hr-pill.pill-d { top: 60%; right: 3%; animation-delay: -3.1s; }
+.hr-pill.pill-e { bottom: 30%; left: 38%; animation-delay: -1.8s; }
+@keyframes hrPillDrift {
+  0%, 100% { transform: translateY(0); opacity: 0.85; }
+  50%      { transform: translateY(-3px); opacity: 1; }
+}
+
+/* Particle field — drifting dust */
+.holo-particles {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+}
+.holo-particles span {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: rgba(34, 211, 238, 0.7);
+  box-shadow: 0 0 4px rgba(34, 211, 238, 0.9);
+  animation: hpRise linear infinite;
+  opacity: 0;
+}
+.holo-particles span:nth-child(1)  { left: 8%;  animation-duration: 9s;  animation-delay: -0.5s; }
+.holo-particles span:nth-child(2)  { left: 18%; animation-duration: 11s; animation-delay: -3s; }
+.holo-particles span:nth-child(3)  { left: 24%; animation-duration: 8s;  animation-delay: -6s; }
+.holo-particles span:nth-child(4)  { left: 32%; animation-duration: 13s; animation-delay: -1.4s; }
+.holo-particles span:nth-child(5)  { left: 40%; animation-duration: 10s; animation-delay: -7s; }
+.holo-particles span:nth-child(6)  { left: 48%; animation-duration: 12s; animation-delay: -2.2s; }
+.holo-particles span:nth-child(7)  { left: 55%; animation-duration: 9s;  animation-delay: -4.5s; }
+.holo-particles span:nth-child(8)  { left: 62%; animation-duration: 11s; animation-delay: -8s; }
+.holo-particles span:nth-child(9)  { left: 70%; animation-duration: 10s; animation-delay: -1s; }
+.holo-particles span:nth-child(10) { left: 76%; animation-duration: 13s; animation-delay: -5.3s; }
+.holo-particles span:nth-child(11) { left: 82%; animation-duration: 8s;  animation-delay: -2.7s; }
+.holo-particles span:nth-child(12) { left: 88%; animation-duration: 12s; animation-delay: -6.5s; }
+.holo-particles span:nth-child(13) { left: 14%; animation-duration: 14s; animation-delay: -9s; width: 1px; height: 1px; }
+.holo-particles span:nth-child(14) { left: 36%; animation-duration: 15s; animation-delay: -4s;  width: 1px; height: 1px; }
+.holo-particles span:nth-child(15) { left: 66%; animation-duration: 16s; animation-delay: -0s;  width: 1px; height: 1px; }
+@keyframes hpRise {
+  0%   { transform: translateY(105%); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateY(-10%); opacity: 0; }
+}
+
+/* Sparkline — bottom-right corner widget */
+.holo-spark {
+  position: absolute;
+  bottom: 12%;
+  right: 6%;
+  width: 110px;
+  z-index: 3;
+  pointer-events: none;
+  padding: 5px 7px;
+  background: rgba(8, 14, 18, 0.55);
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  border-radius: 4px;
+  backdrop-filter: blur(4px);
+}
+.holo-spark .hs-cap {
+  font-size: 0.5rem;
+  letter-spacing: 0.16em;
+  color: rgba(207, 250, 254, 0.7);
+  margin-bottom: 3px;
+  text-transform: uppercase;
+}
+.holo-spark svg {
+  width: 100%;
+  height: 28px;
+  display: block;
+}
+.holo-spark .hs-line { animation: hsPulse 2.4s ease-in-out infinite; }
+.holo-spark .hs-line.dim { animation-delay: -1.2s; }
+@keyframes hsPulse {
+  0%, 100% { transform: translateY(0); opacity: 0.85; }
+  50%      { transform: translateY(-1px); opacity: 1; }
+}
+
+/* Holo console now sits on z-index 4 above immersive layer */
+.holo-console { z-index: 4; }
+.holo-card    { z-index: 4; }
+
+@media (prefers-reduced-motion: reduce) {
+  .holo-radial .hr-rotate-slow,
+  .holo-radial .hr-rotate-rev,
+  .holo-radial .hr-rotate-mid,
+  .holo-radial .hr-radar,
+  .holo-radial .hr-ring,
+  .holo-globe, .holo-globe svg,
+  .hr-pill, .holo-particles span, .holo-spark .hs-line { animation: none !important; }
+}
+
+@media (max-width: 720px) {
+  .holo-globe { width: 48px; height: 48px; }
+  .holo-globe-label { font-size: 0.46rem; }
+  .hr-pill { font-size: 0.5rem; padding: 2px 6px; }
+  .holo-spark { width: 84px; }
+}
+
+/* ============================================================ */
 /* HERO HOLO CONSOLE — Stark-style floating UI driven by gestures*/
 /* ============================================================ */
 .holo-console {

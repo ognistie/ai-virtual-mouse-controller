@@ -306,6 +306,13 @@
     const actionEl = $("#actionName");
     const gestureBar = $("#gestureBar");
 
+    // Telemetry pills around the hero hand (Stark-style live readouts)
+    const roTheta = $("#roTheta");
+    const roVel   = $("#roVel");
+    const roX     = $("#roX");
+    const roY     = $("#roY");
+    const roZ     = $("#roZ");
+
     if (!fpsEl) return;
 
     const gestures = [
@@ -357,6 +364,28 @@
       const cx = Math.floor(847 + Math.sin(now * 0.0008) * 80);
       const cy = Math.floor(412 + Math.cos(now * 0.0011) * 60);
       cursorEl.textContent = `${cx}, ${cy}`;
+
+      // Hero telemetry pills — live drift for immersive feel
+      if (roTheta) {
+        const th = Math.round(32 + Math.sin(now * 0.0009) * 18);
+        roTheta.textContent = (th >= 0 ? "+" : "") + String(th).padStart(3, "0") + "°";
+      }
+      if (roVel) {
+        const v = 0.08 + Math.abs(Math.sin(now * 0.0017)) * 0.14;
+        roVel.textContent = v.toFixed(2);
+      }
+      if (roX) {
+        const x = 0.42 + Math.sin(now * 0.0011) * 0.18;
+        roX.textContent = x.toFixed(2);
+      }
+      if (roY) {
+        const y = 0.61 + Math.cos(now * 0.0009) * 0.14;
+        roY.textContent = y.toFixed(2);
+      }
+      if (roZ) {
+        const z = -1.4 + Math.sin(now * 0.0007) * 0.6;
+        roZ.textContent = z.toFixed(1);
+      }
 
       // Gesture cycle
       const g = gestures[gIdx];
