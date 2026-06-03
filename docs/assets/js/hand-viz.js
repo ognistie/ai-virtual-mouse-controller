@@ -48,6 +48,112 @@
     [0.73, 0.34]   // 20 pinky TIP
   ];
 
+  // Gesture-specific poses — thumb+index pinch, peace sign, thumb+middle pinch, fist.
+  // Wrist + MCP joints stay near REST so the hand keeps anatomical anchor.
+  const GESTURE_POSES = {
+    open_hand: REST_POSE,
+
+    // Thumb tip meets index tip near (0.38, 0.50)
+    pinch: [
+      [0.50, 0.92],
+      [0.42, 0.82],
+      [0.38, 0.72],
+      [0.38, 0.60],
+      [0.38, 0.52],  // thumb tip
+      [0.42, 0.62],
+      [0.40, 0.52],
+      [0.39, 0.46],
+      [0.38, 0.50],  // index tip meets thumb
+      [0.50, 0.60],
+      [0.50, 0.45],
+      [0.50, 0.33],
+      [0.50, 0.24],
+      [0.58, 0.62],
+      [0.60, 0.48],
+      [0.61, 0.37],
+      [0.62, 0.29],
+      [0.66, 0.66],
+      [0.69, 0.54],
+      [0.71, 0.45],
+      [0.73, 0.38]
+    ],
+
+    // Index + middle extended; thumb folded; ring + pinky curled
+    peace: [
+      [0.50, 0.92],
+      [0.44, 0.82],
+      [0.46, 0.74],
+      [0.50, 0.70],
+      [0.54, 0.68],  // thumb folded across palm
+      [0.42, 0.62],
+      [0.40, 0.48],
+      [0.40, 0.36],
+      [0.38, 0.26],  // index up
+      [0.50, 0.60],
+      [0.51, 0.45],
+      [0.52, 0.32],
+      [0.53, 0.20],  // middle up
+      [0.58, 0.62],
+      [0.60, 0.56],
+      [0.58, 0.62],
+      [0.56, 0.60],  // ring curled
+      [0.66, 0.66],
+      [0.68, 0.62],
+      [0.66, 0.66],
+      [0.64, 0.64]   // pinky curled
+    ],
+
+    // Thumb tip meets middle tip; index extended; ring + pinky semi-curled
+    pinch_middle: [
+      [0.50, 0.92],
+      [0.42, 0.82],
+      [0.42, 0.72],
+      [0.46, 0.62],
+      [0.50, 0.54],  // thumb tip
+      [0.42, 0.62],
+      [0.40, 0.48],
+      [0.39, 0.37],
+      [0.38, 0.28],  // index extended
+      [0.50, 0.60],
+      [0.50, 0.50],
+      [0.50, 0.55],
+      [0.50, 0.54],  // middle tip meets thumb
+      [0.58, 0.62],
+      [0.60, 0.52],
+      [0.59, 0.58],
+      [0.58, 0.60],
+      [0.66, 0.66],
+      [0.68, 0.58],
+      [0.67, 0.63],
+      [0.66, 0.65]
+    ],
+
+    // All fingers curled into palm; thumb wraps over
+    fist: [
+      [0.50, 0.92],
+      [0.42, 0.82],
+      [0.46, 0.74],
+      [0.50, 0.70],
+      [0.54, 0.68],
+      [0.42, 0.62],
+      [0.43, 0.54],
+      [0.46, 0.60],
+      [0.44, 0.62],
+      [0.50, 0.60],
+      [0.50, 0.52],
+      [0.52, 0.60],
+      [0.50, 0.62],
+      [0.58, 0.62],
+      [0.58, 0.54],
+      [0.57, 0.61],
+      [0.58, 0.63],
+      [0.66, 0.66],
+      [0.66, 0.60],
+      [0.65, 0.64],
+      [0.64, 0.66]
+    ]
+  };
+
   /**
    * HandRenderer — renders a 21-landmark hand on a canvas with subtle motion.
    * Auto-pauses when offscreen + respects prefers-reduced-motion.
@@ -76,6 +182,13 @@
       this.t = 0;
       this.running = false;
       this.reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      // Live pose interpolated each frame toward the active gesture target.
+      this.currentPose = REST_POSE.map((p) => [p[0], p[1]]);
+      this.targetPose = REST_POSE;
+      this.gestureName = "open_hand";
+      this.poseLerp = 0.14;  // per-frame interpolation factor
+
       this._resize();
       this._observeVisibility();
       window.addEventListener("resize", () => this._resize());
@@ -125,6 +238,16 @@
     }
 
     /**
+     * Switch active gesture target. Renderer eases currentPose → target each frame.
+     * Accepts any name in GESTURE_POSES; unknown names fall back to open_hand.
+     */
+    setGesture(name) {
+      const next = GESTURE_POSES[name] || GESTURE_POSES.open_hand;
+      this.targetPose = next;
+      this.gestureName = name;
+    }
+
+    /**
      * Returns transformed landmarks for current frame.
      */
     _computeLandmarks() {
@@ -137,7 +260,16 @@
       const swayX = this.opts.sway ? Math.sin(this.t * 0.7) * this.opts.sway : 0;
       const swayY = this.opts.sway ? Math.cos(this.t * 0.9) * this.opts.sway * 0.6 : 0;
 
-      return REST_POSE.map(([x, y], i) => {
+      // Ease currentPose toward targetPose so gesture transitions feel organic.
+      const k = this.reduced ? 1 : this.poseLerp;
+      for (let i = 0; i < this.currentPose.length; i++) {
+        const cur = this.currentPose[i];
+        const tgt = this.targetPose[i];
+        cur[0] += (tgt[0] - cur[0]) * k;
+        cur[1] += (tgt[1] - cur[1]) * k;
+      }
+
+      return this.currentPose.map(([x, y], i) => {
         // Per-finger micro-jitter for fingertips (give "alive" feel)
         const isTip = i === 4 || i === 8 || i === 12 || i === 16 || i === 20;
         const jitter = isTip && !this.reduced

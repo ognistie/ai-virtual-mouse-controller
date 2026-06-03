@@ -9,6 +9,10 @@
   const $  = (s, c = document) => c.querySelector(s);
   const $$ = (s, c = document) => Array.from(c.querySelectorAll(s));
 
+  // Active hand renderers — populated by initCanvases, driven by initMetricTicker
+  // so the holographic hands mirror the live "gesto atual" label.
+  const handRenderers = [];
+
   // ============ THEME TOGGLE ============
   function initTheme() {
     const root = document.documentElement;
@@ -181,6 +185,11 @@
 
     let gIdx = 0;
     let lastSwitch = performance.now();
+    let lastGestureName = null;
+
+    // Push initial gesture so hands start aligned with the label.
+    handRenderers.forEach((r) => r.setGesture && r.setGesture(gestures[0].name));
+    lastGestureName = gestures[0].name;
 
     function tick(now) {
       // FPS gentle variance 56-60
@@ -212,6 +221,12 @@
       const next = gestures[gIdx];
       if (gestureEl) gestureEl.textContent = next.name;
       if (actionEl) actionEl.textContent = next.action;
+
+      // Drive the canvas hands when the active gesture changes.
+      if (next.name !== lastGestureName) {
+        handRenderers.forEach((r) => r.setGesture && r.setGesture(next.name));
+        lastGestureName = next.name;
+      }
       if (gestureBar) {
         const progress = Math.min(100, (now - lastSwitch) / next.duration * 100);
         gestureBar.style.width = (100 - progress) + "%";
@@ -230,20 +245,20 @@
     // Hero canvas — main attention-grabbing visualization
     const heroCanvas = $("#handCanvas");
     if (heroCanvas) {
-      new window.HandRenderer(heroCanvas, {
+      handRenderers.push(new window.HandRenderer(heroCanvas, {
         accent: "#22d3ee",
         accentSoft: "rgba(34, 211, 238, 0.18)",
         ink: "#cbd5e1",
         sway: 10,
         breathScale: 0.045,
         fingertipsGlow: true
-      });
+      }));
     }
 
     // System panel canvas — smaller, more clinical
     const sysCanvas = $("#systemCanvas");
     if (sysCanvas) {
-      new window.HandRenderer(sysCanvas, {
+      handRenderers.push(new window.HandRenderer(sysCanvas, {
         accent: "#22d3ee",
         accentSoft: "rgba(34, 211, 238, 0.12)",
         ink: "#94a3b8",
@@ -253,16 +268,16 @@
         sway: 5,
         breathScale: 0.025,
         fingertipsGlow: true
-      });
+      }));
     }
 
     // Holographic canvas — volumetric variant
     const holoCanvas = $("#holoCanvas");
     if (holoCanvas && window.HoloRenderer) {
-      new window.HoloRenderer(holoCanvas, {
+      handRenderers.push(new window.HoloRenderer(holoCanvas, {
         sway: 3,
         breathScale: 0.02
-      });
+      }));
     }
   }
 
