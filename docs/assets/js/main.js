@@ -13,6 +13,141 @@
   // so the holographic hands mirror the live "gesto atual" label.
   const handRenderers = [];
 
+  // ============================================================
+  // HOLO CONSOLE — Stark-style floating UI driven by gesture cycle
+  // ============================================================
+  // Each gesture triggers a different "interaction" on the floating cards
+  // so the hand visually controls a virtual desktop. Targets correspond to
+  // the real action emitted by the gesture detector (CLICK/RIGHT_CLICK/etc).
+  const ConsoleSlots = {
+    open_hand:    "files",     // MOVE — cursor hovers a file tile
+    pinch:        "browser",   // CLICK — ripple on browser link
+    pinch_middle: "context",   // RIGHT_CLICK — context menu pops
+    peace:        "files",     // DOUBLE_CLICK — files burst-pop
+    fist:         "media"      // PAUSE — media halts + global pause veil
+  };
+  const ActionLabels = {
+    MOVE: "cursor.move",
+    CLICK: "click.left",
+    RIGHT_CLICK: "click.right",
+    DOUBLE_CLICK: "click.double",
+    PAUSE: "system.pause"
+  };
+
+  function initHoloConsole() {
+    const root = $("#holoConsole");
+    if (!root) return null;
+    const stream = $("#holoStream");
+    const reticle = $("#holoReticle");
+    const cards = {
+      browser: $(".hc-browser", root),
+      media:   $(".hc-media", root),
+      files:   $(".hc-files", root),
+      context: $(".hc-context", root)
+    };
+    const tileCount = 6;
+
+    function clearTransients() {
+      cards.browser && cards.browser.classList.remove("click", "active");
+      cards.media   && cards.media.classList.remove("active", "dbl");
+      cards.files   && cards.files.classList.remove("active", "hover", "dbl");
+      cards.context && cards.context.classList.remove("show", "active");
+      root.classList.remove("paused");
+    }
+
+    function moveReticleTo(card) {
+      if (!reticle || !card) return;
+      const cb = card.getBoundingClientRect();
+      const rb = root.getBoundingClientRect();
+      const cx = cb.left - rb.left + cb.width / 2;
+      const cy = cb.top - rb.top + cb.height / 2;
+      reticle.style.left = cx + "px";
+      reticle.style.top  = cy + "px";
+      reticle.style.opacity = "0.85";
+    }
+
+    function pulseReticleClick() {
+      if (!reticle) return;
+      reticle.classList.remove("click");
+      // Force reflow to restart animation
+      void reticle.offsetWidth;
+      reticle.classList.add("click");
+    }
+
+    function pushStream(evtName, accent) {
+      if (!stream) return;
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, "0");
+      const mm = String(now.getMinutes()).padStart(2, "0");
+      const ss = String(now.getSeconds()).padStart(2, "0");
+      const row = document.createElement("div");
+      row.className = "hs-row" + (accent ? " act" : "");
+      row.innerHTML = `<span class="hs-time">${hh}:${mm}:${ss}</span><span class="hs-evt">${evtName}</span>`;
+      stream.insertBefore(row, stream.firstChild);
+      // Keep at most 5 rows
+      while (stream.children.length > 5) stream.removeChild(stream.lastChild);
+    }
+
+    function react(gestureName, action) {
+      clearTransients();
+      const slot = ConsoleSlots[gestureName] || "files";
+      const card = cards[slot];
+
+      if (gestureName === "fist") {
+        root.classList.add("paused");
+        moveReticleTo(cards.media);
+        if (reticle) reticle.style.opacity = "0.35";
+        pushStream(ActionLabels[action] || action.toLowerCase(), true);
+        return;
+      }
+
+      if (card) {
+        card.classList.add("active");
+        moveReticleTo(card);
+      }
+
+      switch (action) {
+        case "MOVE": {
+          // Hover a random file tile
+          const idx = 1 + Math.floor(Math.random() * tileCount);
+          if (cards.files) {
+            cards.files.style.setProperty("--target", idx);
+            cards.files.classList.add("hover");
+          }
+          pushStream(ActionLabels.MOVE);
+          break;
+        }
+        case "CLICK":
+          if (cards.browser) cards.browser.classList.add("click");
+          pulseReticleClick();
+          pushStream(ActionLabels.CLICK, true);
+          break;
+        case "RIGHT_CLICK":
+          if (cards.context) cards.context.classList.add("show");
+          pulseReticleClick();
+          pushStream(ActionLabels.RIGHT_CLICK, true);
+          break;
+        case "DOUBLE_CLICK":
+          if (cards.files) cards.files.classList.add("dbl");
+          pulseReticleClick();
+          // second tick for double feel
+          setTimeout(pulseReticleClick, 180);
+          pushStream(ActionLabels.DOUBLE_CLICK, true);
+          break;
+        default:
+          pushStream((action || "event").toLowerCase());
+      }
+    }
+
+    // Reposition reticle on resize so it tracks card centers
+    window.addEventListener("resize", () => {
+      const activeCard = root.querySelector(".holo-card.active");
+      if (activeCard) moveReticleTo(activeCard);
+    });
+
+    return { react };
+  }
+
   // ============ THEME TOGGLE ============
   function initTheme() {
     const root = document.documentElement;
@@ -187,8 +322,19 @@
     let lastSwitch = performance.now();
     let lastGestureName = null;
 
+    // Holo console + gesture legend wiring
+    const holoConsole = initHoloConsole();
+    const legendItems = $$("#gestureLegend li");
+    function highlightLegend(name) {
+      legendItems.forEach((li) => {
+        li.classList.toggle("active", li.dataset.gesture === name);
+      });
+    }
+
     // Push initial gesture so hands start aligned with the label.
     handRenderers.forEach((r) => r.setGesture && r.setGesture(gestures[0].name));
+    if (holoConsole) holoConsole.react(gestures[0].name, gestures[0].action);
+    highlightLegend(gestures[0].name);
     lastGestureName = gestures[0].name;
 
     function tick(now) {
@@ -222,9 +368,11 @@
       if (gestureEl) gestureEl.textContent = next.name;
       if (actionEl) actionEl.textContent = next.action;
 
-      // Drive the canvas hands when the active gesture changes.
+      // Drive the canvas hands + holo console when the active gesture changes.
       if (next.name !== lastGestureName) {
         handRenderers.forEach((r) => r.setGesture && r.setGesture(next.name));
+        if (holoConsole) holoConsole.react(next.name, next.action);
+        highlightLegend(next.name);
         lastGestureName = next.name;
       }
       if (gestureBar) {

@@ -122,6 +122,67 @@
       <div class="hero-visual">
         <div class="hand-stage" aria-hidden="true">
           <canvas id="handCanvas" width="520" height="520"></canvas>
+
+          <!-- Holographic console: floating UI fragments the hand "controls" -->
+          <div class="holo-console" id="holoConsole">
+            <article class="holo-card hc-browser" data-slot="browser">
+              <header class="hc-bar">
+                <span class="hc-dot"></span><span class="hc-dot"></span><span class="hc-dot"></span>
+                <span class="hc-title mono">navegador</span>
+              </header>
+              <div class="hc-body">
+                <div class="hc-url mono"><span>https://</span><span class="hc-cursor"></span></div>
+                <div class="hc-line"></div>
+                <div class="hc-line short"></div>
+                <div class="hc-line"></div>
+              </div>
+              <div class="hc-ripple"></div>
+            </article>
+
+            <article class="holo-card hc-media" data-slot="media">
+              <header class="hc-bar">
+                <span class="hc-title mono">áudio.live</span>
+              </header>
+              <div class="hc-body hc-equalizer" aria-hidden="true">
+                <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+              </div>
+              <div class="hc-play mono">
+                <span class="hc-play-icon"></span>
+                <span class="hc-play-label">tocando</span>
+              </div>
+            </article>
+
+            <article class="holo-card hc-files" data-slot="files">
+              <header class="hc-bar">
+                <span class="hc-title mono">arquivos</span>
+              </header>
+              <div class="hc-grid">
+                <div class="hc-tile"></div><div class="hc-tile"></div><div class="hc-tile"></div>
+                <div class="hc-tile"></div><div class="hc-tile"></div><div class="hc-tile"></div>
+              </div>
+            </article>
+
+            <article class="holo-card hc-context" data-slot="context">
+              <ul class="hc-menu mono">
+                <li>abrir</li>
+                <li>copiar</li>
+                <li>renomear</li>
+                <li class="sep"></li>
+                <li class="danger">excluir</li>
+              </ul>
+            </article>
+
+            <div class="holo-pause-veil">
+              <span class="mono">pausado</span>
+            </div>
+
+            <div class="holo-stream mono" id="holoStream" aria-hidden="true">
+              <div class="hs-row"><span class="hs-time">--:--:--</span><span class="hs-evt">system.boot</span></div>
+            </div>
+
+            <div class="holo-reticle" id="holoReticle"></div>
+          </div>
+
           <div class="stage-corners">
             <span class="corner tl"></span>
             <span class="corner tr"></span>
@@ -206,6 +267,52 @@
               <div class="state-value small">
                 <span>21</span><span class="metric-unit">rastreados</span>
               </div>
+            </div>
+
+            <div class="state-block gesture-legend">
+              <div class="state-label mono">mapa de gestos</div>
+              <ul class="legend-list mono" id="gestureLegend">
+                <li data-gesture="open_hand">
+                  <span class="legend-icon" data-glyph="open">
+                    <i></i><i></i><i></i><i></i><i></i>
+                  </span>
+                  <span class="legend-gest">open_hand</span>
+                  <span class="legend-arr">→</span>
+                  <span class="legend-act">MOVE</span>
+                </li>
+                <li data-gesture="pinch">
+                  <span class="legend-icon" data-glyph="pinch">
+                    <i></i><i></i>
+                  </span>
+                  <span class="legend-gest">pinch</span>
+                  <span class="legend-arr">→</span>
+                  <span class="legend-act">CLICK</span>
+                </li>
+                <li data-gesture="pinch_middle">
+                  <span class="legend-icon" data-glyph="pinch-mid">
+                    <i></i><i></i>
+                  </span>
+                  <span class="legend-gest">pinch_middle</span>
+                  <span class="legend-arr">→</span>
+                  <span class="legend-act">RIGHT_CLICK</span>
+                </li>
+                <li data-gesture="peace">
+                  <span class="legend-icon" data-glyph="peace">
+                    <i></i><i></i>
+                  </span>
+                  <span class="legend-gest">peace</span>
+                  <span class="legend-arr">→</span>
+                  <span class="legend-act">DOUBLE_CLICK</span>
+                </li>
+                <li data-gesture="fist">
+                  <span class="legend-icon" data-glyph="fist">
+                    <i></i>
+                  </span>
+                  <span class="legend-gest">fist</span>
+                  <span class="legend-arr">→</span>
+                  <span class="legend-act">PAUSE</span>
+                </li>
+              </ul>
             </div>
           </div>
         </div>
