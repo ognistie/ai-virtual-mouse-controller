@@ -65,7 +65,31 @@ Ao reportar, inclua:
 - Rode em ambiente nao-admin sempre que possivel.
 - Use `LOG_LEVEL=INFO` (default) — `DEBUG` pode logar dados visualmente sensiveis em raros casos.
 - Desligue o overlay holografico quando nao estiver usando (`H` para toggle) — minimiza a superficie de Win32 hooks.
-- Mantenha mediapipe e opencv atualizados (Dependabot abre PRs automaticos).
+- Mantenha mediapipe e opencv atualizados.
+
+## Checklist anti-vazamento (para mantenedores)
+
+Antes de qualquer commit, verifique:
+
+- [ ] `git status` nao mostra `coverage.xml`, `.coverage`, `htmlcov/`, `.mypy_cache/`, `.ruff_cache/` — esses arquivos podem conter PATHS ABSOLUTOS revelando username do sistema.
+- [ ] Nenhum arquivo `.env`, `*.key`, `*.pem`, `credentials*`, `*.token` em staging.
+- [ ] `calibration.json` (dados de hand size do usuario) nunca commitado.
+- [ ] Logs em `*.log` nunca commitados.
+- [ ] Antes de push, scan rapido: `git diff --staged | grep -iE "(password|api_key|secret|token|bearer)"` deve voltar vazio.
+
+`.gitignore` ja cobre todos esses padroes — mantenha atualizado se adicionar novas ferramentas.
+
+## O que este projeto NAO faz
+
+Garantias de privacidade by-design (verifique no codigo):
+
+- ❌ Nao abre porta TCP/UDP/socket
+- ❌ Nao faz request HTTP / HTTPS
+- ❌ Nao envia telemetria / analytics
+- ❌ Nao salva frames da webcam em disco
+- ❌ Nao persiste dados entre sessoes (exceto config local opt-in)
+- ❌ Nao acessa sistemas de pagamento / billing
+- ❌ Nao usa nenhum servico de cloud
 
 ## Reconhecimentos
 
