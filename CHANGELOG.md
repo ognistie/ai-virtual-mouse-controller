@@ -7,6 +7,21 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-06-08
+
+### Added
+- Primeira release publica oficial no PyPI: `pip install ai-virtual-mouse-controller`
+- Entry point CLI: comando `avmc` disponivel apos install
+- Workflow de auto-publish via Trusted Publishing (OIDC, sem token guardado)
+- Pre-requisitos por OS documentados no README (Windows / macOS / Linux X11/Wayland)
+- Extra opcional `[hologram]` (PySide6 + ModernGL) para o overlay 3D
+- Suite consolidada de melhorias incrementais de v0.2.0 (ancora robusta,
+  finger posture, click freeze, drag precision, holograma otimizado,
+  edge velocity extrapolation, etc.)
+
+### Changed
+- Versao bumpada de 0.2.0 para 1.0.1 marcando primeira release publica
+
 ## [0.2.0] — 2026-06-07
 
 ### Added
