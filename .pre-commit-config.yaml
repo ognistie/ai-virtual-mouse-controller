@@ -1,0 +1,55 @@
+# ============================================================================
+# Pre-commit hooks — rodam ANTES de cada commit
+# ============================================================================
+# Setup (uma vez por clone):
+#   pip install pre-commit
+#   pre-commit install
+#
+# Rodar manualmente em tudo:
+#   pre-commit run --all-files
+# ============================================================================
+
+default_language_version:
+  python: python3.11
+
+repos:
+  # ----------------- Higiene basica de arquivos -----------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  # ----------------- Lint + format (Ruff) -----------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.10
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  # ----------------- Type check (mypy, gradual) -----------------
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.10.0
+    hooks:
+      - id: mypy
+        # So roda nos modulos puros recentes — legacy fica fora ate refactor.
+        files: ^core/(hand_anchor|finger_posture|smoothing|click_burst|utils|perf_telemetry)\.py$
+        additional_dependencies: [numpy]
+        args: [--config-file=pyproject.toml]
+
+  # ----------------- Commits convencionais -----------------
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.2.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert]

@@ -1,0 +1,57 @@
+name: Feature request
+description: Sugerir uma nova feature ou melhoria
+labels: [enhancement, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Para mudancas grandes (novo backend, novo paradigma), considere abrir
+        uma [Discussion](https://github.com/ognistie/ai-virtual-mouse-controller/discussions)
+        antes do issue para alinhar design.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Qual problema voce esta tentando resolver?
+      description: Descricao do problema do usuario (nao da solucao)
+      placeholder: Quando faco X, e dificil Y porque Z
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solucao proposta
+      description: Como voce imagina a feature funcionando
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas consideradas
+      description: Outras abordagens que voce pensou e por que descartou
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexto adicional
+      description: Links, prints, referencias de UX de outros produtos
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Estou disposto a contribuir
+      options:
+        - label: Posso ajudar com o design / discussao
+        - label: Posso abrir um PR implementando
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      options:
+        - label: Procurei em issues abertas e nao encontrei duplicata
+          required: true
+        - label: Concordo com o Codigo de Conduta
+          required: true

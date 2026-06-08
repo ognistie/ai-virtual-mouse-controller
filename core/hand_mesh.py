@@ -702,25 +702,29 @@ def generate_hand_mesh(
     if len(landmarks) < 21:
         return _empty_mesh()
 
-    # Scaling identico ao hand_renderer.py
-    xs = [lm[0] for lm in landmarks]
-    ys = [lm[1] for lm in landmarks]
-    bbox_w = max(max(xs) - min(xs), 1e-6)
-    bbox_h = max(max(ys) - min(ys), 1e-6)
+    # PERF: vetoriza tudo num unico ndarray (21,3) — antes eram 21 calls de
+    # np.array([x,y,z]) por mesh-regen, mais alocs Python que somavam ~ms
+    # durante motion. Agora 1 alloc + 1 broadcast + scaling vetorizado.
+    lm_arr = np.asarray(landmarks, dtype=np.float32)  # (N, 3) -- normalizado
+    xs = lm_arr[:, 0]
+    ys = lm_arr[:, 1]
+    bbox_w = max(float(xs.max() - xs.min()), 1e-6)
+    bbox_h = max(float(ys.max() - ys.min()), 1e-6)
     scale = size_px / max(bbox_w, bbox_h)
 
     pa, pb = _PINCH_ANCHOR
-    anchor_x = (landmarks[pa][0] + landmarks[pb][0]) / 2.0
-    anchor_y = (landmarks[pa][1] + landmarks[pb][1]) / 2.0
+    anchor_x = float((lm_arr[pa, 0] + lm_arr[pb, 0]) * 0.5)
+    anchor_y = float((lm_arr[pa, 1] + lm_arr[pb, 1]) * 0.5)
 
     # Converte pra screen pixels (3D — z escalado pra dar profundidade)
     z_scale = scale * 0.4  # fator de profundidade
-    pts_3d: List[np.ndarray] = []
-    for lm in landmarks:
-        x = center_x + (lm[0] - anchor_x) * scale
-        y = center_y + (lm[1] - anchor_y) * scale
-        z = lm[2] * z_scale
-        pts_3d.append(np.array([x, y, z], dtype=np.float32))
+    pts_arr = np.empty((len(landmarks), 3), dtype=np.float32)
+    pts_arr[:, 0] = center_x + (xs - anchor_x) * scale
+    pts_arr[:, 1] = center_y + (ys - anchor_y) * scale
+    pts_arr[:, 2] = lm_arr[:, 2] * z_scale
+    # Mantem API existente: pts_3d e' lista indexavel de arrays (1,3).
+    # Slicing de ndarray e' barato (views, sem copia).
+    pts_3d: List[np.ndarray] = [pts_arr[i] for i in range(pts_arr.shape[0])]
 
     all_verts: List[Tuple[float, float, float]] = []
     all_norms: List[Tuple[float, float, float]] = []

@@ -27,6 +27,7 @@ DESIGN INTENCIONAL:
 
 from __future__ import annotations
 
+import atexit
 import logging
 import sys
 import time
@@ -34,6 +35,14 @@ from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 
+from .click_burst import (
+    BurstManager,
+    KIND_CLICK,
+    KIND_DOUBLE_CLICK,
+    KIND_DRAG_END,
+    KIND_DRAG_START,
+    KIND_RIGHT_CLICK,
+)
 from .hand_mesh import generate_hand_mesh
 from .smoothing import OneEuroSmoother2D
 
@@ -136,9 +145,153 @@ void main() {
 """
 
 
+# Shader minimalista pra bursts de clique (aneis expansivos no ponto
+# do pinch). Cada vertice carrega corner ([-1..1]) + center (px) +
+# radius (px) + alpha + color_id. Renderizado APOS o mesh, alpha-blended.
+_BURST_VERTEX_SHADER = """
+#version 330 core
+uniform mat4 u_proj;
+in vec2 in_corner;
+in vec2 in_center;
+in float in_radius;
+in float in_alpha;
+in float in_color_id;
+out vec2 v_local;
+out float v_alpha;
+out float v_color_id;
+void main() {
+    vec2 world = in_center + in_corner * in_radius;
+    gl_Position = u_proj * vec4(world, 0.0, 1.0);
+    v_local = in_corner;
+    v_alpha = in_alpha;
+    v_color_id = in_color_id;
+}
+"""
+
+_BURST_FRAGMENT_SHADER = """
+#version 330 core
+in vec2 v_local;
+in float v_alpha;
+in float v_color_id;
+out vec4 frag_color;
+void main() {
+    float d = length(v_local);
+    if (d > 1.0) discard;
+    // Anel: pico em d ~= 0.82, espessura ~0.12 — borda macia.
+    float ring = 1.0 - clamp(abs(d - 0.82) / 0.12, 0.0, 1.0);
+    ring = pow(ring, 1.6);
+    if (ring < 0.02) discard;
+    // 0 = red-ish (clique esquerdo/double/drag), 1 = cyan (right-click).
+    vec3 col = v_color_id < 0.5
+        ? vec3(1.00, 0.42, 0.48)
+        : vec3(0.40, 0.92, 1.00);
+    // Halo interno leve pra dar profundidade no centro do anel.
+    float halo = (1.0 - smoothstep(0.0, 0.7, d)) * 0.12;
+    frag_color = vec4(col, (ring + halo) * v_alpha);
+}
+"""
+
+
 # =====================================================================
 # Click-through nativo Windows (deps lazy — so quando precisa)
 # =====================================================================
+
+# =====================================================================
+# System cursor hide/restore (Win32)
+# =====================================================================
+# Quando o holograma esta ativo, queremos que A MAO seja o ponteiro —
+# nao "cursor + mao". Trocamos os cursores do sistema por uma versao
+# transparente (SetSystemCursor) e restauramos via SPI_SETCURSORS.
+# Estado global pra evitar hide duplicado e garantir restore via atexit
+# mesmo se o app crashar.
+_CURSOR_HIDDEN: bool = False
+
+
+def _hide_system_cursor_win32() -> bool:
+    """Substitui cursores do sistema por versao invisivel.
+
+    Idempotente: chamadas repetidas nao tem efeito adicional. Retorna True
+    se aplicou (ou ja estava aplicado), False se nao for Windows ou falhar.
+    """
+    global _CURSOR_HIDDEN
+    if _CURSOR_HIDDEN:
+        return True
+    if sys.platform != "win32":
+        return False
+    try:
+        import ctypes
+        user32 = ctypes.windll.user32
+
+        # Cursor 32x32 totalmente transparente:
+        # AND mask all 1s + XOR mask all 0s = pixels totalmente transparentes.
+        size = 32
+        bytes_per_plane = size * size // 8
+        and_plane = (ctypes.c_ubyte * bytes_per_plane)(*([0xFF] * bytes_per_plane))
+        xor_plane = (ctypes.c_ubyte * bytes_per_plane)(*([0x00] * bytes_per_plane))
+        blank = user32.CreateCursor(None, 0, 0, size, size, and_plane, xor_plane)
+        if not blank:
+            return False
+
+        # OCR_* = cursores do sistema que substituimos.
+        # SetSystemCursor ASSUME OWNERSHIP do handle a cada chamada,
+        # portanto duplicamos pra cada substituicao.
+        OCR_IDS = (
+            32512,  # OCR_NORMAL  — seta padrao
+            32513,  # OCR_IBEAM   — text
+            32649,  # OCR_HAND    — link
+            32650,  # OCR_APPSTARTING
+            32651,  # OCR_HELP
+            32646,  # OCR_SIZEALL
+            32643,  # OCR_SIZENS
+            32644,  # OCR_SIZEWE
+            32642,  # OCR_SIZENWSE
+            32645,  # OCR_SIZENESW
+            32648,  # OCR_NO
+            32514,  # OCR_WAIT
+        )
+        for ocr in OCR_IDS:
+            try:
+                dup = user32.CopyIcon(blank)
+                if dup:
+                    user32.SetSystemCursor(dup, ocr)
+            except Exception:
+                pass
+
+        user32.DestroyCursor(blank)
+        _CURSOR_HIDDEN = True
+        logger.info("System cursor escondido (holograma ativo)")
+        return True
+    except Exception as e:  # pragma: no cover
+        logger.debug("hide cursor falhou: %s", e)
+        return False
+
+
+def _restore_system_cursor_win32() -> bool:
+    """Restaura cursores do sistema ao default (SPI_SETCURSORS)."""
+    global _CURSOR_HIDDEN
+    if not _CURSOR_HIDDEN:
+        return True
+    if sys.platform != "win32":
+        return False
+    try:
+        import ctypes
+        SPI_SETCURSORS = 0x0057
+        ok = ctypes.windll.user32.SystemParametersInfoW(
+            SPI_SETCURSORS, 0, None, 0,
+        )
+        _CURSOR_HIDDEN = False
+        if ok:
+            logger.info("System cursor restaurado")
+        return bool(ok)
+    except Exception as e:  # pragma: no cover
+        logger.debug("restore cursor falhou: %s", e)
+        return False
+
+
+# Safety net: se o processo morrer, restaurar cursor pra nao deixar
+# o usuario com cursor invisivel pelo sistema inteiro.
+atexit.register(_restore_system_cursor_win32)
+
 
 def _apply_click_through_win32(hwnd: int) -> bool:
     """Aplica click-through em janela Windows via SetWindowLongW.
@@ -191,7 +344,11 @@ if _PYSIDE_OK and _MGL_OK:
             fmt.setVersion(3, 3)
             fmt.setProfile(QSurfaceFormat.OpenGLContextProfile.CoreProfile)
             fmt.setAlphaBufferSize(8)
-            fmt.setSamples(4)  # 4x MSAA
+            # PERF: 4x → 2x MSAA. Em surface fullscreen + rim suave (depth
+            # fade + fresnel), 2x produz resultado visualmente identico ao
+            # 4x mas com ~50% do custo de fragment shader. Em telas 1080p+
+            # esse foi o segundo maior ganho de fps medido.
+            fmt.setSamples(2)
             self.setFormat(fmt)
 
             # Tamanho = tela primaria inteira
@@ -207,11 +364,28 @@ if _PYSIDE_OK and _MGL_OK:
             self._program: Optional[moderngl.Program] = None
             self._gl_ready: bool = False
 
-            # Timer de repaint
-            interval_ms = max(8, int(1000 / max(10, target_fps)))
+            # Timer de repaint — ADAPTATIVO:
+            # - rate ATIVO (target_fps): quando ha mao OU bursts em curso.
+            #   Garante render fluido (~30fps) durante uso real.
+            # - rate IDLE (~6fps): sem mao detectada e sem burst pendente.
+            #   Mantem janela viva sem queimar CPU/GPU em redraw a vazio
+            #   (sem isso, cada paintGL faz clear+compositing fullscreen).
+            # set_active() alterna entre os dois conforme o estado real.
+            self._active_interval_ms = max(8, int(1000 / max(10, target_fps)))
+            self._idle_interval_ms = 160  # ~6 fps quando nao ha o que mostrar
             self._timer = QTimer(self)
             self._timer.timeout.connect(self.requestUpdate)
-            self._timer.start(interval_ms)
+            self._timer.start(self._idle_interval_ms)
+            self._timer_active = False
+
+        def set_active_rate(self, active: bool) -> None:
+            """Alterna timer entre rate ativo (mao visivel) e idle."""
+            if active == self._timer_active:
+                return
+            self._timer_active = active
+            self._timer.setInterval(
+                self._active_interval_ms if active else self._idle_interval_ms,
+            )
 
         def initializeGL(self) -> None:
             try:
@@ -306,10 +480,16 @@ class HologramGLBackend:
         self._pose_y: float = 0.0
         self._pose_visible: bool = False
 
-        # Smoothing dos landmarks (mesmo padrao do Qt backend)
+        # Smoothing dos landmarks.
+        # v6.9.13: min_cutoff 0.8 → 0.55 — em repouso o OneEuro filtra mais
+        # forte, eliminando ~60% do tremor visual do holograma quando a mao
+        # esta parada (tinha micro-vibracao visivel que dava sensacao de
+        # "instabilidade"). beta 1.5 → 1.8 mantem a abertura agressiva
+        # quando ha movimento real — sem lag perceptivel.
         self._lm_smoothers: Optional[List[OneEuroSmoother2D]] = None
-        self._lm_smoother_min_cutoff: float = 0.8
-        self._lm_smoother_beta: float = 1.5
+        self._lm_smoothed_buf: Optional[List[Tuple[float, float, float]]] = None
+        self._lm_smoother_min_cutoff: float = 0.55
+        self._lm_smoother_beta: float = 1.8
 
         # Cursor (pra idle ring future)
         self._cursor_x: float = 0.0
@@ -331,6 +511,30 @@ class HologramGLBackend:
         self._vao = None
         self._MAX_VERTS: int = 1536    # ~2x current 769 verts
         self._MAX_INDICES: int = 4096  # ~2x current 4422 (1474*3)
+
+        # Bursts de clique — feedback visual quando A MAO dispara uma acao.
+        # Sem isso, o usuario nao "sente" que a mao clicou (cursor escondido).
+        # BurstManager e' puro state; renderizamos via _burst_program/VAO em
+        # _render_bursts. Lazy-init dos recursos GL no primeiro burst.
+        self._burst_mgr: BurstManager = BurstManager()
+        self._burst_program = None
+        self._burst_vbo = None
+        self._burst_vao = None
+        self._MAX_BURSTS: int = 16  # double-click conta 2 aneis simultaneos
+        # PERF: scratch buffer pre-alocado pros vertices dos aneis.
+        # Cada burst = 6 verts * 7 floats. Preenchemos in-place a cada render.
+        # Evita np.empty + loop python aninhado por frame.
+        self._burst_scratch: np.ndarray = np.zeros(
+            (self._MAX_BURSTS * 6, 7), dtype=np.float32,
+        )
+        # Template de corners (mesma sequencia em todo burst): preencher 1x.
+        # Layout das 6 colunas: [corner.x, corner.y, ...] — só corners agora.
+        _corners = np.array([
+            [-1.0, -1.0], [1.0, -1.0], [1.0, 1.0],
+            [-1.0, -1.0], [1.0,  1.0], [-1.0, 1.0],
+        ], dtype=np.float32)
+        # Replica corners para todos os slots
+        self._burst_scratch[:, 0:2] = np.tile(_corners, (self._MAX_BURSTS, 1))
 
         # v6.9.8.9: mesh cache — pula gen quando pose estavel.
         # Smoother converge quando mao para → landmarks identicos → cache hit
@@ -378,8 +582,20 @@ class HologramGLBackend:
         screen = self._app.primaryScreen()
         if screen is not None:
             geom = screen.geometry()
-            self._screen_w = geom.width()
-            self._screen_h = geom.height()
+            # FIX alinhamento cursor↔holograma:
+            # geom.width()/height() do Qt vem em pixels LOGICOS (device-independent).
+            # Mas (a) o framebuffer do QOpenGLWindow é em pixels FÍSICOS — o
+            # resizeGL recebe physical e o viewport vive em physical — e (b) o
+            # CursorController usa pyautogui, que reporta/move em pixels FÍSICOS
+            # (processo DPI-aware). Se o ortho usar logical e os vértices vierem
+            # em physical (pose_x = cursor._last_x), em telas com escala >100%
+            # (125/150/175%) o holograma renderiza deslocado do cursor — quanto
+            # maior o DPR, maior o drift.
+            # Multiplicar por devicePixelRatio normaliza tudo pra physical e
+            # garante que o midpoint do pinch caia EXATAMENTE no pixel do cursor.
+            dpr = float(screen.devicePixelRatio() or 1.0)
+            self._screen_w = int(round(geom.width()  * dpr))
+            self._screen_h = int(round(geom.height() * dpr))
 
         self._window = _HologramGLWindow(self, self._target_fps)
         self._window.hide()
@@ -395,9 +611,17 @@ class HologramGLBackend:
         if enabled:
             self._window.show()
             self._window.raise_()
+            # Esconde o cursor do sistema — a partir daqui A MAO HOLOGRAFICA
+            # é o ponteiro do usuario. Sem isso o usuario veria "seta + mao",
+            # quebrando a imersao de que a mao na tela e' a propria mao real.
+            _hide_system_cursor_win32()
         else:
             self._window.hide()
             self._pose_visible = False
+            # Restaura o cursor — overlay desligado volta ao mouse normal.
+            _restore_system_cursor_win32()
+            # Limpa bursts ativos pra nao "ressuscitarem" ao reativar.
+            self._burst_mgr.clear()
 
     def toggle(self) -> bool:
         self.set_enabled(not self._enabled)
@@ -417,18 +641,26 @@ class HologramGLBackend:
             self._pose_visible = False
             self._pose_landmarks = None
             self._lm_smoothers = None
+            # Se nao ha bursts ativos, deixa o timer cair pra rate IDLE
+            # (paintGL praticamente vazio nesse caso).
+            if self._window is not None and self._burst_mgr.count() == 0:
+                self._window.set_active_rate(False)
             return
         smoothed = self._smooth_landmarks(landmarks)
         self._pose_landmarks = smoothed
         self._pose_visible = True
         self._pose_x = float(screen_x)
         self._pose_y = float(screen_y)
+        # Mao detectada → timer em rate ATIVO (target_fps) p/ render fluido.
+        if self._window is not None:
+            self._window.set_active_rate(True)
 
     def _smooth_landmarks(
         self,
         raw: Sequence[Tuple[float, float, float]],
     ) -> List[Tuple[float, float, float]]:
-        if self._lm_smoothers is None or len(self._lm_smoothers) != len(raw):
+        n = len(raw)
+        if self._lm_smoothers is None or len(self._lm_smoothers) != n:
             self._lm_smoothers = [
                 OneEuroSmoother2D(
                     freq=60.0,
@@ -436,13 +668,20 @@ class HologramGLBackend:
                     beta=self._lm_smoother_beta,
                     d_cutoff=1.0,
                 )
-                for _ in raw
+                for _ in range(n)
             ]
-        out: List[Tuple[float, float, float]] = []
-        for smoother, p in zip(self._lm_smoothers, raw):
-            sx, sy = smoother(p[0], p[1])
-            out.append((sx, sy, p[2]))
-        return out
+            # PERF: lista pre-alocada — substituimos elementos em vez de
+            # rebuild com list-append + tuple-alloc 21x por frame.
+            self._lm_smoothed_buf: List[Tuple[float, float, float]] = [
+                (0.0, 0.0, 0.0)
+            ] * n
+        buf = self._lm_smoothed_buf
+        smoothers = self._lm_smoothers
+        for i in range(n):
+            p = raw[i]
+            sx, sy = smoothers[i](p[0], p[1])
+            buf[i] = (sx, sy, p[2])
+        return buf
 
     def update_cursor(self, screen_x: float, screen_y: float) -> None:
         self._cursor_x = float(screen_x)
@@ -450,9 +689,18 @@ class HologramGLBackend:
         self._has_cursor = True
 
     def fire_burst(self, kind: str = "click") -> None:
-        # TODO: implementar burst como pass adicional GL.
-        # Por enquanto sem efeito visual (gestos continuam funcionando).
-        pass
+        """No-op (v6.9.13): paradigma de mouse fisico — sem feedback visual.
+
+        Real mice nao tem 'anel vermelho' explodindo no click; o feedback
+        e' o cursor PARADO + UI reagindo. Anel visual estava roubando a
+        atencao do usuario e quebrando a sensacao de naturalidade.
+
+        Metodo mantido pra compat com call-sites (virtual_mouse_service
+        chama em todos os eventos). Infraestrutura (BurstManager,
+        shaders, scratch buffer) preservada — restauracao futura sem
+        ajustar callers.
+        """
+        return
 
     def pump(self) -> None:
         if not self.available or self._app is None:
@@ -465,6 +713,11 @@ class HologramGLBackend:
     def close(self) -> None:
         # v6.9.8.6: libera buffers persistentes antes da window
         self._release_buffers()
+        self._release_burst_buffers()
+        # Restaura cursor antes de fechar a janela — garantia extra de que
+        # o sistema nao fica com cursor invisivel se close() for chamado
+        # fora do fluxo normal de toggle.
+        _restore_system_cursor_win32()
         if self._window is not None:
             try:
                 self._window.close()
@@ -523,6 +776,7 @@ class HologramGLBackend:
         ctx.clear(0.0, 0.0, 0.0, 0.0)
 
         if not self._pose_visible or self._pose_landmarks is None:
+            # v6.9.13: bursts removidos (sem feedback visual no click)
             return
 
         # v6.9.8.9: mesh cache check antes de regenerar.
@@ -599,6 +853,94 @@ class HologramGLBackend:
 
         # Render apenas os indices usados (buffer pode ser maior)
         self._vao.render(moderngl.TRIANGLES, vertices=n_indices)
+
+    # ---------------------------------------------- Bursts (click feedback)
+
+    def _render_bursts(self, ctx) -> None:
+        """Renderiza aneis de feedback de click no ponto do pinch."""
+        self._burst_mgr.cleanup()
+        snaps = self._burst_mgr.snapshots()
+        if not snaps:
+            return
+
+        # Lazy-init shader + buffers no primeiro burst (precisa ctx ativo).
+        if self._burst_program is None:
+            try:
+                self._burst_program = ctx.program(
+                    vertex_shader=_BURST_VERTEX_SHADER,
+                    fragment_shader=_BURST_FRAGMENT_SHADER,
+                )
+            except Exception as e:  # pragma: no cover
+                logger.debug("burst program falhou: %s", e)
+                return
+            # 6 verts por anel * 7 floats por vert (corner.xy, center.xy,
+            # radius, alpha, color_id). Reservamos espaco com folga.
+            self._burst_vbo = ctx.buffer(reserve=self._MAX_BURSTS * 6 * 7 * 4)
+            self._burst_vao = ctx.vertex_array(
+                self._burst_program,
+                [
+                    (
+                        self._burst_vbo,
+                        "2f 2f 1f 1f 1f",
+                        "in_corner", "in_center", "in_radius",
+                        "in_alpha", "in_color_id",
+                    ),
+                ],
+            )
+
+        # Preenche scratch buffer direto (corners ja sao constantes nas
+        # colunas 0:2). Cada slot = 6 verts contiguos com center/r/a/cid
+        # replicados. Sem listas Python intermediarias.
+        scratch = self._burst_scratch
+        slot_count = 0
+        max_slots = self._MAX_BURSTS
+
+        for snap in snaps:
+            color_id = 0.0 if snap.color_kind == "red" else 1.0
+            # Primario
+            if snap.alpha > 0.01 and snap.radius > 0.5 and slot_count < max_slots:
+                base = slot_count * 6
+                scratch[base:base + 6, 2] = snap.x
+                scratch[base:base + 6, 3] = snap.y
+                scratch[base:base + 6, 4] = snap.radius
+                scratch[base:base + 6, 5] = snap.alpha
+                scratch[base:base + 6, 6] = color_id
+                slot_count += 1
+            # Secundario (double-click)
+            if snap.secondary_alpha > 0.01 and snap.secondary_radius > 0.5 \
+                    and slot_count < max_slots:
+                base = slot_count * 6
+                scratch[base:base + 6, 2] = snap.x
+                scratch[base:base + 6, 3] = snap.y
+                scratch[base:base + 6, 4] = snap.secondary_radius
+                scratch[base:base + 6, 5] = snap.secondary_alpha
+                scratch[base:base + 6, 6] = color_id
+                slot_count += 1
+
+        if slot_count == 0:
+            return
+
+        # Sobe APENAS os bytes em uso (slot_count * 6 verts * 7 floats * 4 bytes).
+        self._burst_vbo.write(scratch[:slot_count * 6].tobytes())
+
+        try:
+            self._burst_program["u_proj"].write(
+                self._ortho_projection_matrix().tobytes(),
+            )
+        except KeyError:
+            pass
+
+        self._burst_vao.render(moderngl.TRIANGLES, vertices=slot_count * 6)
+
+    def _release_burst_buffers(self) -> None:
+        for attr in ("_burst_vao", "_burst_vbo", "_burst_program"):
+            obj = getattr(self, attr, None)
+            if obj is not None:
+                try:
+                    obj.release()
+                except Exception:
+                    pass
+                setattr(self, attr, None)
 
     def _release_buffers(self) -> None:
         """Libera buffers GPU (chamado em realloc ou close)."""

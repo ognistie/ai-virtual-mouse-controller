@@ -37,6 +37,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Deque, List, Optional, Tuple
 
+from .finger_posture import (
+    FINGER_CHAIN_INDEX,
+    FINGER_CHAIN_MIDDLE,
+    finger_extension,
+)
+from .hand_anchor import RobustHandAnchor
 from .hand_tracker import HandLandmarks
 
 
@@ -51,6 +57,21 @@ LM_THUMB_TIP = 4
 LM_INDEX_TIP = 8
 LM_MIDDLE_TIP = 12
 LM_MIDDLE_MCP = 9
+
+# Sentinel: ancora o cursor no MIDPOINT do pinch (polegar + indicador).
+# Quando usado como CURSOR_ANCHOR_LANDMARK, get_anchor_position retorna
+# (lm[4] + lm[8]) / 2 — mesmo ponto onde o holograma desenha a junção
+# do pinch. Resultado: ao fechar o pinch os dedos se encontram exatamente
+# sobre o cursor (imersão visual no overlay holográfico).
+LM_PINCH_MIDPOINT = -1
+
+# Sentinel: ancora ROBUSTA — combinacao ponderada de TODOS os landmarks
+# visiveis e estaveis (ver core/hand_anchor.py). Resistente a oclusao:
+# quando a webcam corta a palma, a mao esta de perfil, ou um landmark
+# critico falha, o peso migra organicamente pros pontos ainda confiaveis,
+# sem saltos no cursor. RECOMENDADO como default — preserva a UX
+# (cursor segue a mao) sem o ponto unico de falha.
+LM_ROBUST_HAND = -2
 
 
 # ---------------------------------------------------------------------
@@ -100,7 +121,43 @@ def compute_hand_size(hand: HandLandmarks) -> float:
     return _distance_2d(lm[LM_WRIST], lm[LM_MIDDLE_MCP])
 
 
-def get_anchor_position(hand: HandLandmarks, anchor_landmark: int = LM_MIDDLE_MCP):
+def get_anchor_position(
+    hand: HandLandmarks,
+    anchor_landmark: int = LM_MIDDLE_MCP,
+    *,
+    robust_anchor: "Optional[RobustHandAnchor]" = None,
+):
+    """
+    Calcula a coordenada normalizada que o cursor deve seguir.
+
+    Modos (selecionados via `anchor_landmark`):
+      LM_ROBUST_HAND (-2)   ancora ponderada usando todos os 21 landmarks
+                            (resistente a oclusao). Exige `robust_anchor`
+                            injetado — sem ele, faz fallback p/ pinch midpoint.
+      LM_PINCH_MIDPOINT (-1) midpoint(polegar 4, indicador 8). Alinha com
+                            o ponto onde o holograma fecha o pinch.
+      0..20                  landmark unico do MediaPipe Hands.
+
+    A funcao continua PURA: estado fica encapsulado no `robust_anchor`
+    injetado, nao em variaveis globais.
+    """
+    # Modo robusto: delega pra instancia stateful injetada.
+    if anchor_landmark == LM_ROBUST_HAND:
+        if robust_anchor is not None:
+            res = robust_anchor.compute(hand.landmarks)
+            return (res.x, res.y)
+        # Sem instancia disponivel: fallback consistente p/ pinch midpoint
+        # (segundo melhor anchor — alinha com o holograma).
+        anchor_landmark = LM_PINCH_MIDPOINT
+
+    # Modo especial: ancora no midpoint do pinch (polegar 4 + indicador 8).
+    # Alinha 1-pra-1 com a ancora do mesh holografico (_PINCH_ANCHOR em
+    # hand_mesh.py), garantindo que o ponto onde os dedos se tocam no
+    # overlay coincida exatamente com o cursor na tela.
+    if anchor_landmark == LM_PINCH_MIDPOINT:
+        lm_t = hand.landmarks[LM_THUMB_TIP]
+        lm_i = hand.landmarks[LM_INDEX_TIP]
+        return ((lm_t[0] + lm_i[0]) * 0.5, (lm_t[1] + lm_i[1]) * 0.5)
     lm = hand.landmarks[anchor_landmark]
     return (lm[0], lm[1])
 
@@ -133,43 +190,84 @@ def classify_shape(
     pinch_threshold: float,
     pinch_middle_threshold: float = 0.0,
     pinch_middle_index_guard: float = 0.0,
+    *,
+    pinch_middle_index_extension_min: float = 0.88,
+    pinch_middle_middle_extension_max: float = 0.92,
 ) -> HandShape:
     """
     Classifica a forma da mao em uma das HandShape.
 
     PRIORIDADE de classificacao:
-    1. PINCH_MIDDLE (clique direito v6.9) — polegar+medio juntos E indicador AFASTADO
+    1. PINCH_MIDDLE (clique direito) — polegar+medio juntos E indicador
+       claramente ESTENDIDO E medio claramente CURVADO (postura intencional)
     2. PINCH (clique normal) — polegar+indicador juntos
     3. FIST / OPEN_HAND / PEACE / OTHER
 
+    --- Por que postura anatomica? (v6.9.12) ---
+    O classificador anterior decidia PINCH_MIDDLE so com distancias
+    par-a-par. Por acoplamento de tendoes flexores (FDP), o dedo medio
+    cai naturalmente 30-50% quando o usuario faz PINCH (polegar+indicador).
+    Isso fazia o medio chegar perto do polegar inadvertidamente -> falso
+    positivo de RIGHT_CLICK durante CLICK.
+
+    Fix: validamos a POSTURA dos dedos via `finger_extension` (score
+    rotation-invariant). PINCH_MIDDLE so dispara quando o usuario fez a
+    postura intencional:
+      - Indicador EXTENDIDO (>= 0.88 ratio): claramente apontando
+      - Medio CURVADO (<= 0.92 ratio): foi deliberadamente ate o polegar
+    Durante um PINCH natural, o indicador estaria curvado (score ~0.65-0.80)
+    e a porta fica fechada — sem alucinacao.
+
     Args:
-        pinch_middle_threshold: 0 (default) desabilita deteccao de PINCH_MIDDLE,
+        pinch_middle_threshold: 0 desabilita deteccao de PINCH_MIDDLE,
                                 preservando comportamento pre-v6.9.
         pinch_middle_index_guard: distancia minima polegar→indicador para
-                                  reconhecer PINCH_MIDDLE (evita falsos positivos
-                                  com a pinca normal).
+                                  reconhecer PINCH_MIDDLE (evita falsos
+                                  positivos com a pinca normal).
+        pinch_middle_index_extension_min: score minimo de extensao do
+                                          indicador para validar postura
+                                          (default 0.88 = quase reto).
+        pinch_middle_middle_extension_max: score maximo de extensao do
+                                           medio (default 0.92 = nao pode
+                                           estar reto pra ser "tocando" o
+                                           polegar de forma intencional).
     """
     lm = hand.landmarks
     dist_thumb_index = _distance_2d(lm[LM_THUMB_TIP], lm[LM_INDEX_TIP])
 
-    # NOVO v6.9: clique direito tem prioridade
-    # So dispara se: medio junto AO polegar E indicador AFASTADO do polegar
-    #
-    # v6.9.1.1 — disambiguacao por proximidade relativa:
-    # quando o usuario transita PINCH -> PINCH_MIDDLE (ex: depois de
-    # segurar pinch pra drag e tentar abrir menu de contexto), o
-    # indicador ainda fica naturalmente perto do polegar (na zona da
-    # pinca anterior). O guard absoluto rejeita. Fix: se medio esta
-    # CLARAMENTE mais proximo do polegar que indicador (30%+ closer),
-    # confirma PINCH_MIDDLE mesmo com guard falhando.
+    # PINCH_MIDDLE: ordem de portas (cheap → caro):
+    # 1) distancia polegar↔medio abaixo do threshold (raw signal)
+    # 2) postura anatomica do indicador (estendido) — GATE NOVO v6.9.12
+    # 3) postura anatomica do medio (curvado, foi ate o polegar)
+    # 4) guard de distancia (indicador afastado OU disambiguacao apertada)
     if pinch_middle_threshold > 0:
         dist_thumb_middle = _distance_2d(lm[LM_THUMB_TIP], lm[LM_MIDDLE_TIP])
-        middle_clearly_closer = dist_thumb_middle < dist_thumb_index * 0.70
-        if dist_thumb_middle < pinch_middle_threshold and (
-            dist_thumb_index > pinch_middle_index_guard
-            or middle_clearly_closer
-        ):
-            return HandShape.PINCH_MIDDLE
+        if dist_thumb_middle < pinch_middle_threshold:
+            # Postura: indicador claramente estendido E medio curvado.
+            # Esses dois gates juntos eliminam o falso positivo do
+            # acoplamento de tendoes durante PINCH normal.
+            index_ext = finger_extension(lm, FINGER_CHAIN_INDEX)
+            middle_ext = finger_extension(lm, FINGER_CHAIN_MIDDLE)
+            posture_intentional = (
+                index_ext >= pinch_middle_index_extension_min
+                and middle_ext <= pinch_middle_middle_extension_max
+            )
+
+            if posture_intentional:
+                # v6.9.1.1 — disambiguacao por proximidade relativa:
+                # quando o usuario transita PINCH -> PINCH_MIDDLE, o
+                # indicador ainda fica naturalmente perto do polegar.
+                # Apertamos 0.70 -> 0.55 (margem maior pra exigir
+                # intencao real) — agora protegido pela postura, podemos
+                # ser mais permissivos sem regredir false positives.
+                middle_clearly_closer = (
+                    dist_thumb_middle < dist_thumb_index * 0.55
+                )
+                if (
+                    dist_thumb_index > pinch_middle_index_guard
+                    or middle_clearly_closer
+                ):
+                    return HandShape.PINCH_MIDDLE
 
     # Pinch normal (mantido identico ao v6.5)
     if dist_thumb_index < pinch_threshold:
@@ -294,6 +392,11 @@ class GestureDetector:
         # Pinca dual (v6.4 → v6.5: default desabilitada)
         pinch_dual_detection: bool = False,
         pinch_velocity_threshold: float = 0.008,
+        # POSTURA anatomica para validar PINCH_MIDDLE (v6.9.12).
+        # Defaults eliminam falso positivo causado por acoplamento de
+        # tendoes (medio caindo junto durante PINCH normal).
+        pinch_middle_index_extension_min: float = 0.88,
+        pinch_middle_middle_extension_max: float = 0.92,
     ) -> None:
         self.anchor_landmark = anchor_landmark
         self.pinch_threshold = pinch_threshold
@@ -335,6 +438,20 @@ class GestureDetector:
 
         self.pinch_dual_detection = pinch_dual_detection
         self.pinch_velocity_threshold = pinch_velocity_threshold
+
+        # Thresholds de postura anatomica (v6.9.12 — anti acoplamento).
+        self.pinch_middle_index_extension_min = float(
+            pinch_middle_index_extension_min
+        )
+        self.pinch_middle_middle_extension_max = float(
+            pinch_middle_middle_extension_max
+        )
+
+        # Ancora robusta da mao — instanciada eagermente porem barata.
+        # So consultada quando anchor_landmark == LM_ROBUST_HAND. Manter
+        # como atributo permite reset() pelo proprio detector quando
+        # convem (mao perdida, modo trocado em runtime, etc).
+        self._robust_anchor: RobustHandAnchor = RobustHandAnchor()
 
         # Estado interno
         self._candidate_shape: HandShape = HandShape.UNKNOWN
@@ -389,6 +506,9 @@ class GestureDetector:
         self._previous_raw_shape = HandShape.UNKNOWN
         self._click_already_fired = False
         self._right_click_already_fired = False
+        # Ancora robusta: limpa historico de landmarks (mao saiu por muito
+        # tempo, comecaremos do zero ao re-detectar).
+        self._robust_anchor.reset()
 
     # -----------------------------------------------------------------
     # AIM ASSIST com pre-ativacao + holdover (NOVO v6.4)
@@ -540,6 +660,12 @@ class GestureDetector:
             effective_pinch_threshold,
             pinch_middle_threshold=mid_th,
             pinch_middle_index_guard=mid_guard,
+            pinch_middle_index_extension_min=(
+                self.pinch_middle_index_extension_min
+            ),
+            pinch_middle_middle_extension_max=(
+                self.pinch_middle_middle_extension_max
+            ),
         )
 
         if not self.pinch_dual_detection:
@@ -638,7 +764,7 @@ class GestureDetector:
         #
         # Press-to-click resolve os dois: feedback imediato + sempre captura.
         # ===========================================================
-        anchor_now = get_anchor_position(hand, self.anchor_landmark)
+        anchor_now = get_anchor_position(hand, self.anchor_landmark, robust_anchor=self._robust_anchor)
 
         edge_pinch = (
             self._previous_raw_shape != HandShape.PINCH
@@ -703,7 +829,7 @@ class GestureDetector:
         )
 
         if cursor_moves_in_open_hand or cursor_moves_in_pinch_drag:
-            anchor = get_anchor_position(hand, self.anchor_landmark)
+            anchor = get_anchor_position(hand, self.anchor_landmark, robust_anchor=self._robust_anchor)
             dpi_adaptive = compute_dpi_multiplier(
                 self._last_hand_size,
                 self.hand_size_reference,
@@ -722,7 +848,7 @@ class GestureDetector:
         else:
             # Em PEACE/FIST: mantem posicao para continuidade
             if confirmed_now in (HandShape.PEACE, HandShape.FIST):
-                anchor = get_anchor_position(hand, self.anchor_landmark)
+                anchor = get_anchor_position(hand, self.anchor_landmark, robust_anchor=self._robust_anchor)
                 dpi_adaptive = compute_dpi_multiplier(
                     self._last_hand_size,
                     self.hand_size_reference,
@@ -761,7 +887,7 @@ class GestureDetector:
     # -----------------------------------------------------------------
 
     def _process_action(self, shape, previous_shape, hand, now):
-        anchor = get_anchor_position(hand, self.anchor_landmark)
+        anchor = get_anchor_position(hand, self.anchor_landmark, robust_anchor=self._robust_anchor)
         event = None
 
         # 1. SAIU DE PEACE -> DOUBLE_CLICK

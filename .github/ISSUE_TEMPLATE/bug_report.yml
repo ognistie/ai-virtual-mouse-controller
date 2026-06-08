@@ -1,0 +1,93 @@
+name: Bug report
+description: Reportar um bug reproduzivel
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por reportar! Para acelerar a resolucao, preencha todos os campos.
+        Antes de abrir: cheque se ja existe issue similar em [Issues abertas](https://github.com/ognistie/ai-virtual-mouse-controller/issues).
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: O que aconteceu
+      description: Descricao clara do bug
+      placeholder: Ao tentar X, o sistema fez Y em vez de Z
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Como reproduzir
+      description: Passos minimos pra reproduzir
+      placeholder: |
+        1. Rode `python main.py`
+        2. Faca pinch com a mao direita
+        3. Veja que o cursor pula 30px
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportamento esperado
+      placeholder: O cursor deveria ficar parado no momento do click
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Versao do projeto
+      description: Output de `git rev-parse HEAD` ou tag de release
+      placeholder: "33b6174 ou v6.9.13"
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Versao do Python
+      placeholder: "3.11.7"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Sistema operacional
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS
+        - Linux
+        - Outro
+    validations:
+      required: true
+
+  - type: input
+    id: webcam
+    attributes:
+      label: Modelo da webcam (se relevante)
+      placeholder: Logitech C920 / Razer Kiyo / built-in laptop
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs com LOG_LEVEL=DEBUG
+      description: Cole os logs relevantes (ate 50 linhas; cuidado com info pessoal)
+      render: shell
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      options:
+        - label: Procurei em issues abertas e nao encontrei duplicata
+          required: true
+        - label: Estou usando uma versao suportada (ver SECURITY.md)
+          required: true
+        - label: Concordo com o Codigo de Conduta
+          required: true

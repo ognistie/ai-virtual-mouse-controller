@@ -1,0 +1,47 @@
+# Changelog
+
+Todas as mudancas notaveis deste projeto vivem aqui.
+
+Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
+Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
+
+## [Unreleased]
+
+## [0.2.0] — 2026-06-07
+
+### Added
+- `core/finger_posture.py`: features anatomicas por dedo (score de extensao, rotation-invariant) usadas pra desambiguar PINCH vs PINCH_MIDDLE.
+- `core/hand_anchor.py`: `RobustHandAnchor` — ancora ponderada multi-landmark resistente a oclusao + extrapolacao por velocidade nas bordas.
+- `CursorController.freeze(duration)`: trava o cursor no pixel atual durante N segundos. Usado pelos metodos de click para anular o drift causado pelo curl dos dedos no pinch.
+- `CursorController.drag_precision_factor`: DPI baixo durante drag (selecao de texto sem tremor).
+- Sentinel `LM_ROBUST_HAND = -2` em `gesture_detector` (default novo do `CURSOR_ANCHOR_LANDMARK`).
+- Sentinel `LM_PINCH_MIDPOINT = -1` em `gesture_detector` (alinha cursor com mesh do holograma).
+- Configs `CLICK_FREEZE_SECONDS`, `DRAG_PRECISION_FACTOR`, `PINCH_MIDDLE_INDEX_EXTENSION_MIN`, `PINCH_MIDDLE_MIDDLE_EXTENSION_MAX` em `config.py`.
+- `pyproject.toml`, `.pre-commit-config.yaml`, `.github/workflows/ci.yml`, `.github/dependabot.yml`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, issue/PR templates.
+
+### Changed
+- `SCREEN_MARGIN_PERCENTAGE`: 0.18 -> 0.10 (alcance facil ate bordas da tela sem forcar mao no limite do frame).
+- `CURSOR_ANCHOR_LANDMARK`: 9 (palma) -> -2 (ancora robusta da mao toda).
+- Holograma: cursor do sistema Windows escondido quando overlay ativo, restaurado no desligamento/atexit.
+- Holograma: smoothing per-landmark afinado (`min_cutoff` 0.8 -> 0.55; `beta` 1.5 -> 1.8) — menos tremor em repouso, mesma responsividade.
+- MSAA do holograma: 4x -> 2x (custo de fragment shader ~50% menor; visual identico em rim suave).
+- Timer de repaint do holograma agora e adaptativo: 30 fps quando ha mao/burst, ~6 fps idle.
+- `classify_shape`: PINCH_MIDDLE agora exige postura anatomica intencional (indicador estendido + medio curvado) — elimina falsos positivos de RIGHT_CLICK causados por acoplamento de tendoes durante PINCH normal.
+- `_smooth_landmarks` e `generate_hand_mesh` reescritos com buffers pre-alocados (vetorizacao numpy + zero-alloc no caminho quente).
+
+### Fixed
+- Hologram: `_update_hologram` era chamado **2x por tick** no service (bug de copy-paste) — corrigido, ~50% do custo de CPU do caminho do holograma.
+- Hologram: alinhamento cursor-holograma em telas Windows com escala 125/150/175% (DPR aplicado no ortho).
+- `tests/test_gesture_detector.py` nao coletava por `ImportError` em ambientes sem mediapipe; usa `pytest.importorskip`.
+- LICENSE consistente com `MIT` declarado nos badges/README (era "all rights reserved" contraditorio).
+
+### Removed
+- Aneis vermelhos de burst no click do holograma (paradigma de mouse fisico: feedback vem da UI reagindo, nao do cursor brilhando).
+
+---
+
+## Versoes anteriores
+
+Versionamento formal comeca a partir da `[Unreleased]` acima. Mudancas
+anteriores estao registradas em commits e nas docstrings de `config.py`
+(historico v6.4, v6.5, v6.9.x). Backfill para tags retroativas pendente.

@@ -76,8 +76,28 @@ de cv2 instalada. Coloca False se notar problema de window refresh.
 # ---------------------------------------------------------------------
 # CURSOR — PONTO DE ANCORA
 # ---------------------------------------------------------------------
-
-CURSOR_ANCHOR_LANDMARK: int = 9
+#
+# Define qual ponto da mao a posicao do cursor segue.
+#
+# Opcoes:
+#   -2 = ANCORA ROBUSTA DA MAO TODA — DEFAULT v6.9.11
+#        Combinacao ponderada de TODOS os 21 landmarks, com pesos por
+#        anatomia (palma > fingertips > intermediarios), por proximidade
+#        da borda do frame (landmark cortado pesa menos) e por estabilidade
+#        local (variancia curta = mais peso). Histerese suaviza queda de
+#        confianca. Resolve casos onde a webcam nao enxerga o centro da
+#        palma (mao de perfil, cantos do frame, oclusao parcial) — o
+#        cursor migra organicamente pros landmarks ainda visiveis sem
+#        saltos. Ver core/hand_anchor.py.
+#   -1 = MIDPOINT DO PINCH (polegar 4 + indicador 8)
+#        Alinha 1-pra-1 com a ancora do holograma; pinch fecha sobre o
+#        cursor. Vulneravel se polegar OU indicador for ocluido.
+#    0 = pulso
+#    8 = ponta do indicador
+#    9 = palma (middle MCP) — comportamento legado pre-v6.9.10
+#   12 = ponta do medio
+#
+CURSOR_ANCHOR_LANDMARK: int = -2
 
 # ---------------------------------------------------------------------
 # POSITION HOLD
@@ -215,6 +235,47 @@ Resultado: pinca normal e clique direito ficam mutuamente exclusivos.
 """
 
 # ---------------------------------------------------------------------
+# POSTURA ANATOMICA — anti acoplamento de tendoes (v6.9.12)
+# ---------------------------------------------------------------------
+# Durante PINCH (polegar+indicador), o dedo medio cai naturalmente 30-50%
+# do quanto o indicador caiu — efeito do flexor digitorum profundus (FDP)
+# que controla os 4 dedos juntos. Isso fazia o classificador antigo
+# disparar PINCH_MIDDLE (RIGHT_CLICK) inadvertidamente durante CLICK.
+#
+# Fix: alem das distancias par-a-par, validamos a POSTURA dos dedos via
+# score de extensao (razao distancia direta MCP→TIP / soma de segmentos).
+# Score ∈ [0,1]: ~1.0 = dedo reto, ~0.65 = curvado, ~0.40 = fechado.
+
+PINCH_MIDDLE_INDEX_EXTENSION_MIN: float = 0.88
+"""
+Score MINIMO de extensao do indicador para validar PINCH_MIDDLE.
+
+0.88 = indicador claramente apontando (apenas leve flexao natural).
+Durante um PINCH normal, o indicador esta CURVADO (score 0.65-0.80) —
+nessa faixa, a porta de PINCH_MIDDLE fica fechada. So abre quando o
+usuario estende deliberadamente o indicador, indicando intencao real
+de fazer o gesto de clique direito.
+
+Ajuste UP (0.92+) se ainda houver falsos positivos.
+Ajuste DOWN (0.80-) se o gesto intencional for rejeitado por sobra
+de flexao natural do indicador.
+"""
+
+PINCH_MIDDLE_MIDDLE_EXTENSION_MAX: float = 0.92
+"""
+Score MAXIMO de extensao do dedo medio para validar PINCH_MIDDLE.
+
+0.92 = medio nao pode estar totalmente reto. Para PINCH_MIDDLE real
+o medio precisa ter dobrado para encontrar o polegar — entao deve
+estar pelo menos em flexao leve. Sem esse limite, um gesto onde
+todos os dedos estao estendidos e por acidente o medio passa perto do
+polegar dispararia o clique direito.
+
+Ajuste UP (0.96) para aceitar gestos mais sutis.
+Ajuste DOWN (0.85) se houver falsos positivos com medio quase reto.
+"""
+
+# ---------------------------------------------------------------------
 # DRAG
 # ---------------------------------------------------------------------
 
@@ -249,10 +310,58 @@ GESTURE_EXIT_FRAMES: int = 3
 # TELA E MAPEAMENTO
 # ---------------------------------------------------------------------
 
-SCREEN_MARGIN_PERCENTAGE: float = 0.18
+SCREEN_MARGIN_PERCENTAGE: float = 0.10
 """
-UX: 0.20 → 0.18. Zona morta menor nas bordas → mesma area de mao cobre
-mais tela. Cursor sente "mais grudado" no movimento. Sutil.
+v6.9.13: 0.18 → 0.10. Margem reduzida significa que o usuario nao precisa
+levar a mao ate o ULTIMO 18% da borda da camera pra atingir a borda da
+tela — bordas do desktop, taskbar, cantos pra fechar janela ficam
+alcancaveis sem forcar a mao pra fora do quadro util do MediaPipe (que
+e' onde os landmarks comecam a falhar).
+
+Trade-off: cursor fica ligeiramente mais sensivel no centro. Compensado
+pelo drag_precision_factor (DPI baixo durante drag) e pelo aim_assist
+slowdown (DPI baixo perto de cliques). Resultado liquido: precisao
+maior nas tarefas que IMPORTAM (clicks finos, selecao) e alcance fluido
+nas bordas que ANTES travavam.
+"""
+
+# ---------------------------------------------------------------------
+# FEEL DE MOUSE FISICO (v6.9.13)
+# ---------------------------------------------------------------------
+# Replicam dois fundamentos que fazem mouse fisico ser preciso:
+#  1. Apertar o botao NUNCA desloca o cursor.
+#  2. DPI baixo durante movimentos finos (texto, drag).
+
+CLICK_FREEZE_SECONDS: float = 0.12
+"""
+Quanto tempo o cursor fica TRAVADO no pixel atual logo apos um click.
+
+Problema que resolve: ao fechar a pinca (polegar+indicador), o midpoint
+4+8 (= ancora do cursor) inerentemente se desloca alguns pixels — o
+polegar avanca em direcao ao indicador. Sem freeze, o cursor "viaja"
+2-10px durante o click, o que faz cliques em alvos pequenos errarem.
+
+0.12s = 120ms: cobre o intervalo entre a deteccao do raw shape PINCH e
+a estabilizacao da pose pos-fechamento. Aumente para 0.15-0.20s se ainda
+notar deriva no click. Diminua para 0.08s se sentir cursor "preso" apos
+clicks rapidos consecutivos.
+"""
+
+DRAG_PRECISION_FACTOR: float = 0.55
+"""
+Multiplicador do delta do cursor enquanto DRAG esta ativo.
+
+0.55 = mao precisa percorrer ~1.8x a distancia pra cobrir o mesmo pixel
+range. Replica o feel de "ajustar DPI pra baixo" que profissionais
+fazem fisicamente quando vao selecionar texto, fazer drag de selecao
+retangular, ou arrastar icones pra um local preciso.
+
+Sem isso, a tremedeira da mao no ar (3-5 pixels naturais) atrapalha a
+selecao de palavras / linhas no editor. Com 0.55, a mesma tremedeira
+vira 1.6-2.7 pixels — abaixo do limite perceptual.
+
+Ajuste UP (0.7-0.8) se o drag estiver lento demais.
+Ajuste DOWN (0.4) pra precisao maxima em telas 4K+.
 """
 
 # ---------------------------------------------------------------------

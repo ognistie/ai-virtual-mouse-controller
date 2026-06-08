@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussao geral
+    url: https://github.com/ognistie/ai-virtual-mouse-controller/discussions
+    about: Para perguntas, ideias, design de features grandes
+  - name: 📖 Documentacao
+    url: https://ognistie.github.io/ai-virtual-mouse-controller/
+    about: Guia de uso, troubleshooting, FAQ
+  - name: 🔒 Reportar vulnerabilidade
+    url: https://github.com/ognistie/ai-virtual-mouse-controller/security/advisories/new
+    about: Use o canal privado de Security Advisories

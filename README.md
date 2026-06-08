@@ -1,9 +1,12 @@
 # AI Virtual Mouse Controller
 
-![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
+[![CI](https://github.com/ognistie/ai-virtual-mouse-controller/actions/workflows/ci.yml/badge.svg)](https://github.com/ognistie/ai-virtual-mouse-controller/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg)
 ![Status](https://img.shields.io/badge/status-alpha-orange.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://conventionalcommits.org)
 
 > Controle o cursor do sistema operacional com gestos da mão, usando apenas uma webcam.
 
@@ -255,7 +258,22 @@ Esta é uma alpha pública. Feedback em hardwares e iluminações diferentes é 
 - 💬 Discussões: [GitHub Discussions](https://github.com/ognistie/ai-virtual-mouse-controller/discussions)
 - 💡 Sugestões de gestos: issue com label `enhancement`
 
-PRs são bem-vindos. Mantenha mudanças cirúrgicas e cobertas por testes quando possível.
+PRs são bem-vindos. Antes de submeter, leia [CONTRIBUTING.md](CONTRIBUTING.md) — cobre setup, padrões de código, convenção de commits e workflow de PR.
+
+### Para desenvolvedores
+
+```bash
+git clone https://github.com/ognistie/ai-virtual-mouse-controller.git
+cd ai-virtual-mouse-controller
+make dev          # instala deps + tooling + pre-commit hooks
+make check        # roda lint + types + tests
+```
+
+Documentação técnica em [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) e decisões formais em [`docs/adr/`](docs/adr/).
+
+## Segurança
+
+Encontrou vulnerabilidade? Veja [SECURITY.md](SECURITY.md). **Não abra issue público.**
 
 ## Licença
 

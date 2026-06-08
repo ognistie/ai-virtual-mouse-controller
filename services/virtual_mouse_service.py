@@ -211,6 +211,12 @@ class VirtualMouseService:
             dead_zone_pixels=config.DEAD_ZONE_PIXELS,
             failsafe=config.PYAUTOGUI_FAILSAFE,
             pyautogui_pause=config.PYAUTOGUI_PAUSE,
+            click_freeze_seconds=getattr(
+                config, "CLICK_FREEZE_SECONDS", 0.12,
+            ),
+            drag_precision_factor=getattr(
+                config, "DRAG_PRECISION_FACTOR", 0.55,
+            ),
         )
 
         # 6. Smoother (API real: kwargs alpha, freq, min_cutoff, beta, d_cutoff)
@@ -276,6 +282,12 @@ class VirtualMouseService:
             velocity_fast_factor=config.VELOCITY_FAST_FACTOR,
             pinch_dual_detection=config.PINCH_DUAL_DETECTION,
             pinch_velocity_threshold=config.PINCH_VELOCITY_THRESHOLD,
+            pinch_middle_index_extension_min=getattr(
+                config, "PINCH_MIDDLE_INDEX_EXTENSION_MIN", 0.88,
+            ),
+            pinch_middle_middle_extension_max=getattr(
+                config, "PINCH_MIDDLE_MIDDLE_EXTENSION_MAX", 0.92,
+            ),
         )
 
     # -----------------------------------------------------------------
@@ -411,11 +423,6 @@ class VirtualMouseService:
         # Toda a logica acima (smoother, cursor, deteccao) NAO eh afetada.
         with prof.stage("hologram"):
             self._update_hologram(hand)
-
-        # Holograma: alimenta a pose atual (barato, sempre que possivel)
-        # e bomba os eventos do Tk pra janela continuar responsiva.
-        # Toda a logica acima (smoother, cursor, deteccao) NAO eh afetada.
-        self._update_hologram(hand)
 
         if self.enable_preview:
             with prof.stage("preview"):

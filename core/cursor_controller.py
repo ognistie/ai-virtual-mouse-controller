@@ -42,6 +42,8 @@ class CursorController:
         failsafe: bool = False,
         pyautogui_pause: float = 0.0,
         double_click_interval: float = 0.10,
+        click_freeze_seconds: float = 0.12,
+        drag_precision_factor: float = 0.55,
     ) -> None:
         if not 0.0 <= screen_margin_percentage < 0.5:
             raise ValueError(
@@ -54,11 +56,26 @@ class CursorController:
         self.screen_margin = screen_margin_percentage
         self.dead_zone = max(0, dead_zone_pixels)
         self.double_click_interval = double_click_interval
+        # v6.9.13 — feel de mouse fisico:
+        # click_freeze: quanto tempo o cursor fica TRAVADO no pixel atual
+        # imediatamente apos um click. Em mouse fisico, apertar o botao
+        # NUNCA move o cursor; aqui o curl dos dedos no pinch desloca o
+        # midpoint e o cursor andava 5-15px na hora do click. Freeze
+        # ANULA esse drift — clique cai exatamente onde voce mirou.
+        self.click_freeze_seconds = max(0.0, float(click_freeze_seconds))
+        # drag_precision_factor: quanto escala o delta do cursor enquanto
+        # DRAG esta ativo. 0.55 = mao precisa andar quase 2x pra cobrir a
+        # mesma distancia em pixel — replica o feel de "mouse DPI baixo"
+        # que profissionais usam pra selecionar texto/icones sem tremedeira.
+        self.drag_precision_factor = max(0.1, min(1.0, float(drag_precision_factor)))
 
         self.screen_width, self.screen_height = pyautogui.size()
         self._last_x: Optional[int] = None
         self._last_y: Optional[int] = None
         self._dragging = False
+
+        # Estado do freeze (timestamp futuro ate o qual ignoramos move).
+        self._frozen_until: float = 0.0
 
         logger.info(
             "CursorController iniciado | tela=%dx%d | margin=%.2f | dead_zone=%dpx | dbl_interval=%.2fs",
@@ -75,7 +92,26 @@ class CursorController:
         return int(x_pixel), int(y_pixel)
 
     def move(self, nx: float, ny: float) -> None:
+        # Click freeze: enquanto travado, ignoramos todas as updates de
+        # posicao. O cursor permanece exatamente onde estava no instante
+        # do click — feel de mouse fisico (apertar botao nao move).
+        if self._frozen_until > 0.0 and time.perf_counter() < self._frozen_until:
+            return
+
         x, y = self.map_to_screen(nx, ny)
+
+        # Drag precision: enquanto DRAG ativo, escala o delta — replica o
+        # feel de DPI baixo pra selecao de texto / movimentos finos.
+        # Aplicado em PIXEL space pra ser independente de escala normalizada.
+        if (
+            self._dragging
+            and self._last_x is not None
+            and self._last_y is not None
+        ):
+            dx = (x - self._last_x) * self.drag_precision_factor
+            dy = (y - self._last_y) * self.drag_precision_factor
+            x = int(round(self._last_x + dx))
+            y = int(round(self._last_y + dy))
 
         if self._last_x is not None and self._last_y is not None:
             if abs(x - self._last_x) < self.dead_zone and \
@@ -91,7 +127,35 @@ class CursorController:
         self._last_x = x
         self._last_y = y
 
+    # ---------------------------------------------------------- Freeze API
+
+    def freeze(self, duration_seconds: float) -> None:
+        """Trava o cursor no pixel atual por N segundos.
+
+        Usado pelos metodos de click pra anular o drift causado pelo
+        curl dos dedos durante o pinch — clique cai exatamente onde
+        voce mirou, igual mouse fisico.
+
+        Composavel: chamadas sucessivas levam o freeze ATE o maior
+        dos timestamps (nao reset).
+        """
+        if duration_seconds <= 0.0:
+            return
+        target = time.perf_counter() + duration_seconds
+        if target > self._frozen_until:
+            self._frozen_until = target
+
+    def is_frozen(self) -> bool:
+        return (
+            self._frozen_until > 0.0
+            and time.perf_counter() < self._frozen_until
+        )
+
     def click(self) -> None:
+        # Trava o cursor ANTES de disparar — frames seguintes da pose
+        # podem chegar com pinch midpoint deslocado pelo curl dos dedos,
+        # mas o cursor ja esta congelado no pixel mirado.
+        self.freeze(self.click_freeze_seconds)
         try:
             pyautogui.click(_pause=False)
             logger.debug("CLICK executado")
@@ -125,6 +189,8 @@ class CursorController:
         delay configurable. Isso garante que apps como Explorer, Chrome,
         etc. reconhecam como duplo clique do sistema.
         """
+        # Freeze cobre os dois cliques + interval (composavel).
+        self.freeze(self.click_freeze_seconds + self.double_click_interval)
         try:
             pyautogui.click(_pause=False)
             time.sleep(self.double_click_interval)
@@ -159,6 +225,7 @@ class CursorController:
         esse evento. _pause=False mantem o tempo zero entre cliques (nosso
         cooldown ja e tratado pelo GestureDetector).
         """
+        self.freeze(self.click_freeze_seconds)
         try:
             pyautogui.rightClick(_pause=False)
             logger.debug("RIGHT_CLICK executado")
@@ -180,6 +247,10 @@ class CursorController:
     def drag_start(self) -> None:
         if self._dragging:
             return
+        # Freeze breve no inicio do drag pra que o mouseDown caia no pixel
+        # exato onde o usuario mirou (sem drift do curl). Depois do freeze,
+        # drag_precision_factor entra em acao escalando o movimento.
+        self.freeze(self.click_freeze_seconds)
         try:
             pyautogui.mouseDown(_pause=False)
             self._dragging = True
@@ -205,6 +276,9 @@ class CursorController:
     def drag_end(self) -> None:
         if not self._dragging:
             return
+        # Freeze no drop tambem — quando o usuario solta o pinch o curl
+        # reverso pode arrastar o cursor 5-10px antes do mouseUp registrar.
+        self.freeze(self.click_freeze_seconds)
         try:
             pyautogui.mouseUp(_pause=False)
             self._dragging = False
