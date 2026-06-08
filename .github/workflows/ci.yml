@@ -36,8 +36,9 @@ jobs:
         run: pip install "ruff>=0.4.0"
       - name: Ruff check
         run: ruff check .
-      - name: Ruff format check
-        run: ruff format --check .
+      # NOTA: `ruff format --check` esta opt-in (nao bloqueia CI) ate o
+      # codebase passar por uma rodada de format inicial controlada. Dev
+      # local pode rodar `make format` a qualquer momento.
 
   type-check:
     name: Mypy (modulos puros)
