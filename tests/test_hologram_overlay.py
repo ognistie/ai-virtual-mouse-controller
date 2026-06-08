@@ -37,6 +37,13 @@ class TestOverlayConstruction:
         finally:
             h.close()
 
+    @pytest.mark.skipif(
+        os.environ.get("CI") == "true",
+        reason=(
+            "Available depende de GL context real — CI offscreen pode "
+            "retornar False legitimamente. Validado local."
+        ),
+    )
     def test_available_true_with_pyside(self):
         from core.hologram_overlay import HologramOverlay
         h = HologramOverlay()

@@ -7,6 +7,14 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.0.5] — 2026-06-08
+
+### Fixed
+- `test_available_true_with_pyside` agora skipa em CI. O atributo
+  `available` da overlay depende de GL context REAL — em offscreen
+  retorna False legitimamente, o que falsamente quebrava o build.
+- Consolida tudo do v1.0.4 que tambem nao chegou ao PyPI (CI bloqueou).
+
 ## [1.0.4] — 2026-06-08
 
 ### Fixed
