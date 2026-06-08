@@ -7,6 +7,19 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.0.2] — 2026-06-08
+
+### Changed
+- Holograma 3D (PySide6 + ModernGL) **agora vem incluido por padrao** no
+  install. Quem rodar `pip install ai-virtual-mouse-controller` ja tem
+  o overlay pronto pra usar via tecla H — sem precisar do extra
+  `[hologram]`. O extra continua existindo pra back-compat.
+- Trade-off: +500MB no download base. Compensado pela UX zero-friction.
+
+### Fixed
+- Documenta workaround pro caso de usuario ter mediapipe 0.11+ instalado
+  no ambiente global (downgrade explicito).
+
 ## [1.0.1] — 2026-06-08
 
 ### Added

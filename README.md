@@ -60,7 +60,7 @@ Posicione a mão a ~50cm da câmera. **`H`** liga o holograma · **`S`** abre o 
 | **🐧 Linux (X11)** | `sudo apt install scrot python3-tk python3-dev` (Ubuntu/Debian). PyAutoGUI precisa desses pra capturar tela. |
 | **🐧 Linux (Wayland)** | PyAutoGUI tem suporte limitado. Recomendado mudar pra sessão X11 ou rodar em modo headless de teste. |
 
-Holograma 3D (opcional, ~500MB extra): `pip install "ai-virtual-mouse-controller[hologram]"`
+Holograma 3D já vem incluído por padrão — basta apertar `H` em runtime. Em ambientes headless (server, sem display): use `pip install ai-virtual-mouse-controller --no-deps` + instale só as deps que precisa.
 
 </details>
 

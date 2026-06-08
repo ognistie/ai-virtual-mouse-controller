@@ -11,7 +11,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-virtual-mouse-controller"
-version = "1.0.1"
+version = "1.0.2"
 description = "Controle de cursor por gestos da mao via webcam, com holograma 3D opcional."
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
@@ -45,10 +45,15 @@ dependencies = [
     "mediapipe>=0.10.18,<0.11.0",
     "pyautogui>=0.9.54,<1.0.0",
     "numpy>=1.26.0,<2.2.0",
+    # v1.0.2: holograma vira default — usuario que roda
+    # `pip install ai-virtual-mouse-controller` ja consegue ativar via tecla H
+    # sem precisar do extra. Trade-off: +500MB no download.
+    "moderngl>=5.10.0",
+    "PySide6>=6.6.0",
 ]
 
 [project.optional-dependencies]
-# Backend ModernGL 3D para o holograma (cai pra QPainter se nao instalado).
+# Mantido pra back-compat: quem ja usava `[hologram]` continua funcionando.
 hologram = [
     "moderngl>=5.10.0",
     "PySide6>=6.6.0",
