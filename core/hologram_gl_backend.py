@@ -367,23 +367,32 @@ if _PYSIDE_OK and _MGL_OK:
             # Timer de repaint — ADAPTATIVO:
             # - rate ATIVO (target_fps): quando ha mao OU bursts em curso.
             #   Garante render fluido (~30fps) durante uso real.
-            # - rate IDLE (~6fps): sem mao detectada e sem burst pendente.
-            #   Mantem janela viva sem queimar CPU/GPU em redraw a vazio
-            #   (sem isso, cada paintGL faz clear+compositing fullscreen).
+            # - rate IDLE (~20fps): sem mao detectada e sem burst pendente.
+            #   v0.3: era 6fps (160ms). Subido pra 20fps (50ms) porque a
+            #   primeira frame apos mao reaparecer no quadro estava chegando
+            #   com ate 160ms de latencia (intervalo do idle), o que se sentia
+            #   como "delay" no movimento. CPU extra e' desprezivel.
             # set_active() alterna entre os dois conforme o estado real.
             self._active_interval_ms = max(8, int(1000 / max(10, target_fps)))
-            self._idle_interval_ms = 160  # ~6 fps quando nao ha o que mostrar
+            self._idle_interval_ms = 50  # ~20 fps idle (responsividade > CPU)
             self._timer = QTimer(self)
             self._timer.timeout.connect(self.requestUpdate)
             self._timer.start(self._idle_interval_ms)
             self._timer_active = False
 
         def set_active_rate(self, active: bool) -> None:
-            """Alterna timer entre rate ativo (mao visivel) e idle."""
+            """Alterna timer entre rate ativo (mao visivel) e idle.
+
+            v0.3: usa timer.start(interval) em vez de setInterval() — o
+            setInterval() do Qt nao reinicia o timer, espera o proximo
+            tick do intervalo antigo, e depois aplica o novo. Resultado:
+            ao sair do idle, primeira frame podia demorar ate 50ms a mais
+            do que devia. start() restarta imediatamente.
+            """
             if active == self._timer_active:
                 return
             self._timer_active = active
-            self._timer.setInterval(
+            self._timer.start(
                 self._active_interval_ms if active else self._idle_interval_ms,
             )
 
@@ -481,6 +490,16 @@ class HologramGLBackend:
         self._pose_visible: bool = False
 
         # Smoothing dos landmarks.
+        # v0.3 — TUNADO PARA RESPONSIVIDADE:
+        # min_cutoff 0.55 → 1.2: cutoff base maior reduz lag perceptivel em
+        #   movimentos sustentados (antes a mao holografica "arrastava"
+        #   atras do gesto real ~50ms).
+        # beta 1.8 → 2.5: cutoff abre mais agressivamente em velocidade
+        #   maior — sem lag quando o usuario gesticula rapido.
+        # Trade-off: tremor microscopico em repouso pode aparecer, mas o
+        #   MediaPipe ja filtra muito, e o d_cutoff=1.0 segura o restante.
+        # Resultado: mao holografica acompanha gesto real "grudada" sem
+        #   atrasos perceptiveis.
         # v6.9.13: min_cutoff 0.8 → 0.55 — em repouso o OneEuro filtra mais
         # forte, eliminando ~60% do tremor visual do holograma quando a mao
         # esta parada (tinha micro-vibracao visivel que dava sensacao de
@@ -488,8 +507,8 @@ class HologramGLBackend:
         # quando ha movimento real — sem lag perceptivel.
         self._lm_smoothers: Optional[List[OneEuroSmoother2D]] = None
         self._lm_smoothed_buf: Optional[List[Tuple[float, float, float]]] = None
-        self._lm_smoother_min_cutoff: float = 0.55
-        self._lm_smoother_beta: float = 1.8
+        self._lm_smoother_min_cutoff: float = 1.2
+        self._lm_smoother_beta: float = 2.5
 
         # Cursor (pra idle ring future)
         self._cursor_x: float = 0.0
@@ -611,14 +630,16 @@ class HologramGLBackend:
         if enabled:
             self._window.show()
             self._window.raise_()
-            # Esconde o cursor do sistema — a partir daqui A MAO HOLOGRAFICA
-            # é o ponteiro do usuario. Sem isso o usuario veria "seta + mao",
-            # quebrando a imersao de que a mao na tela e' a propria mao real.
-            _hide_system_cursor_win32()
+            # v0.3: cursor do sistema PERMANECE visivel quando overlay liga.
+            # Antes escondiamos via SetSystemCursor pra "mao holografica
+            # virar o ponteiro", mas isso causava confusao visual e
+            # quebrava a expectativa do usuario. Cursor nativo do Windows
+            # convive lado a lado com a mao — leitura mais natural.
         else:
             self._window.hide()
             self._pose_visible = False
-            # Restaura o cursor — overlay desligado volta ao mouse normal.
+            # Safety net: se em algum cenario o cursor tiver sido escondido
+            # (sessao anterior crash, toggle interrompido), restauramos.
             _restore_system_cursor_win32()
             # Limpa bursts ativos pra nao "ressuscitarem" ao reativar.
             self._burst_mgr.clear()
