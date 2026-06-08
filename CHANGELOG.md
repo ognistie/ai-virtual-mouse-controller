@@ -7,6 +7,15 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.0.4] — 2026-06-08
+
+### Fixed
+- Tests de rendering Qt+OpenGL (`TestRenderingNoCrash`) agora skipam
+  em ambiente CI (offscreen sem GL context real). Antes crashavam o
+  pytest no Ubuntu CI, impedindo o publish.
+- Consolida fixes do 1.0.3 que nao chegaram ao PyPI por falha
+  transitoria de sigstore (ChunkedEncodingError).
+
 ## [1.0.3] — 2026-06-08
 
 ### Fixed

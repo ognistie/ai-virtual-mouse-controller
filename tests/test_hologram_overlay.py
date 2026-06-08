@@ -162,6 +162,13 @@ class TestBurstFiring:
     not _PYSIDE_AVAILABLE,
     reason="PySide6 nao instalado",
 )
+@pytest.mark.skipif(
+    os.environ.get("CI") == "true",
+    reason=(
+        "Render real Qt+OpenGL crasha em CI sem display server "
+        "(offscreen platform nao garante GL context). Roda local."
+    ),
+)
 class TestRenderingNoCrash:
     """Garante que o paint roda sem crashar com varias configuracoes."""
 
