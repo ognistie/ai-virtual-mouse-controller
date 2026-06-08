@@ -11,7 +11,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-virtual-mouse-controller"
-version = "1.0.2"
+version = "1.0.3"
 description = "Controle de cursor por gestos da mao via webcam, com holograma 3D opcional."
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
@@ -42,7 +42,11 @@ classifiers = [
 ]
 dependencies = [
     "opencv-python>=4.10.0,<5.0.0",
-    "mediapipe>=0.10.18,<0.11.0",
+    # CRITICAL: mediapipe 0.10.30+ removeu mp.solutions.hands que esse
+    # projeto usa. Range estreito 0.10.18-0.10.21 garante o modulo
+    # solutions presente. Quando migrarmos pro novo Task API podemos
+    # abrir esse range.
+    "mediapipe>=0.10.18,<0.10.30",
     "pyautogui>=0.9.54,<1.0.0",
     "numpy>=1.26.0,<2.2.0",
     # v1.0.2: holograma vira default — usuario que roda

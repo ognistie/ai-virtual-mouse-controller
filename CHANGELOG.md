@@ -7,6 +7,18 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.0.3] — 2026-06-08
+
+### Fixed
+- **CRITICAL**: pin de mediapipe apertado de `<0.11.0` para `<0.10.30`.
+  Mediapipe 0.10.30+ removeu silenciosamente o modulo `mp.solutions.hands`
+  que esse projeto usa. Versao 0.10.21 e' o ultimo release seguro.
+  Sem essa correcao, `pip install` instalava mediapipe 0.10.35 e quebrava
+  no startup com AttributeError obscuro.
+- main.py agora verifica versao do mediapipe ANTES de importar o resto.
+  Se mp.solutions.hands nao existe, mostra mensagem clara com comando
+  de fix em vez do AttributeError obscuro.
+
 ## [1.0.2] — 2026-06-08
 
 ### Changed
