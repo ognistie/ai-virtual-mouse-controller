@@ -448,12 +448,21 @@
       }));
     }
 
-    // Holographic canvas — volumetric variant
+    // Holographic canvas — mesmo padrao skeleton dos outros 2 canvases
+    // (todos os 21 landmarks visiveis), com brilho um pouco maior pra
+    // marcar a secao "holografica" sem virar visual divergente.
     const holoCanvas = $("#holoCanvas");
-    if (holoCanvas && window.HoloRenderer) {
-      handRenderers.push(new window.HoloRenderer(holoCanvas, {
+    if (holoCanvas) {
+      handRenderers.push(new window.HandRenderer(holoCanvas, {
+        accent: "#22d3ee",
+        accentSoft: "rgba(34, 211, 238, 0.22)",
+        ink: "#cbd5e1",
+        landmarkRadius: 4,
+        landmarkRadiusBig: 5,
+        lineWidth: 1.4,
         sway: 3,
-        breathScale: 0.02
+        breathScale: 0.02,
+        fingertipsGlow: true
       }));
     }
   }
