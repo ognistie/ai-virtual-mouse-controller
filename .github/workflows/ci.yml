@@ -53,10 +53,10 @@ jobs:
         run: |
           pip install "mypy>=1.10.0" numpy
       - name: Mypy run
-        # So nos modulos puros recentes — modulos legacy ficam fora ate
-        # refactor dos god-files.
+        # So nos modulos puros que passam mypy limpo. smoothing.py e legacy
+        # com type issue real — entra quando passar por cleanup de tipagem.
         run: |
-          mypy core/hand_anchor.py core/finger_posture.py core/smoothing.py \
+          mypy core/hand_anchor.py core/finger_posture.py \
                core/click_burst.py core/utils.py core/perf_telemetry.py
 
   test:

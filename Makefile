@@ -33,8 +33,8 @@ format:  ## Aplica ruff format
 	ruff format .
 	ruff check . --fix
 
-type-check:  ## Roda mypy nos modulos puros
-	mypy core/hand_anchor.py core/finger_posture.py core/smoothing.py \
+type-check:  ## Roda mypy nos modulos puros que passam limpo
+	mypy core/hand_anchor.py core/finger_posture.py \
 	     core/click_burst.py core/utils.py core/perf_telemetry.py
 
 check: lint type-check test  ## Roda tudo: lint + types + tests

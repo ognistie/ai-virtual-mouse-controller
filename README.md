@@ -269,7 +269,7 @@ make dev          # instala deps + tooling + pre-commit hooks
 make check        # roda lint + types + tests
 ```
 
-Documentação técnica em [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) e decisões formais em [`docs/adr/`](docs/adr/).
+Decisões de arquitetura formais ficam em [`docs/adr/`](docs/adr/).
 
 ## Segurança
 

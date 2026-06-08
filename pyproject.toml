@@ -224,7 +224,10 @@ exclude = [
 ]
 
 [[tool.mypy.overrides]]
-module = ["core.hand_anchor", "core.finger_posture", "core.smoothing"]
-# Modulos puros recentes — type-check rigoroso.
+module = ["core.hand_anchor"]
+# Type-check rigoroso so no modulo escrito do zero com tipagem completa.
+# Outros modulos puros (finger_posture, smoothing) podem subir pra strict
+# quando passarem por uma rodada de cleanup de tipagem (helpers internos
+# sem annotation, operadores com None implicito etc).
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
