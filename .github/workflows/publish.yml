@@ -1,0 +1,96 @@
+# ============================================================================
+# Publish — publica o pacote no PyPI ao criar tag v*
+# ============================================================================
+# Disparado quando voce push uma tag (ex: v0.3.0). Builda, valida e
+# publica usando Trusted Publishing (OIDC) — sem precisar guardar token
+# nos secrets do repo.
+#
+# Setup (uma vez):
+# 1. Cria conta em pypi.org + ativa 2FA
+# 2. Em pypi.org -> Account settings -> Publishing -> Add a new pending
+#    publisher com:
+#      Project name: ai-virtual-mouse-controller
+#      Owner: ognistie
+#      Repository: ai-virtual-mouse-controller
+#      Workflow: publish.yml
+#      Environment: pypi
+# 3. No GitHub -> Settings -> Environments -> New environment "pypi"
+# 4. Cria git tag e push:
+#      git tag v0.3.0
+#      git push origin v0.3.0
+# ============================================================================
+
+name: Publish to PyPI
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch: {}  # permite rodar manualmente pelo UI do GitHub
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install build tooling
+        run: pip install build twine
+
+      - name: Build wheel + sdist
+        run: python -m build
+
+      - name: Verify metadata
+        run: twine check dist/*
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: dist/
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    needs: build
+    runs-on: ubuntu-latest
+    # So roda em tag formal (nao em manual dispatch) pra evitar publicar
+    # snapshot no TestPyPI sem querer.
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/ai-virtual-mouse-controller/
+    permissions:
+      id-token: write  # OIDC — sem token guardado
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [build, publish-testpypi]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: pypi
+      url: https://pypi.org/project/ai-virtual-mouse-controller/
+    permissions:
+      id-token: write  # OIDC — sem token guardado
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

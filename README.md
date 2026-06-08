@@ -33,6 +33,15 @@ Webcam → 21 landmarks → cursor do sistema. Sem hardware extra. Sem GPU.
 
 ## Comece
 
+Requer **Python 3.11 ou 3.12** + webcam.
+
+```bash
+pip install ai-virtual-mouse-controller
+avmc
+```
+
+Ou via clone:
+
 ```powershell
 git clone https://github.com/ognistie/ai-virtual-mouse-controller.git
 cd ai-virtual-mouse-controller && py -3.11 -m venv .venv && .\.venv\Scripts\Activate.ps1
@@ -40,6 +49,20 @@ pip install -r requirements.txt && python main.py
 ```
 
 Posicione a mão a ~50cm da câmera. **`H`** liga o holograma · **`S`** abre o painel · **`ESC`** sai.
+
+<details>
+<summary><b>Pré-requisitos por OS</b></summary>
+
+| OS | Setup adicional |
+|---|---|
+| **🪟 Windows 10/11** | Nada. Funciona out-of-the-box após `pip install`. |
+| **🍎 macOS** | Após primeiro run, libere acesso em **System Settings → Privacy & Security → Accessibility** (cursor) e **Camera** (webcam). Em Apple Silicon: se PyAutoGUI reclamar, `pip install pyobjc-core pyobjc`. |
+| **🐧 Linux (X11)** | `sudo apt install scrot python3-tk python3-dev` (Ubuntu/Debian). PyAutoGUI precisa desses pra capturar tela. |
+| **🐧 Linux (Wayland)** | PyAutoGUI tem suporte limitado. Recomendado mudar pra sessão X11 ou rodar em modo headless de teste. |
+
+Holograma 3D (opcional, ~500MB extra): `pip install "ai-virtual-mouse-controller[hologram]"`
+
+</details>
 
 ---
 
