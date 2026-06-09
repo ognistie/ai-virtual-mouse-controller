@@ -28,6 +28,7 @@ from core.cursor_controller import CursorController
 from core.gesture_detector import Gesture, GestureDetector
 from core.hand_tracker import HandTracker
 from core.hologram_overlay import HologramOverlay
+from core.keyboard import AccessibilitySettings, KeyboardOverlay
 from core.perf_telemetry import configure as configure_perf, get_profiler
 from core.runtime_settings import RuntimeSettings
 from core.smoothing import make_smoother
@@ -174,6 +175,57 @@ class VirtualMouseService:
             print(f"[AVM] Falha ao iniciar HologramOverlay: {e}", flush=True)
             logger.warning("Falha ao iniciar HologramOverlay: %s", e)
             self.hologram = None
+
+        # Smart Adaptive Holographic Keyboard (v7.0).
+        # Falha silenciosamente se PySide6 nao puder iniciar — projeto segue.
+        self.keyboard: Optional[KeyboardOverlay] = None
+        self._keyboard_toggle_key: str = (
+            getattr(config, "KEYBOARD_TOGGLE_KEY", "k") or "k"
+        ).lower()
+        try:
+            access = AccessibilitySettings(
+                keyboard_scale=getattr(config, "KEYBOARD_SCALE", 1.0),
+                opacity=getattr(config, "KEYBOARD_OPACITY", 0.85),
+                high_contrast=getattr(config, "KEYBOARD_HIGH_CONTRAST", False),
+                reduced_motion=getattr(config, "KEYBOARD_REDUCED_MOTION", False),
+                audio_feedback=getattr(config, "KEYBOARD_AUDIO_FEEDBACK", False),
+                tremor_compensation=getattr(
+                    config, "KEYBOARD_TREMOR_COMPENSATION", 0,
+                ),
+            )
+            self.keyboard = KeyboardOverlay(
+                layout_name=getattr(config, "KEYBOARD_LAYOUT", "ABNT2"),
+                target_fps=getattr(config, "KEYBOARD_FPS", 60),
+                adaptive_profile_path=getattr(
+                    config, "KEYBOARD_ADAPTIVE_PROFILE_PATH",
+                    "data/keyboard/adaptive_profile.json",
+                ),
+                dict_path=getattr(
+                    config, "KEYBOARD_DICT_PATH",
+                    "data/keyboard/dict_pt_br.txt",
+                ),
+                accessibility=access,
+                typer_dry_run=getattr(config, "KEYBOARD_DRY_RUN", False),
+                vertical_anchor=getattr(
+                    config, "KEYBOARD_VERTICAL_ANCHOR", 0.50,
+                ),
+            )
+            print(
+                f"[AVM] KeyboardOverlay criado: available={self.keyboard.available} "
+                f"| layout={getattr(config, 'KEYBOARD_LAYOUT', 'ABNT2')} "
+                f"| aperte '{self._keyboard_toggle_key.upper()}' pra ligar/desligar",
+                flush=True,
+            )
+            if (
+                getattr(config, "KEYBOARD_ENABLED", False)
+                and self.keyboard.available
+            ):
+                self.keyboard.set_enabled(True)
+                print("[AVM] Keyboard ATIVO no startup", flush=True)
+        except Exception as e:
+            print(f"[AVM] Falha ao iniciar KeyboardOverlay: {e}", flush=True)
+            logger.warning("Falha ao iniciar KeyboardOverlay: %s", e)
+            self.keyboard = None
 
     # -----------------------------------------------------------------
     # Factory (todas as chamadas verificadas contra core/)
@@ -424,6 +476,10 @@ class VirtualMouseService:
         with prof.stage("hologram"):
             self._update_hologram(hand)
 
+        # Teclado holografico — alimenta hover/pinch quando ativo.
+        with prof.stage("keyboard"):
+            self._update_keyboard(hand, events)
+
         if self.enable_preview:
             with prof.stage("preview"):
                 self._draw_overlays(frame, hand, raw_results)
@@ -439,6 +495,24 @@ class VirtualMouseService:
                 if key_masked in (ord('t'), ord('T')):
                     self._apply_always_on_top(on=not self._always_on_top)
                     logger.info("ALWAYS_ON_TOP = %s", self._always_on_top)
+                    return
+                # Tecla K alterna o teclado holografico em runtime
+                kkey = self._keyboard_toggle_key
+                if key_masked in (ord(kkey), ord(kkey.upper())):
+                    if self.keyboard is not None and self.keyboard.available:
+                        new_state = self.keyboard.toggle()
+                        print(
+                            f"[AVM] KEYBOARD = {new_state} | "
+                            f"layout={self.keyboard.state.layout.name}",
+                            flush=True,
+                        )
+                    else:
+                        print(
+                            f"[AVM] Keyboard indisponivel: "
+                            f"obj={self.keyboard is not None}, "
+                            f"available={self.keyboard.available if self.keyboard else None}",
+                            flush=True,
+                        )
                     return
                 # NOVO: tecla H alterna o holograma (mao na tela) em runtime
                 hkey = self._hologram_toggle_key
@@ -552,10 +626,82 @@ class VirtualMouseService:
         h.pump()
 
     # -----------------------------------------------------------------
+    # Smart Adaptive Holographic Keyboard
+    # -----------------------------------------------------------------
+
+    def _update_keyboard(self, hand, events) -> None:
+        """
+        Alimenta o KeyboardOverlay com fingertip + pinch raw.
+
+        Convencao: quando o teclado esta ATIVO, o pinch (CLICK) e' consumido
+        pelo teclado e NAO dispara click no SO. Isso e' tratado em
+        _handle_events via flag self._keyboard_consumed_pinch.
+        """
+        self._keyboard_consumed_pinch = False
+        kb = self.keyboard
+        if kb is None or not kb.available:
+            return
+
+        # Sempre pump (mesmo desligado — janela Qt precisa processar)
+        kb.pump()
+
+        if not kb.enabled or hand is None:
+            return
+
+        lms = getattr(hand, "landmarks", None)
+        if lms is None or len(lms) < 21:
+            return
+
+        # Posicao de hover do teclado = MESMO ponto que o cursor visivel.
+        # Antes: hard-coded lms[8] divergia do CURSOR_ANCHOR_LANDMARK
+        # (default -2 = robusto) → tecla destacada nao batia com cursor.
+        # Agora: usa cursor._last_x/_last_y que ja foi processado pelo
+        # CursorController (anchor configurado + smoothing + clamp).
+        # Fallback pra lms[8] se cursor ainda nao tem posicao.
+        if (self.cursor._last_x is not None
+                and self.cursor._last_y is not None):
+            fx, fy = float(self.cursor._last_x), float(self.cursor._last_y)
+        else:
+            try:
+                ix, iy = lms[8][0], lms[8][1]
+                fx, fy = self.cursor.map_to_screen(ix, iy)
+            except Exception:
+                return
+
+        # pinch raw — qualquer CLICK ou DRAG_START no frame e' "pinch_now"
+        pinch_now = any(
+            ev.gesture in (Gesture.CLICK, Gesture.DRAG_START)
+            for ev in events
+        )
+
+        kb.on_frame(lms, pinch_now, (fx, fy))
+
+        # Marca que o pinch deste frame ja foi consumido pelo teclado.
+        if pinch_now:
+            self._keyboard_consumed_pinch = True
+
+    # -----------------------------------------------------------------
     # Event handlers (API real do CursorController)
     # -----------------------------------------------------------------
 
     def _handle_events(self, events, hand=None) -> None:
+        # Quando o teclado holografico esta ATIVO, o pinch confirma teclas
+        # em vez de clicar no SO. Suprime CLICK/DOUBLE_CLICK/RIGHT_CLICK/
+        # DRAG_START — cursor MOVE continua livre pra hover.
+        keyboard_active = (
+            self.keyboard is not None
+            and self.keyboard.available
+            and self.keyboard.enabled
+        )
+        if keyboard_active:
+            events = [
+                ev for ev in events
+                if ev.gesture not in (
+                    Gesture.CLICK, Gesture.DOUBLE_CLICK,
+                    Gesture.RIGHT_CLICK, Gesture.DRAG_START, Gesture.DRAG_END,
+                )
+            ]
+
         move_event = None
         action_events = []
         for ev in events:
@@ -835,5 +981,11 @@ class VirtualMouseService:
         if self.hologram is not None:
             try:
                 self.hologram.close()
+            except Exception:
+                pass
+        # Fecha o teclado holografico (salva adaptive profile)
+        if self.keyboard is not None:
+            try:
+                self.keyboard.close()
             except Exception:
                 pass

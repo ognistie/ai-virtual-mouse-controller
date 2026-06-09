@@ -42,6 +42,7 @@ logs/
 # Arquivos locais com dados / segredos (NUNCA commitar)
 # ============================================================================
 calibration.json
+data/keyboard/adaptive_profile.json
 .env
 .env.*
 !.env.example

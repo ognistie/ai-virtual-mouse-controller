@@ -518,6 +518,64 @@ do Windows. Tem que ser uma cor que nao apareca em mais nada desenhado.
 """
 
 # ---------------------------------------------------------------------
+# SMART ADAPTIVE HOLOGRAPHIC KEYBOARD (v7.0)
+# ---------------------------------------------------------------------
+# Teclado virtual gesture-driven (hover indicador + pinch para confirmar).
+# Toggle em runtime pela tecla KEYBOARD_TOGGLE_KEY. Quando ATIVO o pinch
+# escreve teclas em vez de clicar (mouse fica em hover-only no SO).
+# Spec: docs/smart-adaptive-holographic-keyboard-spec.md
+
+KEYBOARD_ENABLED: bool = True
+"""Se True, abre o teclado ao iniciar. Default False — onboarding via tecla."""
+
+KEYBOARD_TOGGLE_KEY: str = "k"
+"""Tecla para alternar o teclado em runtime."""
+
+KEYBOARD_LAYOUT: str = "ABNT2"
+"""Layout padrao: ABNT2 | QWERTY | COMPACT | FULL."""
+
+KEYBOARD_FPS: int = 60
+"""Taxa alvo de redesenho. 60 da fluidez premium."""
+
+KEYBOARD_SCALE: float = 1.0
+"""Escala do teclado [0.6 .. 1.8]."""
+
+KEYBOARD_OPACITY: float = 0.85
+"""Opacidade do painel glass [0.4 .. 1.0]."""
+
+KEYBOARD_HIGH_CONTRAST: bool = False
+KEYBOARD_REDUCED_MOTION: bool = False
+KEYBOARD_AUDIO_FEEDBACK: bool = False
+
+KEYBOARD_TREMOR_COMPENSATION: int = 0
+"""
+Compensacao de tremor para acessibilidade [0..3].
+0 = off (responsivo); 3 = forte (cursor com inercia significativa).
+Aplica OneEuroFilter agressivo ao fingertip antes do hover dispatch.
+"""
+
+KEYBOARD_ADAPTIVE_PROFILE_PATH: str = "data/keyboard/adaptive_profile.json"
+"""Onde o profile da IA adaptativa (por usuario) e' persistido."""
+
+KEYBOARD_DICT_PATH: str = "data/keyboard/dict_pt_br.txt"
+"""
+Dicionario PT-BR para predicao. Formato: uma palavra por linha, opcionalmente
+seguida da frequencia. Se ausente, usa vocabulario minimo embutido.
+"""
+
+KEYBOARD_DRY_RUN: bool = False
+"""Se True, nao envia teclas ao SO — uso para demos sem acionar apps."""
+
+KEYBOARD_VERTICAL_ANCHOR: float = 0.50
+"""
+Posicao vertical do teclado na tela.
+  0.0 = topo
+  0.5 = centro perfeito (recomendado, ergonomia)
+  1.0 = fundo
+Centralizacao matematica independente da resolucao.
+"""
+
+# ---------------------------------------------------------------------
 # PERFORMANCE TELEMETRY (instrumentation per estagio do tick loop)
 # ---------------------------------------------------------------------
 
