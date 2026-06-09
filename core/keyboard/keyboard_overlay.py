@@ -51,6 +51,9 @@ class KeyboardOverlay:
         accessibility: Optional[AccessibilitySettings] = None,
         typer_dry_run: bool = False,
         vertical_anchor: float = 0.50,
+        dwell_enabled: bool = True,
+        dwell_duration_s: float = 3.0,
+        dwell_cooldown_s: float = 0.25,
     ) -> None:
         self.available: bool = False
         self.enabled: bool = False
@@ -69,13 +72,16 @@ class KeyboardOverlay:
         self._predictor = TextPredictor(dict_path=dict_path)
         self._adaptive = AdaptiveModel(profile_path=adaptive_profile_path)
 
-        # Controller
+        # Controller (com config dwell-to-type)
         self.controller = KeyboardController(
             state=self.state,
             typer=self._typer,
             predictor=self._predictor,
             adaptive=self._adaptive,
             accessibility=self.accessibility,
+            dwell_enabled=dwell_enabled,
+            dwell_duration_s=dwell_duration_s,
+            dwell_cooldown_s=dwell_cooldown_s,
         )
 
         # Renderer (PySide6 — falha graciosamente se ausente)

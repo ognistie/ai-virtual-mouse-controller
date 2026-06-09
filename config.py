@@ -566,6 +566,23 @@ seguida da frequencia. Se ausente, usa vocabulario minimo embutido.
 KEYBOARD_DRY_RUN: bool = False
 """Se True, nao envia teclas ao SO — uso para demos sem acionar apps."""
 
+KEYBOARD_DWELL_ENABLED: bool = True
+"""
+Modo dwell-to-type: tecla e selecionada deixando o dedo sobre ela por
+KEYBOARD_DWELL_DURATION_S segundos. Quando True (default), pinca eh
+ignorada. Quando False, volta pro modo pinch (polegar+indicador).
+"""
+
+KEYBOARD_DWELL_DURATION_S: float = 3.0
+"""Tempo (segundos) que o dedo precisa permanecer sobre a tecla."""
+
+KEYBOARD_DWELL_COOLDOWN_S: float = 0.25
+"""
+Cooldown apos um press (anti re-fire). Durante esse periodo, mesmo
+permanecendo sobre a tecla, novo press nao dispara. Da tempo do
+usuario "sair" da tecla antes de re-armar.
+"""
+
 KEYBOARD_VERTICAL_ANCHOR: float = 0.42
 """
 Posicao vertical do teclado na tela.

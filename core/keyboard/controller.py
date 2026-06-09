@@ -27,16 +27,15 @@ from .prediction import TextPredictor
 logger = logging.getLogger(__name__)
 
 
-# Cooldown entre presses (anti-bounce + ergonomia).
-# 0.12s = 120ms = limite teorico ~8 chars/s de pinch encadeado.
-# Anterior 0.18s limitava a ~5.5/s. Cooldown ainda alto o suficiente
-# pra evitar bounce duplo do mesmo pinch fisico (~50ms tipico).
+# Cooldown entre presses (modo pinch — legacy quando dwell desligado).
 PRESS_COOLDOWN_S = 0.12
 
-# Limiar mínimo de hover_score pra aceitar um pinch como press de tecla.
-# 0.18 = permissivo. Cursor proximo da borda da tecla ainda dispara.
-# Anteior 0.30 rejeitava silenciosamente cliques perto da borda.
+# Limiar mínimo de hover_score pra aceitar press.
 PRESS_HOVER_THRESHOLD = 0.18
+
+# Dwell-to-type defaults (override via construtor a partir do config).
+DWELL_DURATION_S_DEFAULT = 3.0
+DWELL_COOLDOWN_S_DEFAULT = 0.25
 
 
 class KeyboardController:
@@ -56,12 +55,24 @@ class KeyboardController:
         predictor: TextPredictor,
         adaptive: AdaptiveModel,
         accessibility: AccessibilitySettings,
+        *,
+        dwell_enabled: bool = True,
+        dwell_duration_s: float = DWELL_DURATION_S_DEFAULT,
+        dwell_cooldown_s: float = DWELL_COOLDOWN_S_DEFAULT,
     ) -> None:
         self.state = state
         self.typer = typer
         self.predictor = predictor
         self.adaptive = adaptive
         self.accessibility = accessibility
+
+        # Dwell-to-type config
+        self.dwell_enabled = dwell_enabled
+        self.dwell_duration_s = max(0.3, dwell_duration_s)
+        self.dwell_cooldown_s = max(0.0, dwell_cooldown_s)
+        # Estado runtime do dwell
+        self._dwell_key: Optional[str] = None
+        self._dwell_start_t: float = 0.0
 
         self.hover = HoverDetector()
 
@@ -121,6 +132,8 @@ class KeyboardController:
         if not self.state.visible:
             self._pinch_active = pinch_now
             self.state.cursor_xy = None
+            self.state.dwell_progress = 0.0
+            self._dwell_key = None
             return
 
         fx, fy = self._finger_smoother(*finger_xy_screen)
@@ -129,15 +142,18 @@ class KeyboardController:
         # visual exatamente onde o hover detecta. Usuario mira no marker.
         self.state.cursor_xy = (fx, fy)
 
-        # Hover update
+        # Hover update — atualiza state.hovered_code
         self.hover.update(fx, fy, self.state)
 
-        # Edge detection — pinch_now True após False = press
-        edge = pinch_now and not self._pinch_active
-        self._pinch_active = pinch_now
-
-        if edge:
-            self._handle_press(fx, fy)
+        # Modo selecao: dwell-to-type OU pinch edge
+        if self.dwell_enabled:
+            self._update_dwell(fx, fy)
+        else:
+            # Legacy pinch mode (mantido como fallback se dwell desabilitado)
+            edge = pinch_now and not self._pinch_active
+            self._pinch_active = pinch_now
+            if edge:
+                self._handle_press(fx, fy)
 
         # Adaptive periódico (a cada ~30 frames = 0.5 s @60 fps)
         self._adaptive_apply_counter += 1
@@ -147,11 +163,63 @@ class KeyboardController:
                 self.state, self._half_w_avg, self._half_h_avg
             )
 
+    # ───────────────────────────────────────────────────── dwell logic
+
+    def _update_dwell(self, fx: float, fy: float) -> None:
+        """Dwell-to-type: tecla dispara quando dedo permanece sobre ela
+        por self.dwell_duration_s segundos. Sem necessidade de pinca.
+
+        Algoritmo:
+          1. Se hovered_code mudou → reseta timer + zera progress.
+          2. Se hovered_code is None → progress = 0, sem dispatch.
+          3. Se em cooldown (post-press) → progress = 0, sem dispatch.
+          4. Senao, calcula progress = elapsed / duration.
+          5. Quando progress >= 1.0 → press + reset timer + cooldown.
+        """
+        now = time.perf_counter()
+        hov = self.state.hovered_code
+
+        # Mudou de tecla? Reset.
+        if hov != self._dwell_key:
+            self._dwell_key = hov
+            self._dwell_start_t = now
+            self.state.dwell_progress = 0.0
+            return
+
+        # Sem hover ou hover_score insuficiente → sem progresso.
+        if hov is None:
+            self.state.dwell_progress = 0.0
+            return
+        ks = self.state.keys.get(hov)
+        if ks is None or ks.hover_score < PRESS_HOVER_THRESHOLD:
+            self.state.dwell_progress = 0.0
+            return
+
+        # Cooldown pos-press? Skip ate sair da tecla.
+        if now - self._last_press_t < self.dwell_cooldown_s:
+            self.state.dwell_progress = 0.0
+            return
+
+        elapsed = now - self._dwell_start_t
+        progress = elapsed / self.dwell_duration_s
+        if progress >= 1.0:
+            self.state.dwell_progress = 1.0
+            self._handle_press(fx, fy)
+            # Reset pra proxima tecla (mesma tecla precisa "sair e voltar")
+            self._dwell_start_t = now
+            self.state.dwell_progress = 0.0
+        else:
+            self.state.dwell_progress = max(0.0, min(1.0, progress))
+
     # ───────────────────────────────────────────────────── press logic
 
     def _handle_press(self, fx: float, fy: float) -> None:
         now = time.perf_counter()
-        if now - self._last_press_t < PRESS_COOLDOWN_S:
+        # Modo pinch usa PRESS_COOLDOWN_S; modo dwell usa dwell_cooldown_s
+        # (verificado em _update_dwell antes de chamar). Cooldown abaixo
+        # protege ambos os modos contra dispatch duplicado no mesmo frame.
+        cooldown = self.dwell_cooldown_s if self.dwell_enabled else PRESS_COOLDOWN_S
+        if now - self._last_press_t < cooldown:
             logger.debug(
                 "[KB] press skip cooldown (%.3fs since last)",
                 now - self._last_press_t,
@@ -160,8 +228,7 @@ class KeyboardController:
         hov = self.state.hovered_code
         if hov is None:
             logger.info(
-                "[KB] pinch edge SEM hovered_code @ finger=(%.0f,%.0f)",
-                fx, fy,
+                "[KB] press SEM hovered_code @ finger=(%.0f,%.0f)", fx, fy,
             )
             return
         ks = self.state.keys.get(hov)
@@ -169,14 +236,15 @@ class KeyboardController:
             return
         if ks.hover_score < PRESS_HOVER_THRESHOLD:
             logger.info(
-                "[KB] pinch edge REJECTED key=%s hover=%.2f < %.2f",
+                "[KB] press REJECTED key=%s hover=%.2f < %.2f",
                 hov, ks.hover_score, PRESS_HOVER_THRESHOLD,
             )
             return
         self._last_press_t = now
+        mode = "dwell" if self.dwell_enabled else "pinch"
         logger.info(
-            "[KB] PRESS key=%s hover=%.2f finger=(%.0f,%.0f)",
-            hov, ks.hover_score, fx, fy,
+            "[KB] PRESS(%s) key=%s hover=%.2f finger=(%.0f,%.0f)",
+            mode, hov, ks.hover_score, fx, fy,
         )
 
         key = ks.key

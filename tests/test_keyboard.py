@@ -126,7 +126,8 @@ def test_adaptive_learns_miss():
 # ───────────────────────────────────────────────────────── controller
 
 
-def test_controller_pinch_types_char():
+def test_controller_pinch_types_char_legacy():
+    """Modo pinch (dwell_enabled=False) — fallback legado."""
     state = KeyboardState(layout=QWERTY, keys={})
     for k in QWERTY.keys:
         state.keys[k.code] = KeyState(key=k)
@@ -146,18 +147,101 @@ def test_controller_pinch_types_char():
         accessibility=__import__(
             "core.keyboard.accessibility", fromlist=["AccessibilitySettings"]
         ).AccessibilitySettings(),
+        dwell_enabled=False,   # forca modo pinch pra esse teste
     )
     rects = _make_rects(state)
     ctrl.set_rects_from(rects, 1920, 1080)
 
     a = next(r for r in rects if r.key.code == "a")
-    # Hover sem pinch (varias vezes pra subir o score via EMA)
     for _ in range(8):
         ctrl.on_frame((a.cx, a.cy), pinch_now=False)
     assert state.hovered_code == "a"
-    # Pinch edge → press
     ctrl.on_frame((a.cx, a.cy), pinch_now=True)
     assert "a" in typed
+
+
+def test_controller_dwell_types_after_duration(monkeypatch):
+    """Modo dwell: tecla dispara apos hover estavel por duration_s."""
+    import time as _time
+    state = KeyboardState(layout=QWERTY, keys={})
+    for k in QWERTY.keys:
+        state.keys[k.code] = KeyState(key=k)
+    state.visible = True
+
+    typed = []
+
+    class _SpyTyper(SystemTyper):
+        def type_char(self, ch):
+            typed.append(ch)
+
+    ctrl = KeyboardController(
+        state=state,
+        typer=_SpyTyper(dry_run=True),
+        predictor=TextPredictor(),
+        adaptive=AdaptiveModel(),
+        accessibility=__import__(
+            "core.keyboard.accessibility", fromlist=["AccessibilitySettings"]
+        ).AccessibilitySettings(),
+        dwell_enabled=True,
+        dwell_duration_s=0.5,   # acelera teste
+    )
+    rects = _make_rects(state)
+    ctrl.set_rects_from(rects, 1920, 1080)
+    a = next(r for r in rects if r.key.code == "a")
+
+    # Mockar time.perf_counter pra controlar dwell sem sleep real
+    fake_t = [1000.0]
+    monkeypatch.setattr(
+        "core.keyboard.controller.time.perf_counter", lambda: fake_t[0],
+    )
+
+    # Sobe hover_score com varios frames
+    for _ in range(8):
+        ctrl.on_frame((a.cx, a.cy), pinch_now=False)
+    assert state.hovered_code == "a"
+    # Ainda nao passou 0.5s — sem press
+    assert typed == []
+
+    # Avanca tempo > 0.5s
+    fake_t[0] += 0.6
+    ctrl.on_frame((a.cx, a.cy), pinch_now=False)
+    assert "a" in typed, "dwell nao disparou apos duration"
+
+
+def test_controller_dwell_resets_on_key_change():
+    """Trocar tecla durante dwell deve resetar timer + progress."""
+    state = KeyboardState(layout=QWERTY, keys={})
+    for k in QWERTY.keys:
+        state.keys[k.code] = KeyState(key=k)
+    state.visible = True
+
+    ctrl = KeyboardController(
+        state=state,
+        typer=SystemTyper(dry_run=True),
+        predictor=TextPredictor(),
+        adaptive=AdaptiveModel(),
+        accessibility=__import__(
+            "core.keyboard.accessibility", fromlist=["AccessibilitySettings"]
+        ).AccessibilitySettings(),
+        dwell_enabled=True,
+        dwell_duration_s=2.0,
+    )
+    rects = _make_rects(state)
+    ctrl.set_rects_from(rects, 1920, 1080)
+    a = next(r for r in rects if r.key.code == "a")
+    # Tecla distante pra smoother nao "ficar grudado" — pulamos pra 'l'
+    far = next(r for r in rects if r.key.code == "l")
+
+    # Hover na 'a' por varios frames
+    for _ in range(8):
+        ctrl.on_frame((a.cx, a.cy), pinch_now=False)
+    assert ctrl._dwell_key == "a"
+    # Move pra 'l' — smoother precisa de mais frames pra convergir
+    for _ in range(40):
+        ctrl.on_frame((far.cx, far.cy), pinch_now=False)
+    assert ctrl._dwell_key == "l", (
+        f"dwell_key nao resetou apos mudar tecla: {ctrl._dwell_key}"
+    )
 
 
 # ───────────────────────────────────────────────────────── render offscreen

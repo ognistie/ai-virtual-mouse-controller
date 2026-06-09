@@ -209,6 +209,13 @@ class VirtualMouseService:
                 vertical_anchor=getattr(
                     config, "KEYBOARD_VERTICAL_ANCHOR", 0.50,
                 ),
+                dwell_enabled=getattr(config, "KEYBOARD_DWELL_ENABLED", True),
+                dwell_duration_s=getattr(
+                    config, "KEYBOARD_DWELL_DURATION_S", 3.0,
+                ),
+                dwell_cooldown_s=getattr(
+                    config, "KEYBOARD_DWELL_COOLDOWN_S", 0.25,
+                ),
             )
             print(
                 f"[AVM] KeyboardOverlay criado: available={self.keyboard.available} "

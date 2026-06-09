@@ -372,9 +372,11 @@ class KeyboardRenderer:
         # signature a cada micro-movimento (~250 Hz seria desperdicio).
         cur = s.cursor_xy
         cur_sig = (int(cur[0]) // 4, int(cur[1]) // 4) if cur else None
+        # Dwell progress quantizado em 30 niveis — 100ms grain @ 3s.
+        dwell_sig = int(s.dwell_progress * 30)
         return (
             s.layout.name, s.hovered_code, s.suggestions,
-            mods_sig, keys_sig, time_sig, cur_sig,
+            mods_sig, keys_sig, time_sig, cur_sig, dwell_sig,
         )
 
     def _render(self, widget) -> None:
@@ -695,9 +697,14 @@ class KeyboardRenderer:
         painter.drawPath(path)
 
     def _draw_cursor_marker(self, painter, t: float) -> None:
-        """Anel pulsante na posicao do indicador. Usuario mira nele —
-        eh o ponto EXATO que o hover detector mede. Removido se nao ha
-        mao detectada (state.cursor_xy=None)."""
+        """Anel pulsante + dwell progress arc na posicao do indicador.
+
+        Componentes (z-order de baixo pra cima):
+          1. Halo externo difuso (gradient radial).
+          2. Anel base (3 strokes glow).
+          3. Dwell progress arc — preenche 0→360 conforme state.dwell_progress.
+          4. Dot central branco.
+        """
         xy = self.state.cursor_xy
         if xy is None:
             return
@@ -705,7 +712,7 @@ class KeyboardRenderer:
         # Pulso suave 2.5Hz pra atrair olho
         pulse = 1.0 + 0.18 * math.sin(t * 5.0)
 
-        # Halo externo difuso — gradient radial cyan saturado (accent color)
+        # 1. Halo externo difuso
         r_outer = 22.0 * pulse
         grad = QRadialGradient(QPointF(x, y), r_outer)
         grad.setColorAt(0.0, _qcolor(COLOR_ACCENT, 180))
@@ -715,24 +722,43 @@ class KeyboardRenderer:
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(QPointF(x, y), r_outer, r_outer)
 
-        # Anel definidor — borda nitida cyan accent (3 strokes glow)
+        # 2. Anel base (3 strokes glow) — sempre visivel
         r_ring = 9.0 * pulse
-        # outer glow
         pen = QPen(_qcolor(COLOR_ACCENT, 90), 5.0)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawEllipse(QPointF(x, y), r_ring, r_ring)
-        # mid
         pen = QPen(_qcolor(COLOR_ACCENT, 200), 2.5)
         painter.setPen(pen)
         painter.drawEllipse(QPointF(x, y), r_ring, r_ring)
-        # core sharp
         pen = QPen(_qcolor("#FFFFFF", 240), 1.0)
         painter.setPen(pen)
         painter.drawEllipse(QPointF(x, y), r_ring, r_ring)
 
-        # Dot central brilhante (ponto de mira)
+        # 3. Dwell progress arc (raio maior — orbita o ring base)
+        prog = max(0.0, min(1.0, self.state.dwell_progress))
+        if prog > 0.01:
+            r_arc = 22.0
+            # QPainter.drawArc: angulos em 1/16 de grau, start no eixo X (3h),
+            # CCW por default. Forcamos start no TOPO (90°) e sentido horario
+            # passando span negativo.
+            start_angle = 90 * 16  # topo (12 horas)
+            span = int(-360 * 16 * prog)
+            # Outer glow
+            pen = QPen(_qcolor(COLOR_ACCENT, 110), 6.5)
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            painter.setPen(pen)
+            rect = QRectF(x - r_arc, y - r_arc, r_arc * 2.0, r_arc * 2.0)
+            painter.drawArc(rect, start_angle, span)
+            # Sharp core do arco (mais brilhante conforme prog cresce)
+            sharp_alpha = int(180 + 75 * prog)
+            pen = QPen(_qcolor("#FFFFFF", min(255, sharp_alpha)), 2.8)
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            painter.setPen(pen)
+            painter.drawArc(rect, start_angle, span)
+
+        # 4. Dot central brilhante (ponto de mira)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QBrush(_qcolor("#FFFFFF", 255)))
         painter.drawEllipse(QPointF(x, y), 2.5, 2.5)

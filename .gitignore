@@ -43,6 +43,8 @@ logs/
 # ============================================================================
 calibration.json
 data/keyboard/adaptive_profile.json
+# Documentacao local de evolucao do projeto — NAO subir (uso pessoal)
+SMART_KEYBOARD_DOCUMENTATION.txt
 .env
 .env.*
 !.env.example

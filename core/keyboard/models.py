@@ -90,6 +90,10 @@ class KeyboardState:
     # Posicao (px) do indicador no frame atual — usada pra desenhar o
     # cursor marker no overlay. None = sem mao detectada.
     cursor_xy: Optional[Tuple[float, float]] = None
+    # Progresso do dwell timer [0..1]. Renderer desenha arco em torno do
+    # marker preenchendo conforme o usuario mantem o dedo sobre a tecla.
+    # 0 = sem hover ou recem-trocou de tecla. 1 = tecla prestes a disparar.
+    dwell_progress: float = 0.0
     # Tracking pra UX
     last_keypress_t: float = 0.0
     typing_speed_cps: float = 0.0     # chars per second (média móvel)
