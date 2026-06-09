@@ -652,21 +652,19 @@ class VirtualMouseService:
         if lms is None or len(lms) < 21:
             return
 
-        # Posicao de hover do teclado = MESMO ponto que o cursor visivel.
-        # Antes: hard-coded lms[8] divergia do CURSOR_ANCHOR_LANDMARK
-        # (default -2 = robusto) → tecla destacada nao batia com cursor.
-        # Agora: usa cursor._last_x/_last_y que ja foi processado pelo
-        # CursorController (anchor configurado + smoothing + clamp).
-        # Fallback pra lms[8] se cursor ainda nao tem posicao.
-        if (self.cursor._last_x is not None
-                and self.cursor._last_y is not None):
-            fx, fy = float(self.cursor._last_x), float(self.cursor._last_y)
-        else:
-            try:
-                ix, iy = lms[8][0], lms[8][1]
-                fx, fy = self.cursor.map_to_screen(ix, iy)
-            except Exception:
-                return
+        # Hover do teclado usa PONTA DO INDICADOR (landmark 8). Separado
+        # do cursor visivel propositalmente: cursor usa ancora robusta
+        # (boa pra navegacao geral, resistente a oclusao), mas pra digitar
+        # tecla precisamos precisao milimetrica → ponta do dedo.
+        #
+        # Como cursor visivel != hover position, desenhamos um MARKER no
+        # overlay (renderer._draw_cursor_marker) exatamente em (fx, fy).
+        # Usuario mira no marker, nao no cursor do mouse.
+        try:
+            ix, iy = lms[8][0], lms[8][1]
+            fx, fy = self.cursor.map_to_screen(ix, iy)
+        except Exception:
+            return
 
         # pinch raw — qualquer CLICK ou DRAG_START no frame e' "pinch_now"
         pinch_now = any(

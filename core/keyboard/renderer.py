@@ -102,22 +102,33 @@ if _QT_OK:
             self._idle_frames = 0
 
         def _tick(self) -> None:
-            """Promove update; downgrade pra modo idle apos N frames quietos."""
-            # Tenta repaint — _render usa dirty-check pra skip se nada mudou.
-            self.update()
-            # Se renderer reportar nada animando, escala intervalo
+            """Decide se dispara repaint via dirty-check ANTES de chamar
+            update(). Se estado igual ao frame anterior → skip update()
+            (paintEvent nem dispara → sem flicker).
+
+            Quando _render eh chamado (por update() nosso ou expose system),
+            ele SEMPRE pinta completo — Qt entao tem backing store valido."""
             r = self._r
-            anim = r._has_active_animation()
-            if anim:
+            if not r.state.visible:
+                return
+            # Garante layout atualizado pra _paint_signature ser estavel
+            r._compute_layout()
+            sig = r._paint_signature()
+            if sig != r._last_paint_sig:
+                r._last_paint_sig = sig
+                self.update()
                 self._idle_frames = 0
-                if self._timer.interval() != self._interval_active_ms:
-                    self._timer.setInterval(self._interval_active_ms)
             else:
                 self._idle_frames += 1
                 # 30 frames quietos (~0.5s @ 60FPS) → idle mode
                 if (self._idle_frames > 30
                         and self._timer.interval() != self._interval_idle_ms):
                     self._timer.setInterval(self._interval_idle_ms)
+                return
+            # Animacao ativa — volta pra 60 FPS imediatamente
+            if r._has_active_animation():
+                if self._timer.interval() != self._interval_active_ms:
+                    self._timer.setInterval(self._interval_active_ms)
 
         def paintEvent(self, event) -> None:  # noqa: N802
             try:
@@ -136,10 +147,11 @@ class KeyboardRenderer:
     """
 
     # Posicionamento. VERTICAL_ANCHOR ∈ [0,1]:
-    #   0.0 = topo, 0.5 = centro perfeito, 1.0 = fundo.
-    # Independe de resolucao — formula `(screen_h - total_h) * anchor`
-    # centraliza matematicamente em qualquer tela.
-    VERTICAL_ANCHOR = 0.50           # centro
+    #   0.0 = topo, 0.42 = levemente acima do centro (ergonomico),
+    #   0.5 = centro perfeito, 1.0 = fundo.
+    # Default 0.42 compensa offset natural palma↓dedo (mao relaxada
+    # cai pra baixo). Independe de resolucao.
+    VERTICAL_ANCHOR = 0.42
     KEYBOARD_HEIGHT_RATIO = 0.40     # 40% da altura
     SUGGESTION_HEIGHT_PX = 60
 
@@ -270,6 +282,10 @@ class KeyboardRenderer:
         self._kb_origin = (origin_x, origin_y)
 
         # Build rects + state.keys
+        # Hit area estendida nas bordas: top row pra cima, bottom row pra
+        # baixo. Compensa offset natural da mao (palma cai abaixo do dedo).
+        last_row_idx = layout.rows - 1
+        extra_h = cell_size * 0.85   # ~uma celula extra de tolerancia
         rects: List[KeyRect] = []
         for k in layout.keys:
             x = origin_x + k.col * cell_size
@@ -278,9 +294,15 @@ class KeyboardRenderer:
             h = k.height * cell_size
             cx = x + w / 2.0
             cy = y + h / 2.0
+            half_h = h / 2.0 - 4.0
+            # Hit half-h: padrao = half_h. Top row estende pra cima.
+            # Bottom row estende pra baixo. Tudo invisivel ao usuario.
+            hit_up = half_h + extra_h if k.row == 0 else half_h
+            hit_down = half_h + extra_h if k.row == last_row_idx else half_h
             rects.append(KeyRect(
                 key=k, cx=cx, cy=cy,
-                half_w=w / 2.0 - 4.0, half_h=h / 2.0 - 4.0,
+                half_w=w / 2.0 - 4.0, half_h=half_h,
+                hit_half_h_up=hit_up, hit_half_h_down=hit_down,
             ))
             self.state.keys.setdefault(k.code, _new_key_state(k))
 
@@ -308,6 +330,9 @@ class KeyboardRenderer:
         reduced_motion ON).
 
         Usado pelo timer adaptativo (F1.5) — false libera CPU pra 20 FPS."""
+        # Marker do cursor pulsa enquanto mao visivel → mantem 60 FPS.
+        if self.state.cursor_xy is not None:
+            return True
         # Arcos orbitais animam continuamente — mantem 60 FPS quando ON.
         # Se reduced_motion ligado, arcos sao estaticos → pode escalar idle.
         if not self.accessibility.reduced_motion:
@@ -343,22 +368,22 @@ class KeyboardRenderer:
             0 if self.accessibility.reduced_motion
             else int((time.perf_counter() - self._start_t) * 30)
         )
+        # Marker do cursor: quantiza posicao em 4px pra evitar invalidar
+        # signature a cada micro-movimento (~250 Hz seria desperdicio).
+        cur = s.cursor_xy
+        cur_sig = (int(cur[0]) // 4, int(cur[1]) // 4) if cur else None
         return (
             s.layout.name, s.hovered_code, s.suggestions,
-            mods_sig, keys_sig, time_sig,
+            mods_sig, keys_sig, time_sig, cur_sig,
         )
 
     def _render(self, widget) -> None:
+        """Sempre pinta completo quando chamado. Dirty-check vive no timer
+        (_tick) que decide se chama update() — evita flicker do backing
+        store transparente no Windows quando paintEvent retorna sem pintar."""
         if not self.state.visible:
             return
         self._compute_layout()
-
-        # Dirty-check: se estado visual identico ao frame anterior, skip.
-        # Qt ainda re-blitta o backing store, mas pulamos todo o paint pipeline.
-        sig = self._paint_signature()
-        if sig == self._last_paint_sig:
-            return
-        self._last_paint_sig = sig
 
         painter = QPainter(widget)
         # AA OFF por default — ligamos so quando precisa (paths/ripple).
@@ -383,6 +408,8 @@ class KeyboardRenderer:
         self._draw_suggestions(painter, t)
         # Teclas: paths arredondados → AA ON (mantem)
         self._draw_keys(painter, t)
+        # Marker do dedo POR CIMA das teclas — usuario mira nele.
+        self._draw_cursor_marker(painter, t)
 
     def render_to_image(self, width: Optional[int] = None,
                         height: Optional[int] = None):
@@ -666,6 +693,49 @@ class KeyboardRenderer:
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(pen)
         painter.drawPath(path)
+
+    def _draw_cursor_marker(self, painter, t: float) -> None:
+        """Anel pulsante na posicao do indicador. Usuario mira nele —
+        eh o ponto EXATO que o hover detector mede. Removido se nao ha
+        mao detectada (state.cursor_xy=None)."""
+        xy = self.state.cursor_xy
+        if xy is None:
+            return
+        x, y = xy
+        # Pulso suave 2.5Hz pra atrair olho
+        pulse = 1.0 + 0.18 * math.sin(t * 5.0)
+
+        # Halo externo difuso — gradient radial cyan saturado (accent color)
+        r_outer = 22.0 * pulse
+        grad = QRadialGradient(QPointF(x, y), r_outer)
+        grad.setColorAt(0.0, _qcolor(COLOR_ACCENT, 180))
+        grad.setColorAt(0.45, _qcolor(COLOR_PRIMARY, 110))
+        grad.setColorAt(1.0, _qcolor(COLOR_PRIMARY, 0))
+        painter.setBrush(QBrush(grad))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(QPointF(x, y), r_outer, r_outer)
+
+        # Anel definidor — borda nitida cyan accent (3 strokes glow)
+        r_ring = 9.0 * pulse
+        # outer glow
+        pen = QPen(_qcolor(COLOR_ACCENT, 90), 5.0)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawEllipse(QPointF(x, y), r_ring, r_ring)
+        # mid
+        pen = QPen(_qcolor(COLOR_ACCENT, 200), 2.5)
+        painter.setPen(pen)
+        painter.drawEllipse(QPointF(x, y), r_ring, r_ring)
+        # core sharp
+        pen = QPen(_qcolor("#FFFFFF", 240), 1.0)
+        painter.setPen(pen)
+        painter.drawEllipse(QPointF(x, y), r_ring, r_ring)
+
+        # Dot central brilhante (ponto de mira)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(_qcolor("#FFFFFF", 255)))
+        painter.drawEllipse(QPointF(x, y), 2.5, 2.5)
 
     def _draw_ripple(self, painter, rect: KeyRect, ks, t: float) -> None:
         if ks.ripple_t <= 0.0:

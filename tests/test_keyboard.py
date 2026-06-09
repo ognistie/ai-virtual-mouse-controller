@@ -302,6 +302,59 @@ def test_hover_max_distance_widened():
 # ───────────────────────────────────────────────────── F1.3 dirty-check
 
 
+def test_hit_area_extended_bottom_row():
+    """Bottom row deve ter hit_half_h_down maior que half_h (hit extend)."""
+    pytest.importorskip("PySide6")
+    from core.keyboard import KeyboardOverlay
+
+    kb = KeyboardOverlay(layout_name="ABNT2", typer_dry_run=True)
+    if not kb.available:
+        pytest.skip("PySide6 sem display disponivel")
+    kb.renderer._screen_w = 1920
+    kb.renderer._screen_h = 1080
+    kb.set_enabled(True)
+    kb.renderer._compute_layout()
+    last_row = kb.state.layout.rows - 1
+    bottom_rects = [r for r in kb.renderer._rects if r.key.row == last_row]
+    assert bottom_rects, "no rects in last row"
+    for r in bottom_rects:
+        assert r.hit_half_h_down > r.half_h, (
+            f"key {r.key.code} hit_down={r.hit_half_h_down} "
+            f"not > half_h={r.half_h}"
+        )
+    # Top row: hit_half_h_up > half_h
+    top_rects = [r for r in kb.renderer._rects if r.key.row == 0]
+    for r in top_rects:
+        assert r.hit_half_h_up > r.half_h
+    kb.close()
+
+
+def test_cursor_marker_drawn_when_xy_set():
+    """Marker so aparece quando state.cursor_xy != None."""
+    pytest.importorskip("PySide6")
+    from core.keyboard import KeyboardOverlay
+
+    kb = KeyboardOverlay(layout_name="QWERTY", typer_dry_run=True)
+    if not kb.available:
+        pytest.skip("PySide6 sem display disponivel")
+    kb.renderer._screen_w = 1920
+    kb.renderer._screen_h = 1080
+    kb.set_enabled(True)
+    kb.renderer._compute_layout()
+
+    # Render sem cursor_xy — sem marker
+    img_no = kb.renderer.render_to_image(1920, 1080)
+    # Render com cursor_xy centrado — com marker
+    kb.state.cursor_xy = (960.0, 540.0)
+    img_yes = kb.renderer.render_to_image(1920, 1080)
+
+    # Pixel central deve mudar entre os dois renders (marker desenhado)
+    px_no = img_no.pixel(960, 540)
+    px_yes = img_yes.pixel(960, 540)
+    assert px_no != px_yes, "marker do cursor nao apareceu no render"
+    kb.close()
+
+
 def test_paint_signature_stable_when_idle():
     """Signature identica quando nada muda → skip repaint."""
     pytest.importorskip("PySide6")

@@ -21,13 +21,28 @@ from .models import Key, KeyboardState
 
 @dataclass
 class KeyRect:
-    """Bounding box em screen coords de uma tecla renderizada."""
+    """Bounding box em screen coords de uma tecla renderizada.
+
+    Visual vs hit area separados: half_w/half_h sao usados pelo renderer
+    (forma desenhada). hit_half_h_up/hit_half_h_down sao usados pelo
+    hover detector — assimetricos pra teclas da borda (top/bottom row
+    estendem pra fora do teclado, capturando miras "fora" como hits)."""
 
     key: Key
     cx: float        # centro x
     cy: float        # centro y
-    half_w: float    # meia-largura (px)
-    half_h: float    # meia-altura (px)
+    half_w: float    # meia-largura visual (px)
+    half_h: float    # meia-altura visual (px)
+    # Hit area assimetrica — defaults = half_h (sem extensao). Layout
+    # sobrescreve pra bordas do teclado.
+    hit_half_h_up: float = 0.0     # 0 = usa half_h
+    hit_half_h_down: float = 0.0   # 0 = usa half_h
+
+    def get_hit_half_h_up(self) -> float:
+        return self.hit_half_h_up if self.hit_half_h_up > 0 else self.half_h
+
+    def get_hit_half_h_down(self) -> float:
+        return self.hit_half_h_down if self.hit_half_h_down > 0 else self.half_h
 
 
 class HoverDetector:
@@ -106,8 +121,14 @@ class HoverDetector:
         dy = finger_y - adj_cy
         dist = math.hypot(dx, dy)
 
-        # Raio de referência = diagonal da meia-célula * scale adaptativo
-        ref_radius = math.hypot(nearest_rect.half_w, nearest_rect.half_h) * scale
+        # Raio de referencia: usa hit half-h direcional (assimetrico nas
+        # bordas) — score reflete distancia real ao hit box, nao ao visual.
+        rel_dy = finger_y - adj_cy
+        ref_hh = (
+            nearest_rect.get_hit_half_h_up() if rel_dy < 0
+            else nearest_rect.get_hit_half_h_down()
+        )
+        ref_radius = math.hypot(nearest_rect.half_w, ref_hh) * scale
         # Distância normalizada [0..max_dist_factor]
         norm = min(self._max_dist_factor, dist / max(1.0, ref_radius))
         # Score: 1.0 no centro, 0.0 no limite. Curva suave (cosine).
@@ -143,7 +164,10 @@ class HoverDetector:
         return hovered
 
     def _nearest(self, x: float, y: float) -> Tuple[int, float]:
-        """Busca grid + linear nos vizinhos. O(1) amortizado."""
+        """Busca grid + linear nos vizinhos. O(1) amortizado.
+
+        Distancia ao bounding rect usa HIT area (assimetrica pra bordas:
+        teclas top/bottom row estendem hit pra fora do teclado)."""
         cx = int(x // self._cell_size)
         cy = int(y // self._cell_size)
         candidates = self._grid.get((cx, cy), [])
@@ -154,9 +178,15 @@ class HoverDetector:
         best_d = float("inf")
         for idx in candidates:
             r = self._rects[idx]
-            # Distância ao bounding rect (0 se dentro)
             ddx = max(abs(x - r.cx) - r.half_w, 0.0)
-            ddy = max(abs(y - r.cy) - r.half_h, 0.0)
+            # Hit assimetrico: distancia pra cima usa hit_half_h_up,
+            # pra baixo usa hit_half_h_down. Borda do teclado captura
+            # miras que cairiam fora do bounding visual.
+            dy = y - r.cy
+            if dy < 0:
+                ddy = max(-dy - r.get_hit_half_h_up(), 0.0)
+            else:
+                ddy = max(dy - r.get_hit_half_h_down(), 0.0)
             d = ddx * ddx + ddy * ddy
             if d < best_d:
                 best_d = d

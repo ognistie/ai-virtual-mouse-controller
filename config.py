@@ -566,13 +566,15 @@ seguida da frequencia. Se ausente, usa vocabulario minimo embutido.
 KEYBOARD_DRY_RUN: bool = False
 """Se True, nao envia teclas ao SO — uso para demos sem acionar apps."""
 
-KEYBOARD_VERTICAL_ANCHOR: float = 0.50
+KEYBOARD_VERTICAL_ANCHOR: float = 0.42
 """
 Posicao vertical do teclado na tela.
   0.0 = topo
-  0.5 = centro perfeito (recomendado, ergonomia)
+  0.42 = LEVEMENTE acima do centro (recomendado — compensa offset
+         natural palma↓dedo: mao relaxada cai pra baixo, teclado mais
+         alto faz mira cair no meio).
+  0.5 = centro matematico
   1.0 = fundo
-Centralizacao matematica independente da resolucao.
 """
 
 # ---------------------------------------------------------------------

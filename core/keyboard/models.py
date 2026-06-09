@@ -87,6 +87,9 @@ class KeyboardState:
     alt_on: bool = False
     suggestions: Tuple[str, ...] = ()
     visible: bool = False
+    # Posicao (px) do indicador no frame atual — usada pra desenhar o
+    # cursor marker no overlay. None = sem mao detectada.
+    cursor_xy: Optional[Tuple[float, float]] = None
     # Tracking pra UX
     last_keypress_t: float = 0.0
     typing_speed_cps: float = 0.0     # chars per second (média móvel)

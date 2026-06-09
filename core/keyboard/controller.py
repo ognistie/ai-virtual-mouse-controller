@@ -34,7 +34,9 @@ logger = logging.getLogger(__name__)
 PRESS_COOLDOWN_S = 0.12
 
 # Limiar mínimo de hover_score pra aceitar um pinch como press de tecla.
-PRESS_HOVER_THRESHOLD = 0.30
+# 0.18 = permissivo. Cursor proximo da borda da tecla ainda dispara.
+# Anteior 0.30 rejeitava silenciosamente cliques perto da borda.
+PRESS_HOVER_THRESHOLD = 0.18
 
 
 class KeyboardController:
@@ -118,9 +120,14 @@ class KeyboardController:
     ) -> None:
         if not self.state.visible:
             self._pinch_active = pinch_now
+            self.state.cursor_xy = None
             return
 
         fx, fy = self._finger_smoother(*finger_xy_screen)
+
+        # Compartilha posicao smoothada com renderer pra desenhar marker
+        # visual exatamente onde o hover detecta. Usuario mira no marker.
+        self.state.cursor_xy = (fx, fy)
 
         # Hover update
         self.hover.update(fx, fy, self.state)
@@ -145,14 +152,32 @@ class KeyboardController:
     def _handle_press(self, fx: float, fy: float) -> None:
         now = time.perf_counter()
         if now - self._last_press_t < PRESS_COOLDOWN_S:
+            logger.debug(
+                "[KB] press skip cooldown (%.3fs since last)",
+                now - self._last_press_t,
+            )
             return
         hov = self.state.hovered_code
         if hov is None:
+            logger.info(
+                "[KB] pinch edge SEM hovered_code @ finger=(%.0f,%.0f)",
+                fx, fy,
+            )
             return
         ks = self.state.keys.get(hov)
-        if ks is None or ks.hover_score < PRESS_HOVER_THRESHOLD:
+        if ks is None:
+            return
+        if ks.hover_score < PRESS_HOVER_THRESHOLD:
+            logger.info(
+                "[KB] pinch edge REJECTED key=%s hover=%.2f < %.2f",
+                hov, ks.hover_score, PRESS_HOVER_THRESHOLD,
+            )
             return
         self._last_press_t = now
+        logger.info(
+            "[KB] PRESS key=%s hover=%.2f finger=(%.0f,%.0f)",
+            hov, ks.hover_score, fx, fy,
+        )
 
         key = ks.key
         # Resolve caractere final considerando modificadores
