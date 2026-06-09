@@ -10,6 +10,7 @@ Ver `docs/smart-adaptive-holographic-keyboard-spec.md` para spec completa.
 
 from .accessibility import AccessibilitySettings
 from .adaptive import AdaptiveModel
+from .controller import KeyboardController
 from .hover import HoverDetector, KeyRect
 from .layouts import ABNT2, COMPACT, FULL, LAYOUTS, QWERTY, get_layout
 from .models import Key, KeyboardState, KeyEvent, KeyLayout, KeyState
@@ -30,6 +31,7 @@ __all__ = [
     "KeyLayout",
     "KeyRect",
     "KeyState",
+    "KeyboardController",
     "KeyboardState",
     "SystemTyper",
     "TextPredictor",
