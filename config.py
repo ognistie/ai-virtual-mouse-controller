@@ -525,8 +525,8 @@ do Windows. Tem que ser uma cor que nao apareca em mais nada desenhado.
 # escreve teclas em vez de clicar (mouse fica em hover-only no SO).
 # Spec: docs/smart-adaptive-holographic-keyboard-spec.md
 
-KEYBOARD_ENABLED: bool = True
-"""Se True, abre o teclado ao iniciar. Default False — onboarding via tecla."""
+KEYBOARD_ENABLED: bool = False
+"""Se True, abre o teclado ao iniciar. False = abre via tecla K em runtime."""
 
 KEYBOARD_TOGGLE_KEY: str = "k"
 """Tecla para alternar o teclado em runtime."""
