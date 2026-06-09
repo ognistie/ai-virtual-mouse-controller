@@ -333,9 +333,8 @@ class KeyboardRenderer:
         # Marker do cursor pulsa enquanto mao visivel → mantem 60 FPS.
         if self.state.cursor_xy is not None:
             return True
-        # Arcos orbitais animam continuamente — mantem 60 FPS quando ON.
-        # Se reduced_motion ligado, arcos sao estaticos → pode escalar idle.
-        if not self.accessibility.reduced_motion:
+        # Dwell progress animando → repaint continuo.
+        if self.state.dwell_progress > 0.001:
             return True
         for ks in self.state.keys.values():
             if ks.hover_score > 0.01:
@@ -362,11 +361,11 @@ class KeyboardRenderer:
         mods_sig = (
             s.shift_on, s.caps_on, s.altgr_on, s.ctrl_on, s.alt_on,
         )
-        # Tempo quantizado em 30 ticks/s — ~33ms grain, casa com 60FPS
-        # (pula 1 a cada 2 frames) e mantem arcos animando.
+        # Tempo quantizado: marker pulsa (5Hz), dwell arc invalida
+        # via dwell_progress. Mantemos tick fino apenas se cursor visivel.
         time_sig = (
-            0 if self.accessibility.reduced_motion
-            else int((time.perf_counter() - self._start_t) * 30)
+            int((time.perf_counter() - self._start_t) * 20)
+            if self.state.cursor_xy is not None else 0
         )
         # Marker do cursor: quantiza posicao em 4px pra evitar invalidar
         # signature a cada micro-movimento (~250 Hz seria desperdicio).
@@ -433,10 +432,10 @@ class KeyboardRenderer:
     # ───────────────────── glass panel
 
     def _draw_glass_panel(self, painter) -> None:
-        """Infinity Edge: halo radial difuso + arcos orbitais.
+        """Infinity Edge: halo radial difuso.
 
         Sem painel/borda — teclas flutuam sobre nuvem cyan que dissolve no
-        BG. Replica look de projecao holografica (referência: imagem).
+        BG. Arcos orbitais REMOVIDOS pra visual mais limpo (commit pos-46fc29d).
         """
         if not self._rects:
             return
@@ -456,7 +455,6 @@ class KeyboardRenderer:
         op = self.accessibility.opacity
         grad = QRadialGradient(QPointF(cx, cy), max_r)
         # Centro: cyan MUITO sutil — nao compete com outline das teclas.
-        # Match referencia: halo eh ambiente, teclas tem brilho proprio.
         grad.setColorAt(0.0, _qcolor(COLOR_PRIMARY, int(20 * op)))
         # Meio: BG escurecido leve — apenas base discreta sem bordas duras.
         grad.setColorAt(0.40, _qcolor(COLOR_BG, int(90 * op)))
@@ -468,32 +466,6 @@ class KeyboardRenderer:
         painter.drawRect(QRectF(
             cx - max_r, cy - max_r, max_r * 2.0, max_r * 2.0,
         ))
-
-        # Arcos orbitais — 2 elipses finas atravessando lateralmente.
-        # Referência mostra curvas brilhando ao redor das teclas.
-        if not self.accessibility.reduced_motion:
-            painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            t = time.perf_counter() - self._start_t
-            # Pulso lento de alpha — 0.4Hz pra sutileza
-            pulse = 0.6 + 0.4 * math.sin(t * 2.5)
-            arc_alpha = int(80 * pulse * op)
-            pen = QPen(_qcolor(COLOR_PRIMARY, arc_alpha), 1.5)
-            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-            painter.setPen(pen)
-            # 2 elipses concentricas leve rotacao = arcos cruzados
-            for i, (rx_mult, ry_mult, rot) in enumerate(
-                ((0.62, 0.58, 0.0), (0.58, 0.50, 18.0))
-            ):
-                arc_w = total_w * rx_mult
-                arc_h = total_h * ry_mult
-                # QPainter rotation pra dar dinamismo
-                painter.save()
-                painter.translate(cx, cy)
-                painter.rotate(rot + math.sin(t * 0.3 + i) * 4.0)
-                painter.drawEllipse(QPointF(0, 0), arc_w, arc_h)
-                painter.restore()
-            painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
 
     # ───────────────────── sugestões
 
@@ -540,6 +512,56 @@ class KeyboardRenderer:
 
     # ───────────────────── teclas
 
+    def _draw_keys_shadow_pass(self, painter) -> None:
+        """Desenha sombra projetada de TODAS as teclas antes do conteudo.
+
+        Efeito 'voando': sombra colorida no BG-cyan-escuro (combina com
+        paleta, nao polui) com offset Y positivo. Two passes:
+          1. Penumbra difusa (offset 12px, alpha 25) — soft halo
+          2. Sharp shadow (offset 5px, alpha 45) — ground contact
+        Alpha baixo garante que sombra eh PERCEPCAO de elevacao, nao
+        marca visual concorrendo com glow das teclas.
+        """
+        painter.setPen(Qt.PenStyle.NoPen)
+        # Pass 1: soft penumbra
+        for rect in self._rects:
+            ks = self.state.keys.get(rect.key.code)
+            if ks is None:
+                continue
+            scale = ks.expansion
+            half_w_eff = rect.half_w * scale
+            half_h_eff = rect.half_h * scale
+            qrect = QRectF(
+                rect.cx - half_w_eff,
+                rect.cy - half_h_eff + 12.0,
+                half_w_eff * 2.0,
+                half_h_eff * 2.0,
+            )
+            radius = min(half_w_eff, half_h_eff) * 0.30
+            path = QPainterPath()
+            path.addRoundedRect(qrect, radius, radius)
+            painter.setBrush(QBrush(_qcolor(COLOR_BG, 25)))
+            painter.drawPath(path)
+        # Pass 2: sharper edge
+        for rect in self._rects:
+            ks = self.state.keys.get(rect.key.code)
+            if ks is None:
+                continue
+            scale = ks.expansion
+            half_w_eff = rect.half_w * scale
+            half_h_eff = rect.half_h * scale
+            qrect = QRectF(
+                rect.cx - half_w_eff,
+                rect.cy - half_h_eff + 5.0,
+                half_w_eff * 2.0,
+                half_h_eff * 2.0,
+            )
+            radius = min(half_w_eff, half_h_eff) * 0.30
+            path = QPainterPath()
+            path.addRoundedRect(qrect, radius, radius)
+            painter.setBrush(QBrush(_qcolor(COLOR_BG, 45)))
+            painter.drawPath(path)
+
     # Quantiza expansion pra bucket discreto. Cache key = (code, bucket).
     # 8 buckets entre 1.0 e ~1.18 → step ~0.025 → diferença visual
     # imperceptível mas garante hit-rate ~95% no path cache.
@@ -572,6 +594,11 @@ class KeyboardRenderer:
         # Fonts garantidos em _compute_layout(); guardas defensivas.
         font_main = self._font_main or QFont("Segoe UI", 14)
         font_hint = self._font_hint or QFont("Segoe UI", 9)
+
+        # Sombra direcional (efeito "voando"): desenha PRIMEIRO todas as
+        # sombras embaixo de tudo, depois as teclas em cima. Garante que
+        # sombra de uma tecla nao corte glow de outra adjacente.
+        self._draw_keys_shadow_pass(painter)
 
         for rect in self._rects:
             k = rect.key

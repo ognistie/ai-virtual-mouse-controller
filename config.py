@@ -573,8 +573,9 @@ KEYBOARD_DWELL_DURATION_S segundos. Quando True (default), pinca eh
 ignorada. Quando False, volta pro modo pinch (polegar+indicador).
 """
 
-KEYBOARD_DWELL_DURATION_S: float = 3.0
-"""Tempo (segundos) que o dedo precisa permanecer sobre a tecla."""
+KEYBOARD_DWELL_DURATION_S: float = 1.0
+"""Tempo (segundos) que o dedo precisa permanecer sobre a tecla.
+Default 1.0s = digitacao agil (~60 chars/min teorico)."""
 
 KEYBOARD_DWELL_COOLDOWN_S: float = 0.25
 """
