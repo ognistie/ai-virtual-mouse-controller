@@ -377,9 +377,9 @@ pre, code { font-family: var(--mono); }
 .title-accent {
   display: block;
   color: var(--ink);
-  font-family: var(--serif);
-  font-style: italic;
-  font-weight: 400;
+  font-family: var(--sans);
+  font-weight: 800;
+  letter-spacing: -0.04em;
 }
 .title-accent::before {
   content: "";

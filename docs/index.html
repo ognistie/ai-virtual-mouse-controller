@@ -82,7 +82,7 @@
       <div class="hero-content">
         <div class="hero-eyebrow">
           <span class="status-dot"></span>
-          <span class="mono">v6.9.9 · código aberto</span>
+          <span class="mono">v1.0.6 · código aberto</span>
         </div>
 
         <h1 class="hero-title">
@@ -715,7 +715,8 @@
               <span></span><span></span><span></span>
             </div>
             <div class="terminal-tabs">
-              <button class="tab active" data-tab="win">Windows</button>
+              <button class="tab active" data-tab="pypi">PyPI</button>
+              <button class="tab" data-tab="win">Windows</button>
               <button class="tab" data-tab="unix">macOS / Linux</button>
             </div>
             <button class="copy-btn" data-target="active" aria-label="Copiar comandos">
@@ -727,7 +728,10 @@
             </button>
           </div>
 
-          <pre class="terminal-body" data-tab-content="win"><code><span class="ln">$</span> <span class="cmd">git clone</span> https://github.com/ognistie/ai-virtual-mouse-controller.git
+          <pre class="terminal-body" data-tab-content="pypi"><code><span class="ln">$</span> <span class="cmd">pip install</span> ai-virtual-mouse-controller
+<span class="ln">$</span> <span class="cmd">avmc</span></code></pre>
+
+          <pre class="terminal-body hidden" data-tab-content="win"><code><span class="ln">$</span> <span class="cmd">git clone</span> https://github.com/ognistie/ai-virtual-mouse-controller.git
 <span class="ln">$</span> <span class="cmd">cd</span> ai-virtual-mouse-controller
 <span class="ln">$</span> <span class="cmd">python</span> -m venv .venv
 <span class="ln">$</span> .venv\Scripts\activate
