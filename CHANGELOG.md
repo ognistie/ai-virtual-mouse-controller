@@ -7,6 +7,30 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.0.6] — 2026-06-10
+
+### Added
+- **Margens assimetricas** no mapeamento camera → tela
+  (`SCREEN_MARGIN_X=0.08`, `SCREEN_MARGIN_TOP/BOTTOM=0.04`). Alcance
+  vertical mais facil pra atingir abas/taskbar sem forcar a mao ate o
+  limite do FOV.
+- **Edge velocity extrapolation reforcado** no `RobustHandAnchor`:
+  duas zonas (normal < 30% da borda + critica < 8%), gain 1.4 → 2.2.
+  Cursor escorrega pro canto sem precisar a mao ir ao extremo do quadro.
+- **Cinematic follow-through** quando a mao sai do FOV: cursor
+  continua na direcao da ultima velocidade por ate 200ms com decay
+  exponencial. Termina o gesto em vez de travar abrupto.
+- **Pinch 3D-aware** (`_pinch_distance`): metrica de pinch passa a
+  incluir o eixo Z. Mata falso PINCH quando a mao esta de lado e os
+  dedos aparecem sobrepostos no plano da imagem.
+
+### Changed
+- DPI inicial 0.85 → **1.0** (perfil smooth + RECOMMENDED).
+- `CLICK_COOLDOWN_SECONDS` 0.25 → **0.15**. Permite sequencias rapidas
+  de clique (abrir menu → opcao → fechar) sem descartar cliques.
+- Limpeza ampla de comentarios obsoletos (refs `v6.x.y`, `NOVO vX`,
+  `PERF:`) em 12 arquivos sem mudar comportamento.
+
 ## [1.0.5] — 2026-06-08
 
 ### Fixed
