@@ -1,13 +1,13 @@
 """
-services.virtual_mouse_service  (v6.9.1)
-=========================================
+services.virtual_mouse_service
+==============================
 
 Orquestra: camera + tracker + gesture detector + cursor + UI Overlay.
 
 Responsabilidades:
 - Construir todas as pecas a partir de config.py + RuntimeSettings
-- Rodar o loop principal: read frame -> detectar mao -> processar gestos
-  -> mover cursor / disparar acoes -> renderizar UI
+- Rodar o loop principal: read frame → detectar mao → processar gestos
+  → mover cursor / disparar acoes → renderizar UI
 - Gerenciar a janela (tamanho compacto/expandido, posicao, always-on-top)
 - Conectar callbacks da UI com mudancas em tempo real do detector
 """
@@ -69,7 +69,7 @@ class _ServiceUICallbacks(UICallbacks):
 # ===================================================================
 
 class VirtualMouseService:
-    """Servico principal v6.8 com UI moderna integrada."""
+    """Servico principal com UI moderna integrada."""
 
     def __init__(
         self,
@@ -82,7 +82,7 @@ class VirtualMouseService:
         *,
         enable_preview: bool = True,
         draw_landmarks: bool = True,
-        window_name: str = "AI Virtual Mouse v6.8",
+        window_name: str = "AI Virtual Mouse",
     ) -> None:
         self.camera = camera
         self.tracker = tracker
@@ -205,9 +205,12 @@ class VirtualMouseService:
         # 4. Gesture detector — usa valores do runtime
         gesture_detector = cls._build_detector(runtime)
 
-        # 5. Cursor (API real: screen_margin_percentage, dead_zone_pixels, pyautogui_pause)
+        # 5. Cursor — margens assimetricas (X != Y) com fallback isotropico
         cursor = CursorController(
             screen_margin_percentage=config.SCREEN_MARGIN_PERCENTAGE,
+            screen_margin_x=getattr(config, "SCREEN_MARGIN_X", None),
+            screen_margin_top=getattr(config, "SCREEN_MARGIN_TOP", None),
+            screen_margin_bottom=getattr(config, "SCREEN_MARGIN_BOTTOM", None),
             dead_zone_pixels=config.DEAD_ZONE_PIXELS,
             failsafe=config.PYAUTOGUI_FAILSAFE,
             pyautogui_pause=config.PYAUTOGUI_PAUSE,
@@ -243,7 +246,7 @@ class VirtualMouseService:
 
     @staticmethod
     def _build_detector(runtime: RuntimeSettings) -> GestureDetector:
-        """Cria GestureDetector v6.5 com valores atuais do runtime."""
+        """Cria GestureDetector com valores atuais do runtime."""
         return GestureDetector(
             anchor_landmark=config.CURSOR_ANCHOR_LANDMARK,
             pinch_threshold=runtime.get("pinch_distance_threshold"),
@@ -288,6 +291,12 @@ class VirtualMouseService:
             pinch_middle_middle_extension_max=getattr(
                 config, "PINCH_MIDDLE_MIDDLE_EXTENSION_MAX", 0.92,
             ),
+            followthrough_frames=getattr(
+                config, "CURSOR_FOLLOWTHROUGH_FRAMES", 6,
+            ),
+            followthrough_damping=getattr(
+                config, "CURSOR_FOLLOWTHROUGH_DAMPING", 0.82,
+            ),
         )
 
     # -----------------------------------------------------------------
@@ -298,19 +307,16 @@ class VirtualMouseService:
         self._setup_signal_handlers()
 
         if self.enable_preview:
-            # NOVO v6.9: WINDOW_NORMAL (em vez de AUTOSIZE) para permitir
-            # resize manual via cv2.resizeWindow conforme o modo (compacto/expandido).
+            # WINDOW_NORMAL (em vez de AUTOSIZE) permite resize manual
+            # via cv2.resizeWindow conforme o modo (compacto/expandido).
             cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
             cv2.setMouseCallback(self.window_name, self._on_mouse_event)
-            # Aplica tamanho inicial COMPACTO (painel oculto)
             self._apply_window_size(panel_visible=False)
-            # Posicionamento automatico no canto inferior direito (estilo streamer)
             if getattr(config, "DISPLAY_POSITION_BOTTOM_RIGHT", False):
                 self._position_window_bottom_right(
                     config.DISPLAY_COMPACT_WIDTH,
                     config.DISPLAY_COMPACT_HEIGHT,
                 )
-            # NOVO v6.9: mantem sempre visivel acima de outras janelas
             self._apply_always_on_top()
 
         try:
@@ -329,7 +335,7 @@ class VirtualMouseService:
         self._should_stop = True
 
     # -----------------------------------------------------------------
-    # Window sizing (NOVO v6.9 — UX webcam de streamer)
+    # Window sizing — UX webcam de streamer
     # -----------------------------------------------------------------
 
     def _apply_window_size(self, panel_visible: bool) -> None:
@@ -364,10 +370,10 @@ class VirtualMouseService:
 
     def _apply_always_on_top(self, on: Optional[bool] = None) -> None:
         """
-        Mantem a janela sempre visivel acima de outras (NOVO v6.9).
+        Mantem a janela sempre visivel acima de outras.
 
         Args:
-            on: True liga, False desliga, None usa o estado atual self._always_on_top.
+            on: True liga, False desliga, None usa self._always_on_top.
         """
         if on is not None:
             self._always_on_top = on
@@ -435,12 +441,12 @@ class VirtualMouseService:
                 return
             if key != -1:
                 key_masked = key & 0xFF if 0 <= key < 256 else key
-                # NOVO v6.9: tecla T alterna always-on-top em runtime
+                # Tecla T alterna always-on-top em runtime
                 if key_masked in (ord('t'), ord('T')):
                     self._apply_always_on_top(on=not self._always_on_top)
                     logger.info("ALWAYS_ON_TOP = %s", self._always_on_top)
                     return
-                # NOVO: tecla H alterna o holograma (mao na tela) em runtime
+                # Tecla H alterna o holograma em runtime
                 hkey = self._hologram_toggle_key
                 if key_masked in (ord(hkey), ord(hkey.upper())):
                     if self.hologram is not None and self.hologram.available:
@@ -465,7 +471,7 @@ class VirtualMouseService:
                         print(f"[AVM] {msg}", flush=True)
                         logger.warning(msg)
                     return
-                # NOVO v6.9: detecta toggle do painel para redimensionar janela
+                # Detecta toggle do painel pra redimensionar a janela
                 panel_was_visible = self.ui.state.panel_visible
                 self.ui.handle_key(key_masked)
                 panel_now_visible = self.ui.state.panel_visible
@@ -659,8 +665,8 @@ class VirtualMouseService:
     def _apply_setting_live(self, key: str, value: float) -> None:
         """Aplica setting individual no detector/smoother sem restart.
 
-        Usa setattr seguro: se o detector v6.5 nao tem o atributo (ex: anchor_freeze),
-        a operacao e ignorada silenciosamente.
+        Usa setattr seguro: se o detector nao tem o atributo (ex:
+        anchor_freeze), a operacao e ignorada silenciosamente.
         """
         d = self.gesture_detector
 
@@ -677,7 +683,7 @@ class VirtualMouseService:
         elif key == "sticky_friction_factor":
             d.sticky_friction_factor = value
         elif key == "anchor_freeze_duration_ms":
-            # Detector v6.5 nao tem essa feature — ignora silenciosamente
+            # Detector pode nao ter essa feature — ignora silenciosamente
             if hasattr(d, "anchor_freeze_duration_seconds"):
                 d.anchor_freeze_duration_seconds = value / 1000.0
 
@@ -769,7 +775,7 @@ class VirtualMouseService:
         d = self.gesture_detector
         shape_name = d.current_shape.name if d.current_shape else "UNKNOWN"
 
-        # Properties: usa getattr defensivo (anchor_frozen so existe em v6.6+)
+        # Properties: getattr defensivo (anchor_frozen pode nao existir)
         anchor_frozen = getattr(d, "anchor_frozen", False)
 
         self.ui.render(
@@ -783,9 +789,9 @@ class VirtualMouseService:
             anchor_frozen=anchor_frozen,
         )
 
-        # NOVO: indicador de estado do holograma direto no preview cv2.
-        # Garante que o usuario veja se o toggle por tecla H funcionou,
-        # mesmo se a janela Tk transparente nao estiver visivel.
+        # Indicador de estado do holograma no preview cv2 — garante
+        # que o usuario veja se o toggle por tecla H funcionou, mesmo
+        # se a janela transparente nao estiver visivel.
         if self.hologram is not None and self.hologram.available:
             label = "HOLO ON" if self.hologram.enabled else "HOLO OFF"
             color = (0, 0, 255) if self.hologram.enabled else (120, 120, 120)

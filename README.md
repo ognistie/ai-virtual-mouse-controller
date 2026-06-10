@@ -17,7 +17,7 @@ Webcam → 21 landmarks → cursor do sistema. Sem hardware extra. Sem GPU.
 <tr>
 <td align="center" width="20%"><img src="docs/assets/img/gesture_move_real.png" width="100%"/><br/><sub><b>🖐️ move</b></sub></td>
 <td align="center" width="20%"><img src="docs/assets/img/gesture_left_click_real.png" width="100%"/><br/><sub><b>🤏 click</b></sub></td>
-<td align="center" width="20%"><img src="docs/assets/img/gesture_right_click_real.png" width="100%"/><br/><sub><b>🤞 right click</b></sub></td>
+<td align="center" width="20%"><img src="docs/assets/img/gesture_left_click_real.png" width="100%"/><br/><sub><b>🤏 right click</b></sub></td>
 <td align="center" width="20%"><img src="docs/assets/img/gesture_double_click_real.png" width="100%"/><br/><sub><b>✌️ double click</b></sub></td>
 <td align="center" width="20%"><img src="docs/assets/img/gesture_pause_real.png" width="100%"/><br/><sub><b>✊ pausa</b></sub></td>
 </tr>

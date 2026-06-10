@@ -1,26 +1,17 @@
 """
-config.py  (v6.5 - Easier Pinch)
-================================
+config.py
+=========
 
-GESTOS:
+Configuracao do AI Virtual Mouse Controller.
+
+Gestos:
 - Mao aberta 🖐️           → move cursor
-- Pinca 🤏                 → clique simples (MAIS FACIL na v6.5)
-- Pinca mantida 2s         → iniciar arrasto
-- Dois dedos ✌️            → DUPLO CLIQUE (cursor congela)
+- Pinca 🤏                 → clique simples
+- Pinca mantida 1.5s       → iniciar arrasto
+- Polegar+medio 🤞         → clique direito
+- Dois dedos ✌️            → duplo clique
 - Punho ✊                 → cursor congelado
 - Mao fora do frame        → pausa
-
-MUDANCAS v6.5 (pinch mais facil de disparar):
-1. PINCH_DISTANCE_THRESHOLD: 0.055 → 0.075 (pinca mais "solta" funciona)
-2. PINCH_THRESHOLD_FLOOR: novo (piso minimo do threshold adaptativo)
-3. PINCH_DUAL_DETECTION: True → False (dual estava rejeitando cliques validos)
-4. PINCH_MIN_HOLD_SECONDS: 0.03 → 0.015 (cliques mais rapidos passam)
-5. CLICK_COOLDOWN_SECONDS: 0.35 → 0.25 (cliques consecutivos mais rapidos)
-
-Mantem todas melhorias da v6.4:
-- Sticky targeting (cursor "agarra" ao mirar)
-- Aim assist com pre-ativacao + holdover
-- Curva ballistica suavizada
 """
 
 from typing import Literal, Tuple
@@ -42,19 +33,16 @@ MAX_NUM_HANDS: int = 1
 MIN_DETECTION_CONFIDENCE: float = 0.6
 MIN_TRACKING_CONFIDENCE: float = 0.4
 MODEL_COMPLEXITY: int = 0
-"""
-0=lite, 1=full.
+"""0=lite, 1=full.
 
-PERF: lite reduz inference em ~40-50% vs full. Gesture pinch e' robusto
-o suficiente pra rodar com lite sem perda perceptivel. Volta pra 1 se
-notar drop na deteccao em iluminacao ruim ou mao longe da camera.
+Lite reduz inference em ~40-50% vs full sem perda perceptivel no pinch.
+Volta pra 1 se notar drop na deteccao em iluminacao ruim ou mao longe.
 """
 
 INFERENCE_PRE_RESIZE_ENABLED: bool = False
-"""
-PERF: redimensiona o frame BGR antes de enviar pro MediaPipe.
-MediaPipe rescale internamente — fazer antes corta memcpy + acelera.
+"""Redimensiona o frame BGR antes de enviar pro MediaPipe.
 
+MediaPipe rescale internamente — fazer antes corta memcpy + acelera.
 Default False (compatibilidade). Liga pra testar ganho.
 """
 
@@ -62,39 +50,32 @@ INFERENCE_PRE_RESIZE_WIDTH: int = 320
 """Largura alvo do resize. Altura calculada mantendo aspect ratio."""
 
 CV2_USE_POLLKEY: bool = True
-"""
-PERF: usa cv2.pollKey() (non-blocking) em vez de cv2.waitKeyEx(1).
+"""Usa cv2.pollKey() (non-blocking) em vez de cv2.waitKeyEx(1).
 
 waitKeyEx(1) no Windows respeita o timer default de 15.6 ms → cap em
-~64 FPS na pratica. pollKey() (disponivel em opencv >= 4.7) nao tem
-esse cap.
-
-Fallback automatico pra waitKeyEx se pollKey nao existir na versao
-de cv2 instalada. Coloca False se notar problema de window refresh.
+~64 FPS na pratica. pollKey() (opencv >= 4.7) nao tem esse cap.
+Fallback automatico se pollKey nao existir. Coloca False se notar
+problema de window refresh.
 """
 
 # ---------------------------------------------------------------------
 # CURSOR — PONTO DE ANCORA
 # ---------------------------------------------------------------------
 #
-# Define qual ponto da mao a posicao do cursor segue.
-#
 # Opcoes:
-#   -2 = ANCORA ROBUSTA DA MAO TODA — DEFAULT v6.9.11
+#   -2 = ANCORA ROBUSTA DA MAO TODA (default)
 #        Combinacao ponderada de TODOS os 21 landmarks, com pesos por
-#        anatomia (palma > fingertips > intermediarios), por proximidade
-#        da borda do frame (landmark cortado pesa menos) e por estabilidade
-#        local (variancia curta = mais peso). Histerese suaviza queda de
-#        confianca. Resolve casos onde a webcam nao enxerga o centro da
-#        palma (mao de perfil, cantos do frame, oclusao parcial) — o
-#        cursor migra organicamente pros landmarks ainda visiveis sem
-#        saltos. Ver core/hand_anchor.py.
+#        anatomia, proximidade da borda do frame e estabilidade local.
+#        Histerese suaviza queda de confianca. Resolve casos onde a
+#        webcam nao enxerga o centro da palma — o cursor migra
+#        organicamente pros landmarks ainda visiveis sem saltos.
+#        Ver core/hand_anchor.py.
 #   -1 = MIDPOINT DO PINCH (polegar 4 + indicador 8)
-#        Alinha 1-pra-1 com a ancora do holograma; pinch fecha sobre o
-#        cursor. Vulneravel se polegar OU indicador for ocluido.
+#        Alinha 1-pra-1 com a ancora do holograma; pinch fecha sobre
+#        o cursor. Vulneravel se polegar OU indicador for ocluido.
 #    0 = pulso
 #    8 = ponta do indicador
-#    9 = palma (middle MCP) — comportamento legado pre-v6.9.10
+#    9 = palma (middle MCP)
 #   12 = ponta do medio
 #
 CURSOR_ANCHOR_LANDMARK: int = -2
@@ -104,9 +85,23 @@ CURSOR_ANCHOR_LANDMARK: int = -2
 # ---------------------------------------------------------------------
 
 POSITION_HOLD_FRAMES: int = 2
+"""Frames de hold antes de aceitar mudanca de posicao. Sobe pra 3 se
+notar instabilidade."""
+
+CURSOR_FOLLOWTHROUGH_FRAMES: int = 6
+"""Janela de "cinematic prediction" quando a mao sai do FOV.
+
+A 30fps ≈ 200ms. Cursor continua na direcao da ultima velocidade
+conhecida com decay exponencial, em vez de travar abrupto. Permite
+acertar canto/borda mesmo quando a mao ja saiu do quadro util.
 """
-PERF/UX: 3 → 2 frames. Cursor reage 1 frame mais rapido a mudanca de
-posicao. Pequeno mas perceptivel. Volta pra 3 se notar instabilidade.
+
+CURSOR_FOLLOWTHROUGH_DAMPING: float = 0.82
+"""Decay exponencial da velocidade no follow-through.
+
+0.82 a cada frame → cursor cobre ~80% da distancia maxima em 4-5 frames
+e desacelera suave. < 0.7 = cursor "freia" rapido (pouco impulso).
+> 0.9 = cursor "desliza" muito (impreciso).
 """
 
 # ---------------------------------------------------------------------
@@ -118,8 +113,6 @@ AIM_ASSIST_SLOWDOWN_FACTOR: float = 0.40
 AIM_ASSIST_TRIGGER_SHAPES: Tuple[str, ...] = ("peace", "pinch")
 AIM_ASSIST_PRE_ACTIVATION: bool = True
 AIM_ASSIST_PRE_PINCH_THRESHOLD: float = 0.12
-"""v6.5: 0.10 → 0.12 (combina com novo threshold de pinca)"""
-
 AIM_ASSIST_HOLDOVER_SECONDS: float = 0.30
 PRECISION_MODE_DEAD_ZONE: int = 4
 
@@ -151,7 +144,7 @@ DPI_ADAPTIVE_ENABLED: bool = True
 HAND_SIZE_REFERENCE: float = 0.22
 DPI_MULTIPLIER_MIN: float = 0.7
 DPI_MULTIPLIER_MAX: float = 1.4
-DPI_FIXED_MULTIPLIER: float = 0.85
+DPI_FIXED_MULTIPLIER: float = 1.00
 
 # ---------------------------------------------------------------------
 # SUAVIZACAO
@@ -169,73 +162,59 @@ ONE_EURO_D_CUTOFF: float = 1.0
 DEAD_ZONE_PIXELS: int = 1
 
 # ---------------------------------------------------------------------
-# PINCA (v6.5: MAIS FACIL DE DISPARAR)
+# PINCA
 # ---------------------------------------------------------------------
 
 PINCH_DISTANCE_THRESHOLD: float = 0.075
-"""
-v6.5: 0.055 → 0.075 (+36% mais permissivo).
-Pinca natural (dedos proximos mas nao encostando) agora funciona.
-Antes: precisava encostar polegar no indicador para disparar.
+"""Distancia maxima polegar→indicador pra classificar como pinca.
+
+Pinca natural (dedos proximos mas nao encostando) funciona — nao
+exige toque pra disparar.
 """
 
 PINCH_THRESHOLD_FLOOR: float = 0.045
-"""
-NOVO v6.5: piso MINIMO do threshold apos escala adaptativa.
-Quando mao esta longe (hand_size < reference), o threshold cai proporcionalmente.
-Sem o piso: mao a 0.10 fazia threshold virar 0.034 (impossivel de fechar).
-Com piso 0.045: garantia de que nunca fica absurdamente apertado.
+"""Piso minimo do threshold apos escala adaptativa.
+
+Quando mao esta longe (hand_size < reference) o threshold cai
+proporcionalmente. Sem o piso, mao a 0.10 fazia threshold virar 0.034
+(impossivel de fechar).
 """
 
 PINCH_ADAPTIVE_TO_HAND_SIZE: bool = True
 
 PINCH_DUAL_DETECTION: bool = False
-"""
-v6.5: True → False (DESABILITADO).
-A deteccao dual (distancia + velocidade de aproximacao) estava
-REJEITANDO pincas legitimas quando o usuario relaxava os dedos
-para soltar. Sem ela, deteccao volta a ser confiavel.
-A protecao contra falsos positivos vem do debounce de 2 frames + threshold
-mais cuidadoso.
+"""Deteccao dual (distancia + velocidade de aproximacao).
+
+Desabilitada porque estava rejeitando pincas legitimas quando o
+usuario relaxava os dedos pra soltar. Protecao contra falsos positivos
+vem do debounce de 2 frames + threshold.
 """
 
-PINCH_VELOCITY_THRESHOLD: float = 0.008  # ainda existe se voce quiser reabilitar
+PINCH_VELOCITY_THRESHOLD: float = 0.008
 
 PINCH_MIN_HOLD_SECONDS: float = 0.015
-"""
-NOVO v6.5: tempo minimo da pinca para contar como click.
-Antes era hardcoded em 0.03s (30ms). Agora 0.015s (15ms).
-Permite cliques mais rapidos e fluidos.
-"""
+"""Tempo minimo da pinca pra contar como click. 15ms permite cliques
+rapidos e fluidos sem disparar em encontros acidentais."""
 
 # ---------------------------------------------------------------------
-# CLIQUE DIREITO — pinca polegar+medio (NOVO v6.9)
+# CLIQUE DIREITO — pinca polegar+medio
 # ---------------------------------------------------------------------
 
 PINCH_MIDDLE_THRESHOLD: float = 0.075
-"""
-v6.9: distancia maxima polegar (lm 4) → ponta do dedo medio (lm 12)
-para classificar como pinca do clique direito.
-
-Mesmo valor da pinca normal (PINCH_DISTANCE_THRESHOLD) para manter
-sensacao consistente entre os dois gestos.
-"""
+"""Distancia maxima polegar→medio pra classificar como pinca do clique
+direito. Mesmo valor do pinch normal pra manter sensacao consistente."""
 
 PINCH_MIDDLE_INDEX_GUARD: float = 0.090
-"""
-v6.9: distancia MINIMA polegar → indicador (lm 4 → lm 8) para
-permitir o clique direito.
+"""Distancia MINIMA polegar→indicador pra permitir o clique direito.
 
-Por que: ao fechar polegar+medio, o indicador tende a se aproximar
-junto (mecanica natural da mao). Sem essa guarda, dispararia pinca
-normal (CLICK) tambem. Esse threshold forca o usuario a manter o
-indicador afastado do polegar para o clique direito ser reconhecido.
-
-Resultado: pinca normal e clique direito ficam mutuamente exclusivos.
+Ao fechar polegar+medio o indicador tende a se aproximar junto
+(mecanica natural da mao). Sem essa guarda, dispararia pinca normal
+(CLICK) tambem. Forca o usuario a manter o indicador afastado do
+polegar — pinca normal e clique direito ficam mutuamente exclusivos.
 """
 
 # ---------------------------------------------------------------------
-# POSTURA ANATOMICA — anti acoplamento de tendoes (v6.9.12)
+# POSTURA ANATOMICA — anti acoplamento de tendoes
 # ---------------------------------------------------------------------
 # Durante PINCH (polegar+indicador), o dedo medio cai naturalmente 30-50%
 # do quanto o indicador caiu — efeito do flexor digitorum profundus (FDP)
@@ -247,31 +226,24 @@ Resultado: pinca normal e clique direito ficam mutuamente exclusivos.
 # Score ∈ [0,1]: ~1.0 = dedo reto, ~0.65 = curvado, ~0.40 = fechado.
 
 PINCH_MIDDLE_INDEX_EXTENSION_MIN: float = 0.88
-"""
-Score MINIMO de extensao do indicador para validar PINCH_MIDDLE.
+"""Score MINIMO de extensao do indicador pra validar PINCH_MIDDLE.
 
 0.88 = indicador claramente apontando (apenas leve flexao natural).
-Durante um PINCH normal, o indicador esta CURVADO (score 0.65-0.80) —
-nessa faixa, a porta de PINCH_MIDDLE fica fechada. So abre quando o
-usuario estende deliberadamente o indicador, indicando intencao real
-de fazer o gesto de clique direito.
+Durante PINCH normal o indicador esta CURVADO (score 0.65-0.80) — nessa
+faixa a porta de PINCH_MIDDLE fica fechada. So abre quando o usuario
+estende deliberadamente o indicador.
 
 Ajuste UP (0.92+) se ainda houver falsos positivos.
-Ajuste DOWN (0.80-) se o gesto intencional for rejeitado por sobra
-de flexao natural do indicador.
+Ajuste DOWN (0.80-) se o gesto intencional for rejeitado.
 """
 
 PINCH_MIDDLE_MIDDLE_EXTENSION_MAX: float = 0.92
-"""
-Score MAXIMO de extensao do dedo medio para validar PINCH_MIDDLE.
+"""Score MAXIMO de extensao do dedo medio pra validar PINCH_MIDDLE.
 
-0.92 = medio nao pode estar totalmente reto. Para PINCH_MIDDLE real
-o medio precisa ter dobrado para encontrar o polegar — entao deve
-estar pelo menos em flexao leve. Sem esse limite, um gesto onde
-todos os dedos estao estendidos e por acidente o medio passa perto do
-polegar dispararia o clique direito.
+0.92 = medio nao pode estar totalmente reto. Pra PINCH_MIDDLE real o
+medio precisa ter dobrado pra encontrar o polegar.
 
-Ajuste UP (0.96) para aceitar gestos mais sutis.
+Ajuste UP (0.96) pra aceitar gestos mais sutis.
 Ajuste DOWN (0.85) se houver falsos positivos com medio quase reto.
 """
 
@@ -280,21 +252,25 @@ Ajuste DOWN (0.85) se houver falsos positivos com medio quase reto.
 # ---------------------------------------------------------------------
 
 DRAG_HOLD_SECONDS: float = 1.5
-"""
-1.5s = aggressive: drag dispara rapido.
+"""Tempo de pinch sustentado pra iniciar drag.
 
-Compat: press-to-click ja disparou em ~0ms. Quem so quer clicar
-solta antes de 1.5s → sem drag acidental. Mas pinch sustentado >1.5s
-sem mover muito ja entra em drag — risco maior se voce hesitar
-durante um clique.
+1.5s = aggressive. Press-to-click ja disparou em ~0ms; quem so quer
+clicar solta antes de 1.5s. Risco maior se voce hesitar durante um
+clique.
 """
 
 # ---------------------------------------------------------------------
-# CLIQUE E COOLDOWNS (v6.5: cliques consecutivos mais rapidos)
+# CLIQUE E COOLDOWNS
 # ---------------------------------------------------------------------
 
-CLICK_COOLDOWN_SECONDS: float = 0.25
-"""v6.5: 0.35 → 0.25 (cliques consecutivos mais rapidos)"""
+CLICK_COOLDOWN_SECONDS: float = 0.15
+"""Tempo minimo entre dois cliques consecutivos.
+
+0.15s permite sequencias rapidas (abrir menu, clicar opcao, fechar) sem
+descartar cliques legitimos. Cobre ainda assim a janela de bounce do
+press-to-click. Aumente pra 0.20s+ se notar duplo-clique acidental ao
+abrir/fechar pinch rapido.
+"""
 
 DOUBLE_CLICK_COOLDOWN_SECONDS: float = 2.5
 DOUBLE_CLICK_WINDOW_SECONDS: float = 0.35
@@ -311,54 +287,58 @@ GESTURE_EXIT_FRAMES: int = 3
 # ---------------------------------------------------------------------
 
 SCREEN_MARGIN_PERCENTAGE: float = 0.10
+"""Margem isotropica (fallback). Usado se as margens assimetricas
+abaixo nao forem definidas.
 """
-v6.9.13: 0.18 → 0.10. Margem reduzida significa que o usuario nao precisa
-levar a mao ate o ULTIMO 18% da borda da camera pra atingir a borda da
-tela — bordas do desktop, taskbar, cantos pra fechar janela ficam
-alcancaveis sem forcar a mao pra fora do quadro util do MediaPipe (que
-e' onde os landmarks comecam a falhar).
 
-Trade-off: cursor fica ligeiramente mais sensivel no centro. Compensado
-pelo drag_precision_factor (DPI baixo durante drag) e pelo aim_assist
-slowdown (DPI baixo perto de cliques). Resultado liquido: precisao
-maior nas tarefas que IMPORTAM (clicks finos, selecao) e alcance fluido
-nas bordas que ANTES travavam.
+# Margens assimetricas — top/bottom < X. Anatomia + camera 16:9: alcance
+# horizontal e' confortavel (braco oscila amplo); vertical cansa rapido
+# (ombro contra gravidade). Margens menores no Y permitem atingir abas
+# do navegador / taskbar com a mao em altura comfortavel, sem precisar
+# levar ate o limite do FOV (onde MediaPipe ja erra). X mantem folga
+# pra evitar saltos quando a mao sai pelo lado natural do gesto.
+
+SCREEN_MARGIN_X: float = 0.08
+"""Margem horizontal (esquerda/direita)."""
+
+SCREEN_MARGIN_TOP: float = 0.04
+"""Margem superior — pequena pra alcancar abas/menu/fechar com
+inclinacao leve do braco. Menor que SCREEN_MARGIN_X de proposito.
+"""
+
+SCREEN_MARGIN_BOTTOM: float = 0.04
+"""Margem inferior — pequena pra alcancar taskbar / botoes inferiores
+sem forcar a mao pra baixo (onde a camera tipicamente nao enxerga bem,
+porque o usuario senta na altura da tela e a camera fica acima).
 """
 
 # ---------------------------------------------------------------------
-# FEEL DE MOUSE FISICO (v6.9.13)
+# FEEL DE MOUSE FISICO
 # ---------------------------------------------------------------------
 # Replicam dois fundamentos que fazem mouse fisico ser preciso:
 #  1. Apertar o botao NUNCA desloca o cursor.
 #  2. DPI baixo durante movimentos finos (texto, drag).
 
 CLICK_FREEZE_SECONDS: float = 0.12
-"""
-Quanto tempo o cursor fica TRAVADO no pixel atual logo apos um click.
+"""Quanto tempo o cursor fica TRAVADO no pixel atual logo apos um click.
 
-Problema que resolve: ao fechar a pinca (polegar+indicador), o midpoint
-4+8 (= ancora do cursor) inerentemente se desloca alguns pixels — o
-polegar avanca em direcao ao indicador. Sem freeze, o cursor "viaja"
-2-10px durante o click, o que faz cliques em alvos pequenos errarem.
+Ao fechar a pinca, o midpoint 4+8 (ancora do cursor) inerentemente se
+desloca alguns pixels — o polegar avanca em direcao ao indicador. Sem
+freeze, o cursor "viaja" 2-10px durante o click, fazendo cliques em
+alvos pequenos errarem.
 
-0.12s = 120ms: cobre o intervalo entre a deteccao do raw shape PINCH e
-a estabilizacao da pose pos-fechamento. Aumente para 0.15-0.20s se ainda
-notar deriva no click. Diminua para 0.08s se sentir cursor "preso" apos
-clicks rapidos consecutivos.
+0.12s cobre o intervalo entre a deteccao do raw shape PINCH e a
+estabilizacao da pose. Aumente pra 0.15-0.20s se ainda notar deriva.
+Diminua pra 0.08s se sentir cursor "preso" apos clicks consecutivos.
 """
 
 DRAG_PRECISION_FACTOR: float = 0.55
-"""
-Multiplicador do delta do cursor enquanto DRAG esta ativo.
+"""Multiplicador do delta do cursor enquanto DRAG esta ativo.
 
-0.55 = mao precisa percorrer ~1.8x a distancia pra cobrir o mesmo pixel
-range. Replica o feel de "ajustar DPI pra baixo" que profissionais
-fazem fisicamente quando vao selecionar texto, fazer drag de selecao
-retangular, ou arrastar icones pra um local preciso.
-
-Sem isso, a tremedeira da mao no ar (3-5 pixels naturais) atrapalha a
-selecao de palavras / linhas no editor. Com 0.55, a mesma tremedeira
-vira 1.6-2.7 pixels — abaixo do limite perceptual.
+0.55 = mao percorre ~1.8x a distancia pra cobrir o mesmo pixel range.
+Replica o "ajustar DPI pra baixo" que profissionais fazem fisicamente
+ao selecionar texto / arrastar com precisao. Sem isso, a tremedeira
+natural da mao no ar (3-5 pixels) atrapalha selecao fina.
 
 Ajuste UP (0.7-0.8) se o drag estiver lento demais.
 Ajuste DOWN (0.4) pra precisao maxima em telas 4K+.
@@ -375,159 +355,113 @@ SHOW_DPI: bool = True
 SHOW_DRAG_PROGRESS: bool = True
 SHOW_AIM_ASSIST: bool = True
 DRAW_LANDMARKS: bool = True
-WINDOW_NAME: str = "AI Virtual Mouse v6.5 — ESC to quit"
+WINDOW_NAME: str = "AI Virtual Mouse — ESC to quit"
 
 # ---------------------------------------------------------------------
-# JANELA DE EXIBICAO (NOVO v6.9 — UX webcam de streamer)
+# JANELA DE EXIBICAO
 # ---------------------------------------------------------------------
 
 DISPLAY_COMPACT_WIDTH: int = 480
 DISPLAY_COMPACT_HEIGHT: int = 270
-"""
-Tamanho da janela em modo COMPACTO (sem painel de settings).
+"""Tamanho da janela em modo compacto (sem painel de settings).
+
 A camera continua capturando em CAMERA_WIDTH x CAMERA_HEIGHT (resolucao
-cheia para a IA), mas o frame e redimensionado antes de ser exibido.
-Detec
-cao da mao nao perde precisao."""
+cheia pra a IA); o frame e redimensionado antes de ser exibido.
+Deteccao da mao nao perde precisao.
+"""
 
 DISPLAY_EXPANDED_WIDTH: int = 760
 DISPLAY_EXPANDED_HEIGHT: int = 540
-"""
-Tamanho quando o painel de settings esta aberto (tecla S).
-Mais alto e mais largo para acomodar o painel lateral sem cortar
-nem distorcer os controles.
-"""
+"""Tamanho quando o painel de settings esta aberto (tecla S)."""
 
 DISPLAY_POSITION_BOTTOM_RIGHT: bool = True
-"""
-Se True, posiciona a janela automaticamente no canto inferior direito
-da tela ao iniciar (estilo webcam de streamer/OBS). Se False, deixa o
-sistema operacional decidir a posicao inicial.
-"""
+"""Posiciona a janela no canto inferior direito ao iniciar (estilo
+webcam de streamer). False deixa o SO decidir."""
 
 DISPLAY_POSITION_MARGIN: int = 20
 """Distancia em pixels da borda da tela ao posicionar automaticamente."""
 
 DISPLAY_ALWAYS_ON_TOP: bool = True
-"""
-NOVO v6.9: mantem a janela da webcam SEMPRE visivel acima de outras janelas.
+"""Mantem a janela da webcam SEMPRE visivel acima de outras janelas.
 
-Por que: sem isso, ao clicar em qualquer outra aplicacao (browser, codigo,
-documentos) a janela da webcam vai pra tras e voce nao consegue ver sua
-mao para controlar o cursor.
-
-Mesmo comportamento que webcams de streamers no OBS Studio: a previa fica
-sempre vivivel acima de tudo, mas voce continua podendo clicar e trabalhar
-nas outras janelas normalmente.
-
-Se quiser desabilitar (ex: durante apresentacao em tela cheia), use a tecla
-T para alternar em runtime, ou mude esta constante para False.
+Sem isso, ao clicar em outra aplicacao a janela vai pra tras e voce
+nao consegue ver sua mao pra controlar o cursor. Comportamento similar
+a webcams de streamers no OBS Studio. Tecla T alterna em runtime.
 """
 
 DISPLAY_TOPMOST_TOGGLE_KEY: str = "t"
-"""Tecla para alternar always-on-top em runtime. Use 't'."""
+"""Tecla pra alternar always-on-top em runtime."""
 
 # ---------------------------------------------------------------------
 # HOLOGRAMA (mao virtual desenhada na tela)
 # ---------------------------------------------------------------------
 
 HOLOGRAM_ENABLED: bool = False
-"""
-Se True, abre uma janela fullscreen transparente sobre o desktop e desenha
-uma mao "holografica" pequena seguindo o cursor. Pode ser ligada em runtime
-pela tecla H.
+"""Abre uma janela fullscreen transparente sobre o desktop e desenha
+uma mao "holografica" seguindo o cursor. Tecla H liga em runtime.
 
-Default False porque adiciona overhead visual. Em modo demonstracao/onboarding
-ela faz a experiencia parecer mais magica; em uso prolongado pode distrair.
+Default False porque adiciona overhead visual. Em demo/onboarding
+parece magica; em uso prolongado pode distrair.
 """
 
 HOLOGRAM_BACKEND: str = "auto"
-"""
-Backend de renderizacao do holograma (v6.9.8):
-- "auto"     : tenta GL primeiro; cai pra QPainter se ModernGL/driver falhar
-- "gl"       : forca ModernGL (mesh 3D + GLSL shader, look hologram real)
-- "qpainter" : forca pipeline 2D vetorial original (compatibilidade/debug)
+"""Backend de renderizacao do holograma.
 
-ModernGL backend renderiza a mao como mesh 3D real (palm ellipsoide +
-finger capsules) com shader holografico (fresnel rim, depth fade, cyan
-volumetric). Visualmente proximo de "mao 3D translucida projetada".
+- "auto"     : tenta GL primeiro; cai pra QPainter se driver falhar
+- "gl"       : forca ModernGL (mesh 3D + GLSL shader)
+- "qpainter" : forca pipeline 2D vetorial (compatibilidade/debug)
 
-Tradeoff: requer driver OpenGL 3.3+. Em ambientes sem GPU/driver (RDP,
-VM sem aceleracao), usar "qpainter" pra forcar fallback.
+ModernGL renderiza a mao como mesh 3D real (palm ellipsoide + finger
+capsules) com shader holografico (fresnel rim, depth fade, cyan
+volumetric). Requer driver OpenGL 3.3+. Em ambientes sem GPU/driver
+(RDP, VM sem aceleracao), usar "qpainter".
 """
 
 HOLOGRAM_TOGGLE_KEY: str = "h"
 """Tecla pra alternar o holograma em runtime."""
 
 HOLOGRAM_OPACITY: float = 0.70
-"""
-Opacidade base. Camadas (palm/finger outline, particles, tips) usam
-fracoes desse valor. 0.70 + paleta azul ciano da contraste suficiente
-sem virar barulho.
-"""
+"""Opacidade base. Camadas (palm/finger outline, particles, tips) usam
+fracoes desse valor."""
 
 HOLOGRAM_HAND_SIZE_PX: int = 180
-"""
-Tamanho do bounding box da mao em pixels. 180 da presenca visual sem
-estorvar — com curvas Catmull-Rom + glow PySide6 a mao ja parece anatomica.
-"""
+"""Tamanho do bounding box da mao em pixels."""
 
 HOLOGRAM_FPS: int = 30
 """Taxa de redesenho. 30 Hz e' suave + economico em CPU."""
 
 HOLOGRAM_COLOR_BONE: str = "#00d4ff"
-"""
-Cor primaria do holograma — azul neon ciano. Estilo HUD futurista.
-Usado nas linhas/contornos da mao. Substitui o vermelho do MVP.
-"""
+"""Cor primaria do holograma — azul neon ciano (linhas/contornos)."""
 
 HOLOGRAM_COLOR_POINT: str = "#e0f7ff"
-"""
-Cor dos pontos brilhantes (tips, particulas). Branco azulado para
-contraste com o azul ciano do contorno.
-"""
+"""Cor dos pontos brilhantes (tips, particulas)."""
 
 HOLOGRAM_PARTICLES_ENABLED: bool = False
-"""
-Liga nuvem densa de particles dentro da silhueta. Default False = visual
-clean moderno (sem ruido visual). True = particle cloud densa.
-"""
+"""Nuvem densa de particles dentro da silhueta. False = visual clean."""
 
 HOLOGRAM_PARTICLE_COUNT: int = 180
-"""
-Numero de particles na nuvem. 180 = densidade boa sem custo de FPS.
-Aumentar pra ~300 da look mais "particle cloud". Acima disso pode
-comecar a impactar perceptivelmente.
-"""
+"""Numero de particles na nuvem. >300 pode impactar FPS."""
 
 HOLOGRAM_VIEW_DORSAL: bool = False
-"""
-Vista anatomica do holograma.
+"""Vista anatomica do holograma.
 
 True  = dorsal (costas da mao na tela) — espelha X dos landmarks
-False = palm view — segue webcam mirroreada (sua mao real "transmitida"
-        na tela em 3a pessoa)
-
-Default False = visual coerente com a imagem da webcam.
+False = palm view — segue webcam mirroreada
 """
 
 HOLOGRAM_TRANSPARENT_COLOR: str = "#010203"
-"""
-Cor "magica" pintada como fundo do canvas que vira transparente no compositor
-do Windows. Tem que ser uma cor que nao apareca em mais nada desenhado.
-"""
+"""Cor "magica" pintada como fundo do canvas que vira transparente no
+compositor do Windows. Tem que ser cor que nao apareca em mais nada."""
 
 # ---------------------------------------------------------------------
-# PERFORMANCE TELEMETRY (instrumentation per estagio do tick loop)
+# PERFORMANCE TELEMETRY (instrumentacao per estagio do tick loop)
 # ---------------------------------------------------------------------
 
 PERF_TELEMETRY_ENABLED: bool = True
-"""
-Liga timing por estagio (camera/inference/gesture/events/hologram/preview/
-waitkey). Reporta p50/p99 a cada N ticks via logger.info.
+"""Liga timing por estagio (camera/inference/gesture/events/hologram/
+preview/waitkey). Reporta p50/p99 a cada N ticks via logger.info.
 
-Custo: ~100ns por entry/exit (desprezivel). Coloca False em producao se
-quiser zero overhead.
+Custo: ~100ns por entry/exit (desprezivel).
 """
 
 PERF_TELEMETRY_WINDOW: int = 120

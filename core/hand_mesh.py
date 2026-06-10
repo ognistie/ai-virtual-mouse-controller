@@ -10,7 +10,7 @@ tamanho alvo e retorna 3 numpy arrays prontos pra upload em VBO/EBO:
     - normals:  (N, 3) float32 — normais de superficie (pra shader fresnel)
     - indices:  (M,)   uint32  — triangle indices
 
-Modelagem ANATOMICA (v6.9.8.6):
+Modelagem anatomica:
 - PALMA (`_build_anatomical_palm`): lofted surface via 7 rings eliticos
   ao longo do eixo wrist→MCPs. Largura variavel (estreito wrist, cheio
   MCPs), thenar bulge sutil offset lateral, depth convexa no centro.
@@ -19,15 +19,15 @@ Modelagem ANATOMICA (v6.9.8.6):
   + cross-section eliptica (ratio depth/lateral = 0.80) + hemisphere
   tip cap (3 rings + apex). Knuckle bulge no PIP via SEGMENT_TAPER.
 - POLEGAR: mesma logica de dedo mas com THUMB_TAPER (base musculosa)
-  + THUMB_MCP_INSET_FRAC = 0.30 (3x os outros) pra CMC enterrar no
-  thenar do palm, evitando look "polegar colado de fora".
+  + THUMB_MCP_INSET_FRAC = 0.50 pra CMC enterrar no thenar do palm,
+  evitando look "polegar colado de fora".
 
-Princípio de design: geometria SOZINHA (sem shader) ja le como uma
+Principio de design: geometria SOZINHA (sem shader) ja le como uma
 mao humana simplificada. Shader holografico complementa, nao mascara
 problemas de modelagem.
 
-Reuso intencional do scaling/anchor de hand_renderer.py pra que o
-holograma 3D fique alinhado com o cursor IDENTICAMENTE.
+Reuso do scaling/anchor de hand_renderer.py pra que o holograma 3D
+fique alinhado com o cursor IDENTICAMENTE.
 
 Mesh final: ~770 verts / ~1500 tris. ~1.5ms gen em Python+numpy.
 """
@@ -51,9 +51,8 @@ FINGER_CHAINS = (THUMB_CHAIN, INDEX_CHAIN, MIDDLE_CHAIN, RING_CHAIN, PINKY_CHAIN
 # Largura base por dedo (fracao de size_px) — mesmo do hand_renderer.py
 FINGER_WIDTH_FACTOR = (0.095, 0.075, 0.082, 0.072, 0.060)
 
-# Fator de afilamento por joint (MCP->PIP->DIP->TIP).
-# v6.9.8.2: knuckle bulge no PIP (junta media) + taper natural no TIP.
-# Anatomia humana: dedo nao e' cone — tem leve bump na junta intermediaria.
+# Fator de afilamento por joint (MCP→PIP→DIP→TIP). Anatomia humana:
+# dedo nao e' cone — tem leve bump (knuckle bulge) na junta intermediaria.
 # Index 0=MCP (base), 1=PIP (knuckle), 2=DIP (afina), 3=TIP (redondo).
 SEGMENT_TAPER = (0.90, 1.00, 0.85, 0.65)
 
@@ -64,8 +63,8 @@ THUMB_TAPER = (1.05, 0.95, 0.82, 0.68)
 # criando fusao visual sem precisar de boolean mesh union.
 MCP_INSET_FRAC = 0.12
 
-# v6.9.8.8: polegar inset aumentado pra 0.50 = polegar nasce do CENTRO
-# da thenar, nao de fora. Sem isso parece "tubo grudado lateralmente".
+# Polegar nasce do CENTRO da thenar (nao de fora) — sem isso parece
+# "tubo grudado lateralmente".
 THUMB_MCP_INSET_FRAC = 0.50
 
 # Ancora visual = midpoint pinch_left (mesmo de hand_renderer)
@@ -76,9 +75,8 @@ FINGER_RING_SEGMENTS = 10  # verts por anel dos dedos
 PALM_RING_COUNT = 7        # cross-sections ao longo do eixo wrist→top
 PALM_RING_SEGMENTS = 16    # verts por ring eliptico da palma
 
-# v6.9.8.8: angle tables pre-computadas globalmente — usadas em
-# vectorized ring vertex generation pra evitar math.cos/sin per-vert
-# nos hot loops (12ms → ~2ms target).
+# Angle tables pre-computadas globalmente — usadas em vectorized ring
+# vertex generation pra evitar math.cos/sin per-vert nos hot loops.
 _FINGER_ANGLES = np.linspace(
     0, 2 * np.pi, FINGER_RING_SEGMENTS, endpoint=False, dtype=np.float32,
 )
@@ -95,18 +93,17 @@ _PALM_SIN = np.sin(_PALM_ANGLES).astype(np.float32)
 FINGER_ELLIPSE_RATIO = 0.80
 
 # Profundidade maxima da palma (no centro) como fracao de size_px.
-# v6.9.8.10: 0.10 → 0.05. Antes criava "ridge" vertical visivel no
-# meio da palma (bulge 3D + fresnel rim split). Agora palma FLAT como
-# anatomia real (palm e' essencialmente um slab fino), sem ridge.
+# Palm e' essencialmente um slab fino — depth alta cria "ridge" vertical
+# visivel no meio quando combinada com fresnel rim do shader.
 PALM_DEPTH_MAX_FRAC = 0.05
 
-# Thenar bulge — quanto desloca o ring center na direcao do polegar.
-# v6.9.8.8: 0.04 → 0.08 — thenar mais pronunciada pra absorver visualmente
-# a base do polegar (que tambem foi puxada via THUMB_MCP_INSET_FRAC=0.50).
+# Thenar bulge — desloca o ring center na direcao do polegar pra
+# absorver visualmente a base do polegar (puxada via
+# THUMB_MCP_INSET_FRAC=0.50).
 PALM_THENAR_BULGE_FRAC = 0.08
 
-# Extensao do palm abaixo do landmark wrist. v6.9.8.8: 0.04 → 0.0.
-# Antes criava "stub" de antebraco; agora palm para limpa no wrist.
+# Extensao do palm abaixo do landmark wrist. Zero evita "stub" de
+# antebraco — palm para limpa no wrist.
 PALM_WRIST_EXTEND_FRAC = 0.0
 
 
@@ -252,9 +249,9 @@ def _build_swept_finger(
         mcp_dir = mcp_to_palm / mcp_dist
         joints_adjusted[0] = joints[0] + mcp_dir * mcp_dist * mcp_inset_frac
 
-    # v6.9.8.4: subdivide a chain via Catmull-Rom + interpola widths
-    # smoothstep. Antes: 4 rings lineares = "elbows" visiveis nos joints.
-    # Agora: ~10 rings com curvatura natural = silhueta organica de dedo.
+    # Subdivide a chain via Catmull-Rom + interpola widths smoothstep.
+    # 4 rings lineares geram "elbows" visiveis nos joints; ~10 rings
+    # com curvatura natural = silhueta organica de dedo.
     SAMPLES_PER_SEGMENT = 2  # 4 joints + 3*2 = 10 rings
     joints_dense = _subdivide_chain_catmull_rom(
         joints_adjusted, samples_per_segment=SAMPLES_PER_SEGMENT,
@@ -264,11 +261,9 @@ def _build_swept_finger(
     )
     n_rings = len(joints_dense)
 
-    # v6.9.8.8: VECTORIZED ring generation.
-    # Antes: nested Python loop 13×10=130 iteracoes com sin/cos por vert.
-    # Agora: precomputa tudo em arrays, gera ring inteiro com broadcasting
-    # (1 numpy op em vez de 10 Python ops).
-    # Use angle tables globais se segments == FINGER_RING_SEGMENTS, senao
+    # Vectorized ring generation. Precomputa angle tables e gera ring
+    # inteiro com broadcasting (1 numpy op em vez de N Python ops).
+    # Usa tables globais se segments == FINGER_RING_SEGMENTS, senao
     # gera dinamico (fallback defensivo).
     if segments == FINGER_RING_SEGMENTS:
         cos_table = _FINGER_COS
@@ -325,8 +320,8 @@ def _build_swept_finger(
         all_ring_pos.append(positions)
         all_ring_norm.append(normals_arr)
 
-    # v6.9.8.8: keep numpy arrays — evita conversao tuple por vert.
-    # .tolist() e' significativamente mais rapido que Python comprehension.
+    # Mantem numpy arrays e converte em batch com .tolist() — evita
+    # conversao tuple por vert no hot loop.
     ring_verts_array = np.concatenate(all_ring_pos, axis=0)
     ring_norms_array = np.concatenate(all_ring_norm, axis=0)
     verts: List[Tuple[float, float, float]] = ring_verts_array.tolist()
@@ -344,8 +339,7 @@ def _build_swept_finger(
             i3 = base_idx + (ring_idx + 1) * segments + s2
             indices.extend([i0, i1, i2, i1, i3, i2])
 
-    # v6.9.8.8: hemisphere cap VECTORIZED — antes nested Python loops
-    # 3×10=30 iter c/ tuple appends; agora numpy broadcasting.
+    # Hemisphere cap vectorizado via numpy broadcasting.
     if add_tip_cap and n_rings >= 2:
         tip_tangent = joints_dense[-1] - joints_dense[-2]
         tip_len = float(np.linalg.norm(tip_tangent))
@@ -512,8 +506,8 @@ def _build_anatomical_palm(
         # Posicao ao longo do eixo principal
         center_axis = palm_origin + main_unit * (t * palm_length)
 
-        # v6.9.8.10: width curve mais cheia pra envelopar finger bases.
-        # Top expand 10% alem MCPs = "envolve" bases dos dedos visualmente.
+        # Width curve cheia: top expande 10% alem dos MCPs pra envolver
+        # bases dos dedos visualmente.
         if t < 0.20:
             # Zona do pulso — taper moderado (0.65 → 0.88)
             width_factor = 0.65 + (t / 0.20) * 0.23
@@ -614,7 +608,7 @@ def _build_finger_palm_bridges(
     palm_segments: int,
 ) -> List[int]:
     """
-    v6.9.9.0 — MANO-inspired CONTINUITY GEOMETRY.
+    MANO-inspired continuity geometry.
 
     Cria triangulos conectando cada MCP ring dos dedos com a arc
     correspondente da palm top ring. Resultado: mesh CONTINUA palm↔
@@ -702,10 +696,9 @@ def generate_hand_mesh(
     if len(landmarks) < 21:
         return _empty_mesh()
 
-    # PERF: vetoriza tudo num unico ndarray (21,3) — antes eram 21 calls de
-    # np.array([x,y,z]) por mesh-regen, mais alocs Python que somavam ~ms
-    # durante motion. Agora 1 alloc + 1 broadcast + scaling vetorizado.
-    lm_arr = np.asarray(landmarks, dtype=np.float32)  # (N, 3) -- normalizado
+    # Vetoriza tudo num unico ndarray (21,3) — 1 alloc + broadcast +
+    # scaling vetorizado em vez de 21 calls Python.
+    lm_arr = np.asarray(landmarks, dtype=np.float32)  # (N, 3) normalizado
     xs = lm_arr[:, 0]
     ys = lm_arr[:, 1]
     bbox_w = max(float(xs.max() - xs.min()), 1e-6)
@@ -742,10 +735,9 @@ def generate_hand_mesh(
         (max(palm_zs) + min(palm_zs)) * 0.5,
     ], dtype=np.float32)
 
-    # v6.9.9.0 — MANO-inspired: track ring boundaries pra bridge geometry.
-    # Salvamos start index dos MCP rings de cada dedo + start index do top
-    # ring da palma. Depois conectamos com triangles pra criar mesh
-    # CONTINUA (sem seam visivel entre dedos e palma).
+    # Track ring boundaries pra bridge geometry: start index dos MCP
+    # rings de cada dedo + start index do top ring da palma. Depois
+    # conectados com triangles pra mesh continua palm↔fingers.
     finger_mcp_starts: List[int] = []
 
     # ----------- DEDOS: swept cylinder unico por dedo, com tip cap -----------
@@ -783,11 +775,9 @@ def generate_hand_mesh(
     # Palm top ring (ultimo ring antes dos caps) começa em:
     palm_top_ring_start = palm_base_idx + (PALM_RING_COUNT - 1) * PALM_RING_SEGMENTS
 
-    # v6.9.9.0 — BRIDGES palm↔fingers: cria triangulos conectando cada
-    # MCP ring (10 verts) com a arc correspondente da palm top ring
-    # (16 verts). Por dedo: triangle strip de ~10 triangles.
-    # SKIP THUMB porque seu CMC esta MUITO offset lateral pro polegar
-    # (anatomia distinta — thenar absorption ja resolve).
+    # Bridges palm↔fingers: triangulos conectando cada MCP ring (10 verts)
+    # com a arc correspondente da palm top ring (16 verts). Skip thumb
+    # — seu CMC ja e' absorvido pela thenar.
     bridge_indices = _build_finger_palm_bridges(
         all_verts,
         finger_mcp_starts=finger_mcp_starts[1:],  # skip thumb

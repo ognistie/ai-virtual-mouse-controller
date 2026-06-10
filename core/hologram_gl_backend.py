@@ -121,17 +121,16 @@ void main() {
     float ndotv = max(abs(dot(normalize(v_normal), view_dir)), 0.001);
     float fresnel = pow(1.0 - ndotv, u_fresnel_power);
 
-    // v6.9.8.10: depth fade quase plana (range 0.75 → 1.0). Antes 0.60→1.0
-    // criava gradiente visivel entre front/back que se lia como "split"
-    // no centro da palma. Agora variacao sutil pra preservar volume sem
-    // criar ridge.
+    // Depth fade quase plana (0.75 → 1.0). Range maior cria gradiente
+    // front/back que se le como "split" no centro da palma. Variacao
+    // sutil preserva volume sem ridge.
     float depth_factor = clamp(0.75 + v_depth / u_depth_fade_range, 0.75, 1.0);
 
     // Subtle breathing
     float breath = 0.92 + 0.08 * sin(u_time * 2.0);
 
-    // v6.9.8.10: body alpha 0.90 + rim multiplier 0.8 = corpo unificado
-    // dominante, rim apenas reforça silhueta (não cria "split" no centro).
+    // Body alpha 0.90 + rim multiplier 0.8 = corpo unificado dominante,
+    // rim apenas reforca silhueta (sem split no centro).
     vec3 body = u_base_color * depth_factor * breath;
     vec3 rim = u_rim_color * fresnel * 0.8;  // rim suave, nao agressivo
     vec3 color = body + rim;
@@ -344,10 +343,9 @@ if _PYSIDE_OK and _MGL_OK:
             fmt.setVersion(3, 3)
             fmt.setProfile(QSurfaceFormat.OpenGLContextProfile.CoreProfile)
             fmt.setAlphaBufferSize(8)
-            # PERF: 4x → 2x MSAA. Em surface fullscreen + rim suave (depth
-            # fade + fresnel), 2x produz resultado visualmente identico ao
-            # 4x mas com ~50% do custo de fragment shader. Em telas 1080p+
-            # esse foi o segundo maior ganho de fps medido.
+            # 2x MSAA: em surface fullscreen + rim suave (depth fade +
+            # fresnel) produz resultado visualmente identico ao 4x com
+            # ~50% do custo de fragment shader.
             fmt.setSamples(2)
             self.setFormat(fmt)
 
@@ -364,15 +362,11 @@ if _PYSIDE_OK and _MGL_OK:
             self._program: Optional[moderngl.Program] = None
             self._gl_ready: bool = False
 
-            # Timer de repaint — ADAPTATIVO:
+            # Timer de repaint adaptativo:
             # - rate ATIVO (target_fps): quando ha mao OU bursts em curso.
-            #   Garante render fluido (~30fps) durante uso real.
-            # - rate IDLE (~20fps): sem mao detectada e sem burst pendente.
-            #   v0.3: era 6fps (160ms). Subido pra 20fps (50ms) porque a
-            #   primeira frame apos mao reaparecer no quadro estava chegando
-            #   com ate 160ms de latencia (intervalo do idle), o que se sentia
-            #   como "delay" no movimento. CPU extra e' desprezivel.
-            # set_active() alterna entre os dois conforme o estado real.
+            # - rate IDLE (~20fps): sem mao + sem burst. Mais alto que 6fps
+            #   pra evitar delay perceptivel na primeira frame apos mao
+            #   reaparecer (latencia ate 160ms se idle for muito baixo).
             self._active_interval_ms = max(8, int(1000 / max(10, target_fps)))
             self._idle_interval_ms = 50  # ~20 fps idle (responsividade > CPU)
             self._timer = QTimer(self)
@@ -383,11 +377,10 @@ if _PYSIDE_OK and _MGL_OK:
         def set_active_rate(self, active: bool) -> None:
             """Alterna timer entre rate ativo (mao visivel) e idle.
 
-            v0.3: usa timer.start(interval) em vez de setInterval() — o
+            Usa timer.start(interval) em vez de setInterval() — o
             setInterval() do Qt nao reinicia o timer, espera o proximo
-            tick do intervalo antigo, e depois aplica o novo. Resultado:
-            ao sair do idle, primeira frame podia demorar ate 50ms a mais
-            do que devia. start() restarta imediatamente.
+            tick do intervalo antigo. start() restarta imediatamente
+            (evita ate 50ms de delay ao sair do idle).
             """
             if active == self._timer_active:
                 return
@@ -450,10 +443,9 @@ class HologramGLBackend:
     backend via facade em HologramOverlay.
     """
 
-    # Cores default (deep blue hologram).
-    # v6.9.8.7: ainda mais escuro/denso — usuario reportou hand sumindo
-    # em browser/LinkedIn whites. Agora deep navy puro = solido em
-    # qualquer background, mantendo hologram feel via rim brilhante.
+    # Cores default (deep navy hologram). Solido em qualquer background
+    # — claro demais sumia em browser/LinkedIn whites. Hologram feel
+    # vem do rim brilhante.
     _DEFAULT_BASE_COLOR: Tuple[float, float, float] = (0.02, 0.12, 0.48)
     _DEFAULT_RIM_COLOR: Tuple[float, float, float] = (0.45, 0.82, 1.0)
 
@@ -465,7 +457,7 @@ class HologramGLBackend:
         target_fps: int = 30,
         base_color: Optional[Tuple[float, float, float]] = None,
         rim_color: Optional[Tuple[float, float, float]] = None,
-        fresnel_power: float = 1.8,  # v6.9.8.10: 2.5 → 1.8 (rim mais suave, sem split)
+        fresnel_power: float = 1.8,  # rim suave, sem "split" no centro
         depth_fade_range: float = 50.0,
     ) -> None:
         self.available: bool = False
@@ -489,22 +481,13 @@ class HologramGLBackend:
         self._pose_y: float = 0.0
         self._pose_visible: bool = False
 
-        # Smoothing dos landmarks.
-        # v0.3 — TUNADO PARA RESPONSIVIDADE:
-        # min_cutoff 0.55 → 1.2: cutoff base maior reduz lag perceptivel em
-        #   movimentos sustentados (antes a mao holografica "arrastava"
-        #   atras do gesto real ~50ms).
-        # beta 1.8 → 2.5: cutoff abre mais agressivamente em velocidade
-        #   maior — sem lag quando o usuario gesticula rapido.
-        # Trade-off: tremor microscopico em repouso pode aparecer, mas o
-        #   MediaPipe ja filtra muito, e o d_cutoff=1.0 segura o restante.
-        # Resultado: mao holografica acompanha gesto real "grudada" sem
-        #   atrasos perceptiveis.
-        # v6.9.13: min_cutoff 0.8 → 0.55 — em repouso o OneEuro filtra mais
-        # forte, eliminando ~60% do tremor visual do holograma quando a mao
-        # esta parada (tinha micro-vibracao visivel que dava sensacao de
-        # "instabilidade"). beta 1.5 → 1.8 mantem a abertura agressiva
-        # quando ha movimento real — sem lag perceptivel.
+        # Smoothing dos landmarks tunado pra responsividade:
+        # - min_cutoff 1.2: cutoff base alto reduz lag perceptivel em
+        #   movimentos sustentados ("arrasto" do holograma atras do gesto).
+        # - beta 2.5: cutoff abre agressivamente em velocidade — sem lag
+        #   quando o usuario gesticula rapido.
+        # Tremor microscopico em repouso e' filtrado pelo MediaPipe + o
+        # d_cutoff=1.0.
         self._lm_smoothers: Optional[List[OneEuroSmoother2D]] = None
         self._lm_smoothed_buf: Optional[List[Tuple[float, float, float]]] = None
         self._lm_smoother_min_cutoff: float = 1.2
@@ -521,9 +504,9 @@ class HologramGLBackend:
         self._app = None
         self._window: Optional["_HologramGLWindow"] = None
 
-        # v6.9.8.6: persistent GPU buffers — lazy init no primeiro _render.
+        # Persistent GPU buffers — lazy init no primeiro _render.
         # Substitui ctx.buffer() per-frame por buffer.write() (zero alloc).
-        # Reservamos MAX_VERTS/MAX_INDICES com slack pra futuras meshes.
+        # MAX_VERTS/MAX_INDICES com slack pra futuras meshes.
         self._vbo_pos = None
         self._vbo_norm = None
         self._ibo = None
@@ -555,11 +538,9 @@ class HologramGLBackend:
         # Replica corners para todos os slots
         self._burst_scratch[:, 0:2] = np.tile(_corners, (self._MAX_BURSTS, 1))
 
-        # v6.9.8.9: mesh cache — pula gen quando pose estavel.
-        # Smoother converge quando mao para → landmarks identicos → cache hit
-        # → 0ms mesh gen → frame budget livre → gestos respondem instant.
-        # Threshold 5e-4 = sum-of-abs(63 components) < ~0.0005 = sub-pixel
-        # spread total. Hand still pelo smoother costuma dar < 1e-4 sum.
+        # Mesh cache — pula gen quando pose estavel. Smoother converge
+        # quando mao para → landmarks identicos → cache hit → 0ms mesh
+        # gen → frame budget livre. Threshold = sub-pixel spread total.
         self._cached_landmarks: Optional[Sequence[Tuple[float, float, float]]] = None
         self._cached_center: Tuple[float, float, float] = (0.0, 0.0, 0.0)
         self._cached_mesh: Optional[
@@ -601,17 +582,12 @@ class HologramGLBackend:
         screen = self._app.primaryScreen()
         if screen is not None:
             geom = screen.geometry()
-            # FIX alinhamento cursor↔holograma:
-            # geom.width()/height() do Qt vem em pixels LOGICOS (device-independent).
-            # Mas (a) o framebuffer do QOpenGLWindow é em pixels FÍSICOS — o
-            # resizeGL recebe physical e o viewport vive em physical — e (b) o
-            # CursorController usa pyautogui, que reporta/move em pixels FÍSICOS
-            # (processo DPI-aware). Se o ortho usar logical e os vértices vierem
-            # em physical (pose_x = cursor._last_x), em telas com escala >100%
-            # (125/150/175%) o holograma renderiza deslocado do cursor — quanto
-            # maior o DPR, maior o drift.
-            # Multiplicar por devicePixelRatio normaliza tudo pra physical e
-            # garante que o midpoint do pinch caia EXATAMENTE no pixel do cursor.
+            # Alinhamento cursor↔holograma em telas com escala DPI > 100%:
+            # geom.width()/height() do Qt vem em pixels LOGICOS, mas o
+            # framebuffer do QOpenGLWindow + viewport sao FISICOS, e o
+            # CursorController (pyautogui DPI-aware) reporta em FISICOS.
+            # Multiplicar por devicePixelRatio normaliza tudo pra physical
+            # — garante que o midpoint do pinch caia no pixel do cursor.
             dpr = float(screen.devicePixelRatio() or 1.0)
             self._screen_w = int(round(geom.width()  * dpr))
             self._screen_h = int(round(geom.height() * dpr))
@@ -630,11 +606,10 @@ class HologramGLBackend:
         if enabled:
             self._window.show()
             self._window.raise_()
-            # v0.3: cursor do sistema PERMANECE visivel quando overlay liga.
-            # Antes escondiamos via SetSystemCursor pra "mao holografica
-            # virar o ponteiro", mas isso causava confusao visual e
-            # quebrava a expectativa do usuario. Cursor nativo do Windows
-            # convive lado a lado com a mao — leitura mais natural.
+            # Cursor do sistema PERMANECE visivel quando overlay liga.
+            # Tentativas de esconder via SetSystemCursor causavam confusao
+            # e quebravam a expectativa do usuario. Cursor nativo convive
+            # com a mao — leitura mais natural.
         else:
             self._window.hide()
             self._pose_visible = False
@@ -691,8 +666,8 @@ class HologramGLBackend:
                 )
                 for _ in range(n)
             ]
-            # PERF: lista pre-alocada — substituimos elementos em vez de
-            # rebuild com list-append + tuple-alloc 21x por frame.
+            # Lista pre-alocada — substitui elementos em vez de rebuild
+            # com list-append + tuple-alloc 21x por frame.
             self._lm_smoothed_buf: List[Tuple[float, float, float]] = [
                 (0.0, 0.0, 0.0)
             ] * n
@@ -710,16 +685,15 @@ class HologramGLBackend:
         self._has_cursor = True
 
     def fire_burst(self, kind: str = "click") -> None:
-        """No-op (v6.9.13): paradigma de mouse fisico — sem feedback visual.
+        """No-op: paradigma de mouse fisico — sem feedback visual no click.
 
         Real mice nao tem 'anel vermelho' explodindo no click; o feedback
-        e' o cursor PARADO + UI reagindo. Anel visual estava roubando a
-        atencao do usuario e quebrando a sensacao de naturalidade.
+        e' o cursor PARADO + UI reagindo. Anel visual estava roubando
+        atencao e quebrando a sensacao de naturalidade.
 
-        Metodo mantido pra compat com call-sites (virtual_mouse_service
-        chama em todos os eventos). Infraestrutura (BurstManager,
-        shaders, scratch buffer) preservada — restauracao futura sem
-        ajustar callers.
+        Metodo mantido pra compat com call-sites — infraestrutura
+        (BurstManager, shaders, scratch buffer) preservada pra
+        restauracao futura sem ajustar callers.
         """
         return
 
@@ -732,7 +706,7 @@ class HologramGLBackend:
             logger.debug("pump erro: %s", e)
 
     def close(self) -> None:
-        # v6.9.8.6: libera buffers persistentes antes da window
+        # Libera buffers persistentes antes da window
         self._release_buffers()
         self._release_burst_buffers()
         # Restaura cursor antes de fechar a janela — garantia extra de que
@@ -784,11 +758,9 @@ class HologramGLBackend:
 
     def _render(self, ctx, program) -> None:
         """
-        Called from paintGL. v6.9.8.6: PERSISTENT buffers.
-
-        Lazy-init dos VBOs/IBO/VAO no primeiro frame (precisa do ctx).
-        Frames subsequentes apenas chamam buffer.write() = zero allocacao.
-        Drastically reduces frame time and Python/GPU sync overhead.
+        Called from paintGL. Persistent GPU buffers — lazy-init dos
+        VBOs/IBO/VAO no primeiro frame (precisa do ctx); frames
+        subsequentes apenas chamam buffer.write() (zero alloc).
         """
         if not self._enabled:
             ctx.clear(0.0, 0.0, 0.0, 0.0)
@@ -797,11 +769,10 @@ class HologramGLBackend:
         ctx.clear(0.0, 0.0, 0.0, 0.0)
 
         if not self._pose_visible or self._pose_landmarks is None:
-            # v6.9.13: bursts removidos (sem feedback visual no click)
             return
 
-        # v6.9.8.9: mesh cache check antes de regenerar.
-        # Compara pose contra cache; se mudanca subpixel apenas, reusa.
+        # Mesh cache check antes de regenerar: compara pose contra cache;
+        # se mudanca subpixel apenas, reusa.
         center_key = (
             float(self._pose_x), float(self._pose_y), float(self._hand_size_px),
         )

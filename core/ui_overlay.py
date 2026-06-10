@@ -1,6 +1,6 @@
 """
-core.ui_overlay  (v6.8)
-=========================
+core.ui_overlay
+===============
 
 UI moderna sobre o frame da camera com OpenCV.
 

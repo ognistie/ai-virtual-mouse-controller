@@ -111,15 +111,24 @@ class RobustHandAnchor:
     _CONFIDENCE_FLOOR: float = 0.40      # abaixo disso ja considera frame ruim
     _RESET_AFTER_LOST_FRAMES: int = 8    # apos N frames sem mao -> reset
 
-    # v6.9.13 — extrapolacao por velocidade nas BORDAS do frame:
-    # Quando a confianca cai porque a mao esta proxima da borda da camera
-    # (landmarks comecando a sair do quadro = MediaPipe interpola/erra),
-    # CONTINUAMOS o cursor pra borda usando a velocidade recente. Sem isso,
-    # o cursor "trava" 5-15% antes da borda real da tela — o que fazia
-    # alcancar taskbar / cantos pra fechar janela ser dificil.
+    # Extrapolacao por velocidade nas BORDAS do frame: quando a ancora
+    # esta proxima da borda do quadro da camera (landmarks ja saindo, ou
+    # prestes a sair), continuamos o cursor usando a velocidade recente.
+    # Sem isso, o cursor "trava" 5-15% antes da borda real da tela, que
+    # e' exatamente onde estao os controles importantes (taskbar, fechar,
+    # abas, etc.). Duas zonas de atuacao:
+    #
+    #   1. Proximidade NORMAL (< _EDGE_PROXIMITY): ativa quando a confianca
+    #      cai (mao parcialmente fora). Gain proporcional a (1 - confidence).
+    #   2. Proximidade CRITICA (< _EDGE_CRITICAL_PROXIMITY): ativa SEMPRE,
+    #      mesmo com confidence alta — porque na pratica MediaPipe ainda
+    #      detecta a mao bem mas o anchor "trava" porque os landmarks
+    #      acessiveis sao todos da palma central, sem alavanca pra borda.
     _EDGE_EXTRAPOLATION_ENABLED: bool = True
-    _EDGE_VELOCITY_GAIN: float = 1.4     # quanto da velocidade aplicar
-    _EDGE_PROXIMITY: float = 0.20        # ancora a < 20% da borda = "perto"
+    _EDGE_VELOCITY_GAIN: float = 2.2      # quanto da velocidade aplicar
+    _EDGE_PROXIMITY: float = 0.30         # ancora a < 30% da borda = "perto"
+    _EDGE_CRITICAL_PROXIMITY: float = 0.08  # < 8% = critico, sempre ativo
+    _EDGE_CRITICAL_GAIN: float = 1.0      # gain quando em zona critica
 
     def __init__(
         self,
@@ -248,29 +257,35 @@ class RobustHandAnchor:
             ax = a * ax + (1.0 - a) * lx
             ay = a * ay + (1.0 - a) * ly
 
-        # v6.9.13 — Edge velocity extrapolation:
-        # Se a ancora esta PERTO da borda do frame E a confianca esta
-        # mediocre, projetamos pela velocidade recente. Permite navegar
-        # ate cantos da tela sem precisar levar a mao ate o extremo da
-        # camera (onde o MediaPipe ja erra).
-        if (
-            self._EDGE_EXTRAPOLATION_ENABLED
-            and self._last_anchor is not None
-            and confidence < 0.7
-        ):
+        # Edge velocity extrapolation em duas zonas:
+        # - Critica (< 8% da borda): ativa SEMPRE, gain fixo. Mao ja chegou
+        #   no limite do FOV; aceleramos pro canto da tela mesmo com tracker
+        #   confiante porque o anchor "trava" sem alavanca de landmarks.
+        # - Normal (< 30% da borda): ativa quando confianca cai. Gain
+        #   proporcional a (1 - confidence) — quanto pior a deteccao,
+        #   mais peso na velocidade recente.
+        # Soma direcional preservada — so projeta se a velocidade estava
+        # indo PRA aquela borda (evita pulos espurios).
+        if self._EDGE_EXTRAPOLATION_ENABLED and self._last_anchor is not None:
             edge_dx = min(ax, 1.0 - ax)
             edge_dy = min(ay, 1.0 - ay)
-            near_edge = (
+            in_critical = (
+                edge_dx < self._EDGE_CRITICAL_PROXIMITY
+                or edge_dy < self._EDGE_CRITICAL_PROXIMITY
+            )
+            in_normal = (
                 edge_dx < self._EDGE_PROXIMITY
                 or edge_dy < self._EDGE_PROXIMITY
             )
-            if near_edge:
+            should_extrapolate = in_critical or (in_normal and confidence < 0.7)
+            if should_extrapolate:
                 vx, vy = self._last_velocity
-                # So extrapola se a velocidade tem direcao consistente com
-                # a borda mais proxima (usuario claramente indo pra la).
                 going_to_edge_x = (vx < 0 and ax < 0.5) or (vx > 0 and ax > 0.5)
                 going_to_edge_y = (vy < 0 and ay < 0.5) or (vy > 0 and ay > 0.5)
-                gain = self._EDGE_VELOCITY_GAIN * (1.0 - confidence)
+                if in_critical:
+                    gain = self._EDGE_CRITICAL_GAIN
+                else:
+                    gain = self._EDGE_VELOCITY_GAIN * (1.0 - confidence)
                 if going_to_edge_x:
                     ax += vx * gain
                 if going_to_edge_y:

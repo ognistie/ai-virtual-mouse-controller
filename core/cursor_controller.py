@@ -13,7 +13,7 @@ Notas tecnicas:
 - double_click() usa intervalo explicito entre os 2 cliques (~100ms),
   necessario para que apps como Explorer/Chrome reconhecam o duplo clique
   do sistema. pyautogui.doubleClick() pode disparar rapido demais.
-- right_click() usa pyautogui.rightClick() (NOVO v6.9).
+- right_click() usa pyautogui.rightClick().
 - _pause=False em todas as chamadas: o cooldown de gestos e tratado a
   montante pelo GestureDetector.
 """
@@ -44,19 +44,36 @@ class CursorController:
         double_click_interval: float = 0.10,
         click_freeze_seconds: float = 0.12,
         drag_precision_factor: float = 0.55,
+        screen_margin_x: Optional[float] = None,
+        screen_margin_top: Optional[float] = None,
+        screen_margin_bottom: Optional[float] = None,
     ) -> None:
+        # Margens assimetricas: top/bottom geralmente menores que X.
+        # Anatomia + camera 16:9 — alcance horizontal e' mais confortavel
+        # que vertical (braco contra gravidade). Menos margem vertical
+        # = canto de tela acessivel com menos esforco fisico.
+        # Quando None, cai pro valor isotropico (compat com callers antigos).
         if not 0.0 <= screen_margin_percentage < 0.5:
             raise ValueError(
-                f"screen_margin_percentage deve estar em [0, 0.5)"
+                "screen_margin_percentage deve estar em [0, 0.5)"
             )
+        mx = screen_margin_x if screen_margin_x is not None else screen_margin_percentage
+        mt = screen_margin_top if screen_margin_top is not None else screen_margin_percentage
+        mb = screen_margin_bottom if screen_margin_bottom is not None else screen_margin_percentage
+        for name, val in (("x", mx), ("top", mt), ("bottom", mb)):
+            if not 0.0 <= val < 0.5:
+                raise ValueError(f"screen_margin_{name} deve estar em [0, 0.5)")
 
         pyautogui.FAILSAFE = failsafe
         pyautogui.PAUSE = pyautogui_pause
 
         self.screen_margin = screen_margin_percentage
+        self.screen_margin_x = float(mx)
+        self.screen_margin_top = float(mt)
+        self.screen_margin_bottom = float(mb)
         self.dead_zone = max(0, dead_zone_pixels)
         self.double_click_interval = double_click_interval
-        # v6.9.13 — feel de mouse fisico:
+        # Feel de mouse fisico:
         # click_freeze: quanto tempo o cursor fica TRAVADO no pixel atual
         # imediatamente apos um click. Em mouse fisico, apertar o botao
         # NUNCA move o cursor; aqui o curl dos dedos no pinch desloca o
@@ -78,15 +95,18 @@ class CursorController:
         self._frozen_until: float = 0.0
 
         logger.info(
-            "CursorController iniciado | tela=%dx%d | margin=%.2f | dead_zone=%dpx | dbl_interval=%.2fs",
+            "CursorController iniciado | tela=%dx%d | margin x=%.2f top=%.2f bot=%.2f | dead_zone=%dpx",
             self.screen_width, self.screen_height,
-            self.screen_margin, self.dead_zone, self.double_click_interval,
+            self.screen_margin_x, self.screen_margin_top,
+            self.screen_margin_bottom, self.dead_zone,
         )
 
     def map_to_screen(self, nx: float, ny: float) -> Tuple[int, int]:
-        m = self.screen_margin
-        x_pixel = map_range(nx, m, 1.0 - m, 0, self.screen_width - 1)
-        y_pixel = map_range(ny, m, 1.0 - m, 0, self.screen_height - 1)
+        mx = self.screen_margin_x
+        mt = self.screen_margin_top
+        mb = self.screen_margin_bottom
+        x_pixel = map_range(nx, mx, 1.0 - mx, 0, self.screen_width - 1)
+        y_pixel = map_range(ny, mt, 1.0 - mb, 0, self.screen_height - 1)
         x_pixel = clamp(x_pixel, 0, self.screen_width - 1)
         y_pixel = clamp(y_pixel, 0, self.screen_height - 1)
         return int(x_pixel), int(y_pixel)
@@ -182,12 +202,12 @@ class CursorController:
 
     def double_click(self) -> None:
         """
-        FIX v6.1: Faz duplo clique MANUALMENTE com interval explicito.
+        Faz duplo clique manualmente com interval explicito.
 
-        Ao inves de usar pyautogui.doubleClick() (que pode disparar muito
-        rapido em alguns sistemas), executamos dois cliques separados com
-        delay configurable. Isso garante que apps como Explorer, Chrome,
-        etc. reconhecam como duplo clique do sistema.
+        pyautogui.doubleClick() pode disparar muito rapido em alguns
+        sistemas — executamos dois cliques separados com delay
+        configurable pra garantir que apps (Explorer, Chrome, etc.)
+        reconhecam como duplo clique do sistema.
         """
         # Freeze cobre os dois cliques + interval (composavel).
         self.freeze(self.click_freeze_seconds + self.double_click_interval)
@@ -216,14 +236,10 @@ class CursorController:
 
     def right_click(self) -> None:
         """
-        NOVO v6.9: clique direito do mouse.
+        Clique direito do mouse — aciona o menu de contexto.
 
-        Aciona o menu de contexto (Copiar, Colar, Inspecionar, etc.) — mesma
-        coisa que o botao direito de um mouse fisico ou Ctrl+Click no macOS.
-
-        Usa pyautogui.rightClick() que e a API estavel da biblioteca para
-        esse evento. _pause=False mantem o tempo zero entre cliques (nosso
-        cooldown ja e tratado pelo GestureDetector).
+        _pause=False mantem o tempo zero entre cliques (cooldown e
+        tratado pelo GestureDetector).
         """
         self.freeze(self.click_freeze_seconds)
         try:

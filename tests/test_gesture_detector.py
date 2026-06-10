@@ -21,16 +21,15 @@ import pytest
 # entao precisamos detectar antes dos imports do projeto.
 pytest.importorskip("mediapipe")
 
-# v0.2.0 — testes refletem API antiga (v3): Gesture.MOVE com semantica
-# antiga, cursor_freeze_seconds que migrou pro CursorController, HandShape
-# POINTING / THUMBS_UP removidos. O codigo de producao esta funcionando;
-# sao os testes que precisam ser reescritos. Marcado como skip no nivel
-# do modulo pra nao bloquear CI. Refactor previsto junto do split do
-# GestureDetector em sub-componentes (ver CHANGELOG.md).
+# Testes refletem API antiga (Gesture.MOVE com semantica diferente,
+# cursor_freeze_seconds que migrou pro CursorController, HandShape
+# POINTING/THUMBS_UP removidos). Codigo de producao funciona; os testes
+# e' que precisam ser reescritos. Skip no nivel do modulo pra nao
+# bloquear CI — reescrever junto do split do GestureDetector.
 pytestmark = pytest.mark.skip(
     reason=(
-        "Testes referem API anterior (v3). Reescrever na proxima rodada "
-        "de cleanup junto do refactor do GestureDetector."
+        "Testes referem API anterior. Reescrever junto do refactor do "
+        "GestureDetector em sub-componentes."
     )
 )
 
@@ -98,8 +97,7 @@ def _hand(
 @pytest.mark.skip(
     reason=(
         "API stale: classify_shape() agora exige pinch_threshold como "
-        "argumento posicional e HandShape removeu POINTING/THUMBS_UP "
-        "(refatorado no salto v3 -> v6.x para PINCH-based gestures). "
+        "argumento posicional e HandShape removeu POINTING/THUMBS_UP. "
         "Mantido como referencia historica; reescrever apos refatorar "
         "GestureDetector em sub-componentes (god class atual)."
     )

@@ -1,11 +1,11 @@
 """
-core.runtime_settings  (v6.8)
-==============================
+core.runtime_settings
+=====================
 
 Gerenciador central das settings que podem mudar em runtime via UI.
 
 Responsabilidades:
-- Manter "recommended" baseline (valores que sabemos que funcionam — v6.5)
+- Manter "recommended" baseline (valores que sabemos que funcionam)
 - Manter "current" (valores ativos no detector agora)
 - Converter slider (0-1) ↔ valor real (ex: DPI, threshold, etc.)
 - Aplicar profile presets
@@ -19,11 +19,11 @@ from typing import Callable, Dict, List
 
 
 # ===================================================================
-# RECOMMENDED BASELINE (v6.5 — provadamente funciona)
+# RECOMMENDED BASELINE
 # ===================================================================
 
 RECOMMENDED_VALUES = {
-    "dpi_fixed_multiplier": 0.85,
+    "dpi_fixed_multiplier": 1.00,
     "aim_assist_slowdown_factor": 0.40,
     "one_euro_min_cutoff": 1.2,
     "one_euro_beta": 0.020,
@@ -41,7 +41,7 @@ RECOMMENDED_VALUES = {
 
 PROFILES = {
     "smooth": {
-        "dpi_fixed_multiplier": 0.85,
+        "dpi_fixed_multiplier": 1.00,
         "aim_assist_slowdown_factor": 0.55,
         "one_euro_min_cutoff": 0.8,
         "one_euro_beta": 0.040,
@@ -269,7 +269,7 @@ class RuntimeSettings:
         self.apply_profile(self._current_profile)
 
     def apply_recommended(self):
-        """Aplica os valores 'recommended' (baseline v6.5)."""
+        """Aplica os valores 'recommended' (baseline)."""
         self._current.update(RECOMMENDED_VALUES)
         self._aim_enabled = True
         self._sticky_enabled = True

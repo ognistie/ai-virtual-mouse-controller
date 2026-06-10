@@ -223,10 +223,10 @@ class HologramOverlay:
         self._app: Optional["QApplication"] = None
         self._widget: Optional["_HologramWidget"] = None
 
-        # v6.9.8 — backend dispatch.
-        # Se HOLOGRAM_BACKEND for "gl" ou "auto", tenta ModernGL primeiro.
-        # Quando GL bem-sucedido, _gl_backend != None e toda a API publica
-        # delega pra ele; pipeline QPainter abaixo NAO inicializa.
+        # Backend dispatch: se HOLOGRAM_BACKEND for "gl" ou "auto", tenta
+        # ModernGL primeiro. Quando GL bem-sucedido, _gl_backend != None
+        # e toda a API publica delega pra ele; pipeline QPainter abaixo
+        # nao inicializa.
         self._gl_backend = None
         try:
             import config as _cfg
@@ -316,7 +316,7 @@ class HologramOverlay:
     # ───────────────────────────────────────────────────────── public API
 
     def set_enabled(self, enabled: bool) -> None:
-        # v6.9.8: delega pra GL backend se ativo
+        # Delega pra GL backend se ativo
         if self._gl_backend is not None:
             self._gl_backend.set_enabled(enabled)
             self._enabled = self._gl_backend.enabled
@@ -354,7 +354,7 @@ class HologramOverlay:
         screen_x: float,
         screen_y: float,
     ) -> None:
-        # v6.9.8: delega pra GL backend se ativo
+        # Delega pra GL backend se ativo
         if self._gl_backend is not None:
             self._gl_backend.update_pose(landmarks, screen_x, screen_y)
             return
@@ -409,7 +409,7 @@ class HologramOverlay:
         return out
 
     def update_cursor(self, screen_x: float, screen_y: float) -> None:
-        # v6.9.8: delega pra GL backend se ativo
+        # Delega pra GL backend se ativo
         if self._gl_backend is not None:
             self._gl_backend.update_cursor(screen_x, screen_y)
             return
@@ -419,7 +419,7 @@ class HologramOverlay:
 
     def fire_burst(self, kind: str = "click") -> None:
         """Dispara burst na posicao do pinch correspondente ao gesto."""
-        # v6.9.8: delega pra GL backend (no-op por enquanto no GL — futuro pass)
+        # Delega pra GL backend (no-op por enquanto no GL — futuro pass)
         if self._gl_backend is not None:
             self._gl_backend.fire_burst(kind)
             return
@@ -440,7 +440,7 @@ class HologramOverlay:
 
     def pump(self) -> None:
         """Bomba o event loop do Qt. Chamado do _tick do service."""
-        # v6.9.8: delega pra GL backend se ativo
+        # Delega pra GL backend se ativo
         if self._gl_backend is not None:
             self._gl_backend.pump()
             return
@@ -452,7 +452,7 @@ class HologramOverlay:
             logger.debug("Erro em pump: %s", e)
 
     def close(self) -> None:
-        # v6.9.8: fecha GL backend tambem (se existir)
+        # Fecha GL backend tambem (se existir)
         if self._gl_backend is not None:
             try:
                 self._gl_backend.close()
