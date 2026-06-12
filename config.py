@@ -50,12 +50,15 @@ o suficiente pra rodar com lite sem perda perceptivel. Volta pra 1 se
 notar drop na deteccao em iluminacao ruim ou mao longe da camera.
 """
 
-INFERENCE_PRE_RESIZE_ENABLED: bool = False
+INFERENCE_PRE_RESIZE_ENABLED: bool = True
 """
 PERF: redimensiona o frame BGR antes de enviar pro MediaPipe.
-MediaPipe rescale internamente — fazer antes corta memcpy + acelera.
+MediaPipe rescale internamente pra ~192px — fazer antes corta memcpy
+duplicado + acelera ~40% no estagio inference.
 
-Default False (compatibilidade). Liga pra testar ganho.
+Default True (otimizado). Precisao do tracking nao cai (modelo ja
+escala internamente). Reduz pra False se observar problemas com mao
+muito distante da camera.
 """
 
 INFERENCE_PRE_RESIZE_WIDTH: int = 320
@@ -164,7 +167,7 @@ SMOOTHING_FACTOR: float = 0.6
 
 ONE_EURO_FREQ: float = 60.0
 ONE_EURO_MIN_CUTOFF: float = 1.2
-ONE_EURO_BETA: float = 0.020
+ONE_EURO_BETA: float = 0.050  # subido de 0.020 → cursor mais responsivo em movimentos rápidos
 ONE_EURO_D_CUTOFF: float = 1.0
 DEAD_ZONE_PIXELS: int = 1
 

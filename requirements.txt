@@ -9,3 +9,8 @@ pytest>=8.0.0
 # HOLOGRAM_BACKEND="auto" no config tenta GL e cai pra QPainter se nao
 # disponivel — projeto funciona normalmente sem moderngl instalado.
 moderngl>=5.10.0
+
+# Hook global de tecla — permite toggle do Smart Keyboard (K) com foco em
+# QUALQUER janela do SO, nao so na janela OpenCV. Service soft-fail se
+# ausente (cai pra cv2.pollKey original).
+keyboard>=0.13.5

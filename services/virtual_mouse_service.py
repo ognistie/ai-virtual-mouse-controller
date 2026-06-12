@@ -234,6 +234,12 @@ class VirtualMouseService:
             logger.warning("Falha ao iniciar KeyboardOverlay: %s", e)
             self.keyboard = None
 
+        # Global hotkey K — funciona em qualquer janela focada (browser,
+        # Word, etc). Bypass do cv2.pollKey() que so captura com foco
+        # na janela OpenCV. Usa `keyboard` lib (hook nativo do SO).
+        self._global_kb_thread_flag = False
+        self._setup_global_hotkey()
+
     # -----------------------------------------------------------------
     # Factory (todas as chamadas verificadas contra core/)
     # -----------------------------------------------------------------
@@ -388,6 +394,73 @@ class VirtualMouseService:
         self._should_stop = True
 
     # -----------------------------------------------------------------
+    # Global hotkey K — funciona com foco em qualquer janela
+    # -----------------------------------------------------------------
+
+    def _setup_global_hotkey(self) -> None:
+        """Registra hook global da tecla K via biblioteca `keyboard`.
+
+        Hook roda em thread separada (gerenciada pela lib). Quando K eh
+        apertado em QUALQUER janela focada, agenda toggle do keyboard
+        pra rodar no main thread no proximo tick — evita race com Qt.
+        """
+        if self.keyboard is None or not self.keyboard.available:
+            return
+        try:
+            import keyboard as _kb_lib
+            self._kb_lib = _kb_lib
+            self._toggle_pending = False
+            key = self._keyboard_toggle_key
+
+            def _on_global_k():
+                # Marca flag; main loop consome no proximo tick.
+                self._toggle_pending = True
+
+            self._hotkey_id = _kb_lib.add_hotkey(
+                key, _on_global_k, suppress=False,
+            )
+            print(
+                f"[AVM] Global hotkey '{key.upper()}' ativo — "
+                f"toggle do teclado funciona em QUALQUER janela",
+                flush=True,
+            )
+        except Exception as e:
+            self._kb_lib = None
+            self._hotkey_id = None
+            self._toggle_pending = False
+            print(
+                f"[AVM] Global hotkey indisponivel ({e}) — "
+                f"use 'K' com janela webcam focada",
+                flush=True,
+            )
+
+    def _consume_toggle_pending(self) -> None:
+        """Chamado a cada tick. Aplica toggle agendado pela thread do hook."""
+        if not self._toggle_pending:
+            return
+        self._toggle_pending = False
+        if self.keyboard is not None and self.keyboard.available:
+            new_state = self.keyboard.toggle()
+            print(
+                f"[AVM] KEYBOARD = {new_state} (global hotkey) | "
+                f"layout={self.keyboard.state.layout.name}",
+                flush=True,
+            )
+
+    def _teardown_global_hotkey(self) -> None:
+        """Remove hook ao fechar. Idempotente."""
+        if getattr(self, "_kb_lib", None) is None:
+            return
+        try:
+            if getattr(self, "_hotkey_id", None) is not None:
+                self._kb_lib.remove_hotkey(self._hotkey_id)
+            self._kb_lib.unhook_all()
+        except Exception as e:
+            logger.debug("Erro removendo hotkey global: %s", e)
+        self._kb_lib = None
+        self._hotkey_id = None
+
+    # -----------------------------------------------------------------
     # Window sizing (NOVO v6.9 — UX webcam de streamer)
     # -----------------------------------------------------------------
 
@@ -482,6 +555,10 @@ class VirtualMouseService:
         # Toda a logica acima (smoother, cursor, deteccao) NAO eh afetada.
         with prof.stage("hologram"):
             self._update_hologram(hand)
+
+        # Toggle global agendado pela thread do hook (tecla K em qualquer
+        # janela). Consumido aqui no main thread pra evitar race com Qt.
+        self._consume_toggle_pending()
 
         # Teclado holografico — alimenta hover/pinch quando ativo.
         with prof.stage("keyboard"):
@@ -963,6 +1040,12 @@ class VirtualMouseService:
             pass
 
     def _cleanup(self) -> None:
+        # Remove global hotkey hook ANTES de fechar resto (evita callback
+        # disparar enquanto destruimos o keyboard overlay).
+        try:
+            self._teardown_global_hotkey()
+        except Exception:
+            pass
         try:
             self.cursor.force_release()
         except Exception:

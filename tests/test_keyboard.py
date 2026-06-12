@@ -208,6 +208,126 @@ def test_controller_dwell_types_after_duration(monkeypatch):
     assert "a" in typed, "dwell nao disparou apos duration"
 
 
+def test_backspace_repeat_on_hold(monkeypatch):
+    """BACKSPACE em hold-on deve disparar repetidamente a cada ~150ms."""
+    state = KeyboardState(layout=QWERTY, keys={})
+    for k in QWERTY.keys:
+        state.keys[k.code] = KeyState(key=k)
+    state.visible = True
+
+    presses = []
+
+    class _SpyTyper(SystemTyper):
+        def press_code(self, code):
+            presses.append(code)
+
+    ctrl = KeyboardController(
+        state=state,
+        typer=_SpyTyper(dry_run=True),
+        predictor=TextPredictor(),
+        adaptive=AdaptiveModel(),
+        accessibility=__import__(
+            "core.keyboard.accessibility", fromlist=["AccessibilitySettings"]
+        ).AccessibilitySettings(),
+        dwell_enabled=True,
+        dwell_duration_s=0.3,
+    )
+    rects = _make_rects(state)
+    ctrl.set_rects_from(rects, 1920, 1080)
+    bs = next(r for r in rects if r.key.code == "backspace")
+
+    fake_t = [1000.0]
+    monkeypatch.setattr(
+        "core.keyboard.controller.time.perf_counter", lambda: fake_t[0],
+    )
+
+    # Hover sobe score, primeira dispatch via dwell
+    for _ in range(10):
+        ctrl.on_frame((bs.cx, bs.cy), pinch_now=False)
+    fake_t[0] += 0.4
+    ctrl.on_frame((bs.cx, bs.cy), pinch_now=False)
+    assert presses.count("backspace") == 1
+
+    # Avanca 160ms (acima de 150ms interval) — deve repetir
+    fake_t[0] += 0.16
+    ctrl.on_frame((bs.cx, bs.cy), pinch_now=False)
+    assert presses.count("backspace") == 2
+
+    # Mais 160ms — outra repeticao
+    fake_t[0] += 0.16
+    ctrl.on_frame((bs.cx, bs.cy), pinch_now=False)
+    assert presses.count("backspace") == 3
+
+
+def test_accept_suggestion_deletes_prefix_and_adds_space():
+    """accept_suggestion deve apagar prefix digitado + word + space."""
+    state = KeyboardState(layout=QWERTY, keys={})
+    for k in QWERTY.keys:
+        state.keys[k.code] = KeyState(key=k)
+    state.visible = True
+
+    actions = []
+
+    class _SpyTyper(SystemTyper):
+        def press_code(self, code):
+            actions.append(("press", code))
+
+        def type_char(self, ch):
+            actions.append(("char", ch))
+
+        def type_word(self, word):
+            actions.append(("word", word))
+
+    pred = TextPredictor()
+    ctrl = KeyboardController(
+        state=state,
+        typer=_SpyTyper(dry_run=True),
+        predictor=pred,
+        adaptive=AdaptiveModel(),
+        accessibility=__import__(
+            "core.keyboard.accessibility", fromlist=["AccessibilitySettings"]
+        ).AccessibilitySettings(),
+        dwell_enabled=True,
+    )
+    # Simula digitacao manual de "intel"
+    for ch in "intel":
+        pred.feed_char(ch)
+        ctrl.typer.type_char(ch)
+        ctrl._prefix_chars_typed += 1
+    assert ctrl._prefix_chars_typed == 5
+    # Sugere — pega a primeira
+    sugs = pred.suggestions()
+    assert sugs, "predictor sem sugestoes pra 'intel'"
+    ctrl.accept_suggestion(0)
+    # Verifica: 5 backspaces + 1 type_word(palavra + " ")
+    n_bs = sum(1 for a in actions if a == ("press", "backspace"))
+    n_word = sum(1 for a, _ in actions if a == "word")
+    assert n_bs == 5
+    assert n_word == 1
+    # Word deve terminar em espaco
+    word_action = next(a for a in actions if a[0] == "word")
+    assert word_action[1].endswith(" ")
+    # Contador zerado pos-accept
+    assert ctrl._prefix_chars_typed == 0
+
+
+def test_shadow_path_cache_reused():
+    """Cache de sombra deve crescer 1x por (code, bucket, pass)."""
+    pytest.importorskip("PySide6")
+    from core.keyboard import KeyboardOverlay
+
+    kb = KeyboardOverlay(layout_name="QWERTY", typer_dry_run=True)
+    if not kb.available:
+        pytest.skip("PySide6 sem display disponivel")
+    kb.set_enabled(True)
+    for _ in range(50):
+        _ = kb.renderer.render_to_image(800, 600)
+    n = len(kb.renderer._shadow_path_cache)
+    # 62 teclas × 2 passes × ~1 bucket = ~124 max
+    assert 0 < n < 500, f"shadow cache fora do esperado: {n}"
+    kb.close()
+
+
 def test_controller_dwell_resets_on_key_change():
     """Trocar tecla durante dwell deve resetar timer + progress."""
     state = KeyboardState(layout=QWERTY, keys={})

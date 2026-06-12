@@ -37,6 +37,10 @@ PRESS_HOVER_THRESHOLD = 0.18
 DWELL_DURATION_S_DEFAULT = 3.0
 DWELL_COOLDOWN_S_DEFAULT = 0.25
 
+# Backspace repeat-on-hold: apos dispatch inicial via dwell, se usuario
+# continua sobre BACKSPACE, dispara novamente a cada N segundos.
+BACKSPACE_REPEAT_INTERVAL_S = 0.15
+
 
 class KeyboardController:
     """
@@ -91,6 +95,9 @@ class KeyboardController:
         self._pinch_active = False
         self._last_press_t = 0.0
         self._press_observers: list[Callable[[KeyEvent], None]] = []
+        # Contador de chars do prefix atual digitado no SO — usado pra
+        # apagar prefix antes de enviar a sugestao aceita (auto-complete real).
+        self._prefix_chars_typed = 0
 
         # Adaptive aplica a cada N frames pra não custar nada
         self._adaptive_apply_counter = 0
@@ -195,7 +202,22 @@ class KeyboardController:
             self.state.dwell_progress = 0.0
             return
 
-        # Cooldown pos-press? Skip ate sair da tecla.
+        # Repeat-on-hold em BACKSPACE: apos dispatch inicial via dwell,
+        # se usuario continua sobre backspace, repete a cada N segundos.
+        # Acelera correcao de erros sem precisar sair e voltar.
+        if hov == "backspace" and self._last_press_t > 0:
+            since_last = now - self._last_press_t
+            if since_last >= BACKSPACE_REPEAT_INTERVAL_S:
+                self._handle_press(fx, fy)
+                self._dwell_start_t = now
+                # Indicador visual: progress cheia durante repeat
+                self.state.dwell_progress = 1.0
+                return
+            # Durante o gap de 150ms entre repeats: mostra prog cheia
+            self.state.dwell_progress = 1.0
+            return
+
+        # Cooldown pos-press (outras teclas): skip ate sair da tecla.
         if now - self._last_press_t < self.dwell_cooldown_s:
             self.state.dwell_progress = 0.0
             return
@@ -215,16 +237,27 @@ class KeyboardController:
 
     def _handle_press(self, fx: float, fy: float) -> None:
         now = time.perf_counter()
+        hov_preview = self.state.hovered_code
         # Modo pinch usa PRESS_COOLDOWN_S; modo dwell usa dwell_cooldown_s
         # (verificado em _update_dwell antes de chamar). Cooldown abaixo
         # protege ambos os modos contra dispatch duplicado no mesmo frame.
-        cooldown = self.dwell_cooldown_s if self.dwell_enabled else PRESS_COOLDOWN_S
-        if now - self._last_press_t < cooldown:
-            logger.debug(
-                "[KB] press skip cooldown (%.3fs since last)",
-                now - self._last_press_t,
+        # Bypass cooldown se backspace + intervalo de repeat ja passou
+        # (rota repeat-on-hold ja validou tempo no _update_dwell).
+        is_backspace_repeat = (
+            hov_preview == "backspace"
+            and (now - self._last_press_t) >= BACKSPACE_REPEAT_INTERVAL_S
+        )
+        if not is_backspace_repeat:
+            cooldown = (
+                self.dwell_cooldown_s if self.dwell_enabled
+                else PRESS_COOLDOWN_S
             )
-            return
+            if now - self._last_press_t < cooldown:
+                logger.debug(
+                    "[KB] press skip cooldown (%.3fs since last)",
+                    now - self._last_press_t,
+                )
+                return
         hov = self.state.hovered_code
         if hov is None:
             logger.info(
@@ -270,19 +303,26 @@ class KeyboardController:
             self._notify(event)
             return
 
-        # Dispatch
+        # Dispatch + tracking de prefix chars (pra auto-complete real)
         if key.role == "char":
             self.typer.type_char(char)
             self.predictor.feed_char(char)
+            if char.isalpha():
+                self._prefix_chars_typed += 1
+            else:
+                self._prefix_chars_typed = 0
         elif key.role == "space":
             self.typer.press_code("space")
             self.predictor.feed_special("space")
+            self._prefix_chars_typed = 0
         elif key.role == "enter":
             self.typer.press_code("enter")
             self.predictor.feed_special("enter")
+            self._prefix_chars_typed = 0
         elif key.role == "backspace":
             self.typer.press_code("backspace")
             self.predictor.feed_special("backspace")
+            self._prefix_chars_typed = max(0, self._prefix_chars_typed - 1)
         elif key.role == "system":
             self.typer.press_code(key.code)
         elif key.role == "suggestion":
@@ -315,17 +355,18 @@ class KeyboardController:
         self._notify(event)
 
     def accept_suggestion(self, idx: int) -> None:
-        """Chamado externamente quando usuário hover+pinch numa pílula."""
+        """Aceita sugestao #idx: apaga prefix digitado, envia palavra
+        completa + espaco automatico. Reduz tempo total de digitacao
+        (1 dwell substitui escrever palavra letra a letra)."""
         word = self.predictor.accept(idx)
         if word is None:
             return
-        # Apaga prefixo digitado e envia palavra completa + espaço
-        # (assume que o usuário digitou todo o prefixo; precisa apagar
-        # caracteres equivalentes — mas como type_char foi por pyautogui,
-        # já está no SO. Heurística simples: send backspaces e depois word.)
-        # Para MVP: só envia o restante.
-        # TODO refino: tracking de "chars já enviados para esse prefix"
+        # Apaga chars do prefix ja enviados ao SO (rastreados em
+        # _prefix_chars_typed). Envia palavra completa + espaco.
+        for _ in range(self._prefix_chars_typed):
+            self.typer.press_code("backspace")
         self.typer.type_word(word + " ")
+        self._prefix_chars_typed = 0
         self.state.suggestions = self.predictor.suggestions()
 
     # ───────────────────────────────────────────────────── modifiers

@@ -194,6 +194,10 @@ class KeyboardRenderer:
         # path por (code, expansion_bucket) — bucket=int(exp*8) faz
         # hit-rate ~95% (expansion muda suavemente via lerp).
         self._path_cache: dict = {}
+        # Shadow path cache: (code, expansion_bucket, pass_idx) onde
+        # pass_idx 0=penumbra (offset 12), 1=sharp (offset 5). Mesma
+        # tecnica do path principal — elimina 124 alocacoes/frame.
+        self._shadow_path_cache: dict = {}
         # fonts: criados 1x por _compute_layout (mudam so com cell_size).
         self._font_main: Optional[QFont] = None
         self._font_hint: Optional[QFont] = None
@@ -317,8 +321,9 @@ class KeyboardRenderer:
             "Segoe UI", int(max(12, cell_size * 0.30)),
         )
         self._font_sugg.setBold(True)
-        # Invalida cache de paths (geometria mudou)
+        # Invalida caches de paths (geometria mudou)
         self._path_cache.clear()
+        self._shadow_path_cache.clear()
 
     # ───────────────────────────────────────────────────── render
 
@@ -512,55 +517,52 @@ class KeyboardRenderer:
 
     # ───────────────────── teclas
 
-    def _draw_keys_shadow_pass(self, painter) -> None:
-        """Desenha sombra projetada de TODAS as teclas antes do conteudo.
+    # Offsets Y de cada pass de sombra. (pass_idx, offset_y, alpha).
+    _SHADOW_PASSES = ((0, 12.0, 25), (1, 5.0, 45))
 
-        Efeito 'voando': sombra colorida no BG-cyan-escuro (combina com
-        paleta, nao polui) com offset Y positivo. Two passes:
-          1. Penumbra difusa (offset 12px, alpha 25) — soft halo
-          2. Sharp shadow (offset 5px, alpha 45) — ground contact
-        Alpha baixo garante que sombra eh PERCEPCAO de elevacao, nao
-        marca visual concorrendo com glow das teclas.
+    def _get_shadow_path(self, rect: "KeyRect", expansion: float,
+                         pass_idx: int, offset_y: float) -> "QPainterPath":
+        """Path da sombra cacheado por (code, exp_bucket, pass_idx)."""
+        bucket = int(round((expansion - 1.0) * self._EXP_BUCKETS * 5.0))
+        cache_key = (rect.key.code, bucket, pass_idx)
+        cached = self._shadow_path_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        half_w_eff = rect.half_w * expansion
+        half_h_eff = rect.half_h * expansion
+        qrect = QRectF(
+            rect.cx - half_w_eff,
+            rect.cy - half_h_eff + offset_y,
+            half_w_eff * 2.0, half_h_eff * 2.0,
+        )
+        radius = min(half_w_eff, half_h_eff) * 0.30
+        path = QPainterPath()
+        path.addRoundedRect(qrect, radius, radius)
+        self._shadow_path_cache[cache_key] = path
+        if len(self._shadow_path_cache) > 2048:
+            self._shadow_path_cache.clear()
+        return path
+
+    def _draw_keys_shadow_pass(self, painter) -> None:
+        """Sombra projetada de TODAS as teclas via paths cacheados.
+
+        Two passes (offset Y crescente, alpha crescente):
+          1. Penumbra difusa (offset 12px, alpha 25)
+          2. Sharp shadow (offset 5px, alpha 45)
+        Cor COLOR_BG (cyan-escuro) — integra na paleta sem competir
+        com glow das teclas.
         """
         painter.setPen(Qt.PenStyle.NoPen)
-        # Pass 1: soft penumbra
-        for rect in self._rects:
-            ks = self.state.keys.get(rect.key.code)
-            if ks is None:
-                continue
-            scale = ks.expansion
-            half_w_eff = rect.half_w * scale
-            half_h_eff = rect.half_h * scale
-            qrect = QRectF(
-                rect.cx - half_w_eff,
-                rect.cy - half_h_eff + 12.0,
-                half_w_eff * 2.0,
-                half_h_eff * 2.0,
-            )
-            radius = min(half_w_eff, half_h_eff) * 0.30
-            path = QPainterPath()
-            path.addRoundedRect(qrect, radius, radius)
-            painter.setBrush(QBrush(_qcolor(COLOR_BG, 25)))
-            painter.drawPath(path)
-        # Pass 2: sharper edge
-        for rect in self._rects:
-            ks = self.state.keys.get(rect.key.code)
-            if ks is None:
-                continue
-            scale = ks.expansion
-            half_w_eff = rect.half_w * scale
-            half_h_eff = rect.half_h * scale
-            qrect = QRectF(
-                rect.cx - half_w_eff,
-                rect.cy - half_h_eff + 5.0,
-                half_w_eff * 2.0,
-                half_h_eff * 2.0,
-            )
-            radius = min(half_w_eff, half_h_eff) * 0.30
-            path = QPainterPath()
-            path.addRoundedRect(qrect, radius, radius)
-            painter.setBrush(QBrush(_qcolor(COLOR_BG, 45)))
-            painter.drawPath(path)
+        for pass_idx, offset_y, alpha in self._SHADOW_PASSES:
+            painter.setBrush(QBrush(_qcolor(COLOR_BG, alpha)))
+            for rect in self._rects:
+                ks = self.state.keys.get(rect.key.code)
+                if ks is None:
+                    continue
+                path = self._get_shadow_path(
+                    rect, ks.expansion, pass_idx, offset_y,
+                )
+                painter.drawPath(path)
 
     # Quantiza expansion pra bucket discreto. Cache key = (code, bucket).
     # 8 buckets entre 1.0 e ~1.18 → step ~0.025 → diferença visual
