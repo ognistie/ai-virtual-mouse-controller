@@ -471,6 +471,44 @@ PERF_TELEMETRY_REPORT_EVERY: int = 120
 """Logar report a cada N ticks (= 2s a 60 FPS)."""
 
 # ---------------------------------------------------------------------
+# MODO APRESENTACAO (passar slides com gestos)
+# ---------------------------------------------------------------------
+# Ativado/desativado via tecla (default Z) na janela de preview. Quando
+# ativo, controle de mouse e' suspenso; o detector de slides observa
+# PEACE deitado (indice + medio extendidos HORIZONTAIS) e dispara
+# next/prev quando a mao faz swipe na direcao dos dedos (frente=next,
+# puxar=prev). Mao-agnostico (funciona pra destro e canhoto).
+
+PRESENTATION_TOGGLE_KEY: str = "z"
+"""Tecla pra alternar modo apresentacao em runtime. Janela do preview
+precisa ter foco."""
+
+PRESENTATION_NEXT_KEY: str = "right"
+"""Tecla disparada pra AVANCAR slide. PyAutoGUI key name.
+'right' = seta direita (universal: PowerPoint, Google Slides, Keynote,
+leitores PDF). Trocar pra 'pagedown' / 'space' se quiser."""
+
+PRESENTATION_PREV_KEY: str = "left"
+"""Tecla disparada pra VOLTAR slide. PyAutoGUI key name.
+'left' = seta esquerda. Trocar pra 'pageup' / 'backspace' se quiser."""
+
+PRESENTATION_PEACE_LATERAL_RATIO: float = 1.3
+"""Razao minima |dx|/|dy| da direcao dos dedos (indice+medio) pra
+considerar PEACE como 'deitado' (apontando lateralmente em vez de
+pra cima). 1.3 = dedos pelo menos 30% mais horizontais que verticais.
+Ajuste UP (1.6) pra exigir mais horizontalidade.
+Ajuste DOWN (1.1) pra aceitar leve inclinacao."""
+
+PRESENTATION_SWIPE_THRESHOLD: float = 0.12
+"""Deslocamento minimo da mao (normalizado pelo frame) na direcao dos
+dedos pra disparar um slide. 0.12 = 12% da largura do frame. Aumente
+pra exigir swipe mais longo; reduza pra disparar com movimento sutil."""
+
+PRESENTATION_COOLDOWN_S: float = 0.8
+"""Tempo minimo entre dois disparos de slide consecutivos. Evita
+disparar varios slides com um unico movimento longo."""
+
+# ---------------------------------------------------------------------
 # SEGURANCA
 # ---------------------------------------------------------------------
 

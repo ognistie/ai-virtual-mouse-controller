@@ -83,6 +83,8 @@ class Gesture(Enum):
     DRAG_START = "drag_start"
     DRAG_END = "drag_end"
     PAUSE = "pause"
+    NEXT_SLIDE = "next_slide"
+    PREV_SLIDE = "prev_slide"
 
 
 class HandShape(Enum):

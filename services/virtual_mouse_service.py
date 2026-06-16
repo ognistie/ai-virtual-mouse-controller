@@ -29,6 +29,7 @@ from core.gesture_detector import Gesture, GestureDetector
 from core.hand_tracker import HandTracker
 from core.hologram_overlay import HologramOverlay
 from core.perf_telemetry import configure as configure_perf, get_profiler
+from core.presentation_controller import PresentationController
 from core.runtime_settings import RuntimeSettings
 from core.smoothing import make_smoother
 from core.ui_overlay import UICallbacks, UIOverlay
@@ -132,6 +133,28 @@ class VirtualMouseService:
             logger.info("Usando cv2.pollKey() (non-blocking)")
         else:
             logger.info("Usando cv2.waitKeyEx(1) (fallback)")
+
+        # Modo apresentacao — toggle Z. Quando on, cursor/cliques sao
+        # suspensos; PEACE deitado + swipe direcional dispara left/right.
+        self._presentation_mode: bool = False
+        self._presentation_toggle_key: str = (
+            getattr(config, "PRESENTATION_TOGGLE_KEY", "z") or "z"
+        ).lower()
+        self._presentation_next_key: str = getattr(
+            config, "PRESENTATION_NEXT_KEY", "right"
+        )
+        self._presentation_prev_key: str = getattr(
+            config, "PRESENTATION_PREV_KEY", "left"
+        )
+        self._presentation = PresentationController(
+            lateral_ratio=getattr(
+                config, "PRESENTATION_PEACE_LATERAL_RATIO", 1.3
+            ),
+            swipe_threshold=getattr(
+                config, "PRESENTATION_SWIPE_THRESHOLD", 0.12
+            ),
+            cooldown_s=getattr(config, "PRESENTATION_COOLDOWN_S", 0.8),
+        )
 
         # Hologram overlay (mao virtual desenhada sobre o desktop).
         # Falha silenciosamente se a plataforma nao suportar - o resto do
@@ -419,10 +442,21 @@ class VirtualMouseService:
         else:
             self._hand_lost_frames = 0
 
-        with prof.stage("gesture"):
-            events = self.gesture_detector.update(hand)
-        with prof.stage("events"):
-            self._handle_events(events, hand)
+        if self._presentation_mode:
+            # Bypass completo do controle de mouse. So observa PEACE
+            # deitado + swipe e dispara teclas de slide.
+            with prof.stage("gesture"):
+                slide_event = self._presentation.update(hand)
+            with prof.stage("events"):
+                if slide_event is Gesture.NEXT_SLIDE:
+                    self.cursor.press_key(self._presentation_next_key)
+                elif slide_event is Gesture.PREV_SLIDE:
+                    self.cursor.press_key(self._presentation_prev_key)
+        else:
+            with prof.stage("gesture"):
+                events = self.gesture_detector.update(hand)
+            with prof.stage("events"):
+                self._handle_events(events, hand)
 
         # Holograma: alimenta a pose atual (barato, sempre que possivel)
         # e bomba os eventos do Tk pra janela continuar responsiva.
@@ -445,6 +479,11 @@ class VirtualMouseService:
                 if key_masked in (ord('t'), ord('T')):
                     self._apply_always_on_top(on=not self._always_on_top)
                     logger.info("ALWAYS_ON_TOP = %s", self._always_on_top)
+                    return
+                # Tecla Z alterna modo apresentacao
+                pkey = self._presentation_toggle_key
+                if key_masked in (ord(pkey), ord(pkey.upper())):
+                    self._set_presentation_mode(not self._presentation_mode)
                     return
                 # Tecla H alterna o holograma em runtime
                 hkey = self._hologram_toggle_key
@@ -713,7 +752,24 @@ class VirtualMouseService:
         elif key == "sticky":
             self.runtime_settings.set_sticky_enabled(value)
             self.gesture_detector.sticky_targeting_enabled = value
+        elif key == "presentation":
+            self._set_presentation_mode(value)
         logger.info("TOGGLE %s = %s", key, value)
+
+    def _set_presentation_mode(self, active: bool) -> None:
+        """Liga/desliga modo apresentacao e sincroniza UI + estado interno."""
+        self._presentation_mode = active
+        self._presentation.reset()
+        if active:
+            self.cursor.force_release()
+        self.ui.set_presentation_active(active)
+        msg = (
+            f"PRESENTATION_MODE = {active} | "
+            f"next='{self._presentation_next_key}' | "
+            f"prev='{self._presentation_prev_key}'"
+        )
+        print(f"[AVM] {msg}", flush=True)
+        logger.info(msg)
 
     def _on_reset(self) -> None:
         logger.info("RESET profile")
@@ -799,6 +855,38 @@ class VirtualMouseService:
                 cv2.putText(
                     frame, label, (8, 22),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2, cv2.LINE_AA,
+                )
+            except Exception:
+                pass
+
+        # Banner do modo apresentacao — bem visivel pra deixar claro
+        # quando cursor esta suspenso.
+        if self._presentation_mode:
+            try:
+                h, w = frame.shape[:2]
+                text = "MODO APRESENTACAO"
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                scale = 0.7
+                thick = 2
+                (tw, th), _ = cv2.getTextSize(text, font, scale, thick)
+                pad = 10
+                x0 = (w - tw) // 2 - pad
+                y0 = 8
+                x1 = x0 + tw + pad * 2
+                y1 = y0 + th + pad * 2
+                cv2.rectangle(frame, (x0, y0), (x1, y1), (0, 140, 255), -1)
+                cv2.rectangle(frame, (x0, y0), (x1, y1), (255, 255, 255), 2)
+                cv2.putText(
+                    frame, text, (x0 + pad, y0 + th + pad - 2),
+                    font, scale, (255, 255, 255), thick, cv2.LINE_AA,
+                )
+                hint = (
+                    f"swipe PEACE deitado: ->{self._presentation_next_key} "
+                    f"/ <-{self._presentation_prev_key}  |  Z=sair"
+                )
+                cv2.putText(
+                    frame, hint, (x0, y1 + 18),
+                    font, 0.45, (0, 140, 255), 1, cv2.LINE_AA,
                 )
             except Exception:
                 pass

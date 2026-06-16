@@ -138,6 +138,7 @@ class UIState:
     profile_buttons: List[ButtonSpec] = field(default_factory=list)
     aim_toggle: Optional[ButtonSpec] = None
     sticky_toggle: Optional[ButtonSpec] = None
+    presentation_toggle: Optional[ButtonSpec] = None
     reset_button: Optional[ButtonSpec] = None
     apply_recommended_button: Optional[ButtonSpec] = None
     doc_rows: List[DocRow] = field(default_factory=list)
@@ -390,7 +391,7 @@ class SettingsPanel:
         profile_block_h = (BUTTON_HEIGHT * 2) + BUTTON_GAP
 
         toggles_count = sum(1 for b in [
-            state.aim_toggle, state.sticky_toggle,
+            state.aim_toggle, state.sticky_toggle, state.presentation_toggle,
             state.reset_button, state.apply_recommended_button
         ] if b is not None)
         toggles_h = toggles_count * (BUTTON_HEIGHT + BUTTON_GAP)
@@ -471,6 +472,7 @@ class SettingsPanel:
 
         # Toggles
         for btn in [state.aim_toggle, state.sticky_toggle,
+                    state.presentation_toggle,
                     state.reset_button, state.apply_recommended_button]:
             if btn is not None:
                 Button.render(frame, btn, content_x, cy, content_w)
@@ -531,6 +533,10 @@ class UIOverlay:
             key="sticky_toggle", label="Sticky: ON", active=True,
             color=COLOR_PINK,
         )
+        self.state.presentation_toggle = ButtonSpec(
+            key="presentation_toggle", label="Apresentacao: OFF",
+            active=False, color=COLOR_AMBER,
+        )
         self.state.reset_button = ButtonSpec(
             key="reset", label="Reset profile",
             color=COLOR_TEXT_TERTIARY,
@@ -567,6 +573,13 @@ class UIOverlay:
         if self.state.sticky_toggle:
             self.state.sticky_toggle.active = active
             self.state.sticky_toggle.label = f"Sticky: {'ON' if active else 'OFF'}"
+
+    def set_presentation_active(self, active: bool):
+        if self.state.presentation_toggle:
+            self.state.presentation_toggle.active = active
+            self.state.presentation_toggle.label = (
+                f"Apresentacao: {'ON' if active else 'OFF'}"
+            )
 
     def set_profile(self, profile: str):
         self._current_profile = profile
@@ -703,7 +716,8 @@ class UIOverlay:
                     self.callbacks.on_profile_change(btn.key)
                     return True
 
-            for btn in (self.state.aim_toggle, self.state.sticky_toggle):
+            for btn in (self.state.aim_toggle, self.state.sticky_toggle,
+                        self.state.presentation_toggle):
                 if btn and btn._bbox and self._hit(btn._bbox, x, y):
                     new_state = not btn.active
                     btn.active = new_state
@@ -713,6 +727,9 @@ class UIOverlay:
                     elif btn.key == "sticky_toggle":
                         self.set_sticky_active(new_state)
                         self.callbacks.on_toggle("sticky", new_state)
+                    elif btn.key == "presentation_toggle":
+                        self.set_presentation_active(new_state)
+                        self.callbacks.on_toggle("presentation", new_state)
                     return True
 
             if self.state.reset_button and self.state.reset_button._bbox:
@@ -742,6 +759,7 @@ class UIOverlay:
             if btn._bbox:
                 btn._hover = self._hit(btn._bbox, x, y)
         for btn in (self.state.aim_toggle, self.state.sticky_toggle,
+                    self.state.presentation_toggle,
                     self.state.reset_button,
                     self.state.apply_recommended_button):
             if btn and btn._bbox:

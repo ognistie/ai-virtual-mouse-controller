@@ -308,6 +308,18 @@ class CursorController:
         except Exception as e:
             logger.warning("Falha em scroll: %s", e)
 
+    def press_key(self, key: str) -> None:
+        """Dispara press de uma tecla (sem mover o cursor).
+
+        Usado pelo modo apresentacao (right/left/pagedown/pageup/space).
+        Aceita qualquer key name suportado pelo PyAutoGUI.
+        """
+        try:
+            pyautogui.press(key, _pause=False)
+            logger.debug("press_key: %s", key)
+        except Exception as e:
+            logger.warning("Falha em press_key(%s): %s", key, e)
+
     @property
     def is_dragging(self) -> bool:
         return self._dragging
