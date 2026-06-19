@@ -7,6 +7,36 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-06-17
+
+### Added
+- **Modo apresentacao** (`PresentationController`): mao aberta cruzando
+  do meio do frame pra um lado dispara seta esquerda/direita
+  (PowerPoint, Google Slides, Keynote, Canva, PDFs). Toggle via tecla Z
+  ou botao "Apresentacao" no painel S. Modos sao mutuamente exclusivos
+  — detector de mouse fica suspenso enquanto apresentacao esta on.
+- `CursorController.press_key(key)`: wrapper de `pyautogui.press()`
+  pra disparar teclado sem mover o cursor.
+- `CursorController.last_position` e `HologramOverlay.screen_size`:
+  properties pra acessar estado interno sem violar encapsulamento.
+- `UIState.action_buttons()` / `toggle_buttons()`: helpers que
+  eliminam listas de botoes duplicadas em 4 lugares do `ui_overlay`.
+- `tests/conftest.py` com flag `--gpu`: testes do hologram que
+  precisam de display real ficam fora do `pytest` default.
+
+### Fixed
+- Removida duplicacao silenciosa de `_update_hologram` no
+  `VirtualMouseService` (2 copias identicas no mesmo arquivo).
+- `requirements.txt` agora alinha com `pyproject.toml` (PySide6
+  adicionado, `pytest` removido da lista de runtime).
+- `except Exception: pass` em paths nao-hot agora logam em
+  `logger.debug` em vez de engolir o erro silenciosamente.
+
+### Changed
+- Imports nao usados removidos em `core/ui_overlay.py`.
+- README ganha secao "Testes" explicando `test-fast` / `test-gpu`.
+- `data/` adicionado ao `.gitignore` (runtime state).
+
 ## [1.0.6] — 2026-06-10
 
 ### Added
