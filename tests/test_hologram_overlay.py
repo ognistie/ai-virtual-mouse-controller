@@ -23,12 +23,6 @@ except ImportError:
     _PYSIDE_AVAILABLE = False
 
 
-# Marca todo o modulo como 'gpu': roda apenas com `pytest -m gpu`.
-# Default `pytest` (configurado via addopts no pyproject) ignora — o
-# backend GL pode crashar em ambientes sem driver/display real.
-pytestmark = pytest.mark.gpu
-
-
 @pytest.mark.skipif(
     not _PYSIDE_AVAILABLE,
     reason="PySide6 nao instalado",
@@ -108,6 +102,7 @@ class TestOverlayConstruction:
     not _PYSIDE_AVAILABLE,
     reason="PySide6 nao instalado",
 )
+@pytest.mark.gpu
 class TestDorsalView:
     """Mirror X em torno do anchor (landmark 9) quando view_dorsal=True."""
 
@@ -157,6 +152,7 @@ class TestBurstFiring:
         finally:
             h.close()
 
+    @pytest.mark.gpu
     def test_fire_burst_without_pose_uses_cursor(self):
         from core.hologram_overlay import HologramOverlay
         h = HologramOverlay()
@@ -182,6 +178,7 @@ class TestBurstFiring:
         "(offscreen platform nao garante GL context). Roda local."
     ),
 )
+@pytest.mark.gpu
 class TestRenderingNoCrash:
     """Garante que o paint roda sem crashar com varias configuracoes."""
 
@@ -221,6 +218,7 @@ class TestRenderingNoCrash:
             h.close()
 
 
+@pytest.mark.gpu
 class TestGracefulDegradation:
     """Quando PySide6 nao esta disponivel, overlay deve falhar com graca."""
 
