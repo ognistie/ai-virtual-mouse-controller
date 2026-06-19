@@ -190,9 +190,14 @@ Issues, PRs e feedback técnico são bem-vindos. Comece em [CONTRIBUTING.md](CON
 Workflow local rápido:
 
 ```bash
-make dev    # instala deps + hooks
-make check  # ruff + mypy + pytest
+make dev        # instala deps + hooks
+make check      # ruff + mypy + pytest
+make test-fast  # só testes rápidos (sem GPU/integration/slow)
+make test-gpu   # só testes que precisam de display/GPU real
+make test-cov   # com coverage HTML
 ```
+
+Testes marcados com `gpu` (overlay PySide6/ModernGL) ficam fora do `pytest` default — eles requerem display real e podem crashar em ambientes headless. Rode-os explicitamente com `make test-gpu` quando estiver mexendo no holograma.
 
 ---
 

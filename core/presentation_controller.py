@@ -4,27 +4,18 @@ core.presentation_controller
 
 Modo apresentacao: passa slides com gestos em vez de controlar o cursor.
 
-Gesto: PEACE deitado (indice + medio extendidos APONTANDO LATERALMENTE,
-nao pra cima). Anelar e minimo curvados.
+Gesto: MAO ABERTA cruzando do MEIO do frame pra um dos LADOS.
 
-Swipe (mao-agnostico, independe de destro/canhoto):
-- Mover a mao NA DIRECAO em que os dedos apontam = NEXT_SLIDE
-- Mover a mao na DIRECAO OPOSTA (puxar pra tras) = PREV_SLIDE
+    |--LEFT--|----MIDDLE (neutro)----|--RIGHT--|
+    0       lo                       hi        1
+    PREV         (nao dispara)            NEXT
 
-Estado:
-- IDLE      : sem PEACE deitado -> nao faz nada
-- ARMED     : PEACE deitado detectado, posicao de referencia gravada
-- COOLDOWN  : acabou de disparar, aguarda PRESENTATION_COOLDOWN_S
-             antes de aceitar novo disparo
+- Cruzou MEIO -> LEFT  -> PREV_SLIDE
+- Cruzou MEIO -> RIGHT -> NEXT_SLIDE
+- Mao parada num lado nao re-dispara; voltar pro MEIO rearma
 
-Design:
-- Modulo desacoplado: nao depende do GestureDetector principal nem do
-  CursorController. Recebe HandLandmarks por frame, retorna Optional[Gesture].
-- Direcao de referencia = vetor MCP->TIP medio (indice + medio).
-  Robusto: usar TIP-MCP em vez de TIP-WRIST elimina contribuicao da pose
-  do braco, fica preso a orientacao real dos dedos.
-- Threshold de swipe usa coordenadas normalizadas (0-1) do frame, escala
-  com tamanho da mao no enquadramento (curto = ainda detecta swipe).
+Frame ja vem espelhado pelo service (mirror=True), entao x cresce pra
+a direita na vista do usuario.
 """
 
 from __future__ import annotations
@@ -32,6 +23,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
+from enum import Enum
 from typing import Optional
 
 from core.finger_posture import (
@@ -40,7 +32,6 @@ from core.finger_posture import (
     FINGER_CHAIN_PINKY,
     FINGER_CHAIN_RING,
     finger_extension,
-    is_clearly_curled,
     is_clearly_extended,
 )
 from core.gesture_detector import Gesture
@@ -50,131 +41,125 @@ from core.hand_tracker import HandLandmarks
 logger = logging.getLogger(__name__)
 
 
-# Landmarks usados pra computar direcao dos dedos
-_LM_INDEX_MCP = 5
-_LM_INDEX_TIP = 8
+# Middle MCP: centro estavel da palma, mais robusto que TIP a oclusao
 _LM_MIDDLE_MCP = 9
-_LM_MIDDLE_TIP = 12
+
+
+class Zone(Enum):
+    LEFT = "left"
+    MIDDLE = "middle"
+    RIGHT = "right"
 
 
 @dataclass
-class _SwipeState:
-    armed: bool = False
-    ref_x: float = 0.0
-    ref_y: float = 0.0
-    ref_dir_x: float = 0.0
-    ref_dir_y: float = 0.0
-    last_emit_t: float = 0.0
+class DebugSnapshot:
+    """Estado do ultimo frame, exposto pra overlay visual."""
+    has_hand: bool = False
+    idx_ext: float = 0.0
+    mid_ext: float = 0.0
+    ring_ext: float = 0.0
+    pinky_ext: float = 0.0
+    open_hand: bool = False
+    anchor_x: float = 0.5
+    zone: Zone = Zone.MIDDLE
 
 
 class PresentationController:
-    """Detecta PEACE deitado + swipe direcional e emite NEXT/PREV_SLIDE."""
+    """Detecta MAO ABERTA cruzando do meio pra um lado -> NEXT/PREV_SLIDE."""
 
     def __init__(
         self,
         *,
-        lateral_ratio: float = 1.3,
-        swipe_threshold: float = 0.12,
-        cooldown_s: float = 0.8,
-        extension_threshold: float = 0.88,
-        curl_threshold: float = 0.70,
+        dead_zone: float = 0.30,
+        cooldown_s: float = 0.5,
+        extension_threshold: float = 0.80,
     ) -> None:
-        self._ratio = lateral_ratio
-        self._threshold = swipe_threshold
+        """
+        Args:
+            dead_zone: Largura da zona neutra central (fracao do frame).
+                       0.20 = 20% central nao dispara. Aumente pra
+                       'buffer' maior entre LEFT/RIGHT.
+            cooldown_s: Tempo minimo entre disparos consecutivos.
+            extension_threshold: Score minimo de extensao dos 4 dedos
+                                 longos pra reconhecer MAO ABERTA.
+        """
+        self._dead_zone = max(0.0, min(0.8, dead_zone))
         self._cooldown = cooldown_s
         self._ext_th = extension_threshold
-        self._curl_th = curl_threshold
-        self._state = _SwipeState()
+        self._lo = 0.5 - self._dead_zone / 3.0
+        self._hi = 0.5 + self._dead_zone / 3.0
+        self._last_zone: Zone = Zone.MIDDLE
+        self._last_emit_t: float = 0.0
+        self._debug = DebugSnapshot()
 
     def reset(self) -> None:
-        self._state = _SwipeState()
+        self._last_zone = Zone.MIDDLE
+        self._last_emit_t = 0.0
+        self._debug = DebugSnapshot()
+
+    @property
+    def debug(self) -> DebugSnapshot:
+        return self._debug
+
+    @property
+    def dead_zone_bounds(self) -> tuple[float, float]:
+        """Retorna (lo, hi) normalizado [0,1] das bordas da zona neutra."""
+        return self._lo, self._hi
 
     def update(self, hand: Optional[HandLandmarks]) -> Optional[Gesture]:
-        """Processa um frame. Retorna Gesture.NEXT_SLIDE / PREV_SLIDE ou None."""
+        """Processa um frame. Retorna NEXT_SLIDE / PREV_SLIDE ou None."""
         if hand is None:
-            self._state.armed = False
+            self._last_zone = Zone.MIDDLE
+            self._debug = DebugSnapshot()
             return None
 
-        if not self._is_peace_lateral(hand):
-            self._state.armed = False
-            return None
-
-        lm = hand.landmarks
-        anchor_x = (lm[_LM_INDEX_MCP][0] + lm[_LM_MIDDLE_MCP][0]) * 0.5
-        anchor_y = (lm[_LM_INDEX_MCP][1] + lm[_LM_MIDDLE_MCP][1]) * 0.5
-        dir_x, dir_y = self._finger_direction(hand)
-
-        now = time.perf_counter()
-
-        if not self._state.armed:
-            self._state = _SwipeState(
-                armed=True,
-                ref_x=anchor_x,
-                ref_y=anchor_y,
-                ref_dir_x=dir_x,
-                ref_dir_y=dir_y,
-                last_emit_t=self._state.last_emit_t,
-            )
-            return None
-
-        if now - self._state.last_emit_t < self._cooldown:
-            return None
-
-        # Deslocamento projetado na direcao dos dedos (referencia inicial).
-        # Sinal positivo = mao moveu PRA FRENTE (mesma direcao que dedos
-        # apontam) -> next. Sinal negativo = puxou pra tras -> prev.
-        dx = anchor_x - self._state.ref_x
-        dy = anchor_y - self._state.ref_y
-        projection = dx * self._state.ref_dir_x + dy * self._state.ref_dir_y
-
-        if abs(projection) < self._threshold:
-            return None
-
-        emitted = Gesture.NEXT_SLIDE if projection > 0 else Gesture.PREV_SLIDE
-        # Rearmar com a posicao atual: usuario pode continuar swipando
-        # mas espera cooldown antes de novo disparo.
-        self._state.ref_x = anchor_x
-        self._state.ref_y = anchor_y
-        self._state.last_emit_t = now
-        logger.info(
-            "Presentation swipe: %s (projection=%.3f, threshold=%.3f)",
-            emitted.value,
-            projection,
-            self._threshold,
-        )
-        return emitted
-
-    def _is_peace_lateral(self, hand: HandLandmarks) -> bool:
         lm = hand.landmarks
         idx_ext = finger_extension(lm, FINGER_CHAIN_INDEX)
         mid_ext = finger_extension(lm, FINGER_CHAIN_MIDDLE)
         ring_ext = finger_extension(lm, FINGER_CHAIN_RING)
         pinky_ext = finger_extension(lm, FINGER_CHAIN_PINKY)
-
-        peace_posture = (
+        open_hand = (
             is_clearly_extended(idx_ext, threshold=self._ext_th)
             and is_clearly_extended(mid_ext, threshold=self._ext_th)
-            and is_clearly_curled(ring_ext, threshold=self._curl_th)
-            and is_clearly_curled(pinky_ext, threshold=self._curl_th)
+            and is_clearly_extended(ring_ext, threshold=self._ext_th)
+            and is_clearly_extended(pinky_ext, threshold=self._ext_th)
         )
-        if not peace_posture:
-            return False
+        anchor_x = lm[_LM_MIDDLE_MCP][0]
+        zone = self._zone_of(anchor_x)
 
-        dir_x, dir_y = self._finger_direction(hand)
-        # Lateral = vetor predominantemente horizontal
-        return abs(dir_x) >= self._ratio * abs(dir_y)
+        self._debug = DebugSnapshot(
+            has_hand=True,
+            idx_ext=idx_ext, mid_ext=mid_ext,
+            ring_ext=ring_ext, pinky_ext=pinky_ext,
+            open_hand=open_hand,
+            anchor_x=anchor_x,
+            zone=zone,
+        )
 
-    @staticmethod
-    def _finger_direction(hand: HandLandmarks) -> tuple[float, float]:
-        """Vetor unitario da direcao indice+medio (MCP -> TIP, media)."""
-        lm = hand.landmarks
-        ix = lm[_LM_INDEX_TIP][0] - lm[_LM_INDEX_MCP][0]
-        iy = lm[_LM_INDEX_TIP][1] - lm[_LM_INDEX_MCP][1]
-        mx = lm[_LM_MIDDLE_TIP][0] - lm[_LM_MIDDLE_MCP][0]
-        my = lm[_LM_MIDDLE_TIP][1] - lm[_LM_MIDDLE_MCP][1]
-        vx = (ix + mx) * 0.5
-        vy = (iy + my) * 0.5
-        mag = (vx * vx + vy * vy) ** 0.5
-        if mag < 1e-9:
-            return 0.0, 0.0
-        return vx / mag, vy / mag
+        if not open_hand:
+            # Fechar a mao rearma o gatilho — sem isto, reabrir num lado
+            # ja "presente" dispararia sem o usuario ter atravessado o meio.
+            self._last_zone = Zone.MIDDLE
+            return None
+
+        emitted = self._maybe_emit(zone)
+        self._last_zone = zone
+        return emitted
+
+    def _zone_of(self, x: float) -> Zone:
+        if x < self._lo:
+            return Zone.LEFT
+        if x > self._hi:
+            return Zone.RIGHT
+        return Zone.MIDDLE
+
+    def _maybe_emit(self, zone: Zone) -> Optional[Gesture]:
+        if self._last_zone != Zone.MIDDLE or zone == Zone.MIDDLE:
+            return None
+        now = time.perf_counter()
+        if now - self._last_emit_t < self._cooldown:
+            return None
+        emitted = Gesture.NEXT_SLIDE if zone == Zone.RIGHT else Gesture.PREV_SLIDE
+        self._last_emit_t = now
+        logger.info("Presentation: meio -> %s", emitted.value)
+        return emitted

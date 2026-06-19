@@ -348,6 +348,12 @@ class HologramOverlay:
             return self._gl_backend.enabled
         return self._enabled
 
+    @property
+    def screen_size(self) -> Tuple[int, int]:
+        """Dimensoes da tela primaria (default 1920x1080 ate o backend
+        resolver a geometria real)."""
+        return self._screen_w, self._screen_h
+
     def update_pose(
         self,
         landmarks: Optional[Sequence[Tuple[float, float, float]]],
@@ -452,19 +458,18 @@ class HologramOverlay:
             logger.debug("Erro em pump: %s", e)
 
     def close(self) -> None:
-        # Fecha GL backend tambem (se existir)
         if self._gl_backend is not None:
             try:
                 self._gl_backend.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("GL backend close falhou: %s", e)
             self._gl_backend = None
         if self._widget is not None:
             try:
                 self._widget.close()
                 self._widget.deleteLater()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("widget close falhou: %s", e)
             self._widget = None
         self.available = False
         self._enabled = False

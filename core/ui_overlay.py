@@ -18,10 +18,9 @@ Interacao:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import cv2
-import numpy as np
 
 
 # ===================================================================
@@ -141,6 +140,29 @@ class UIState:
     presentation_toggle: Optional[ButtonSpec] = None
     reset_button: Optional[ButtonSpec] = None
     apply_recommended_button: Optional[ButtonSpec] = None
+
+    def action_buttons(self) -> List[ButtonSpec]:
+        """Ordem canonica dos botoes de acao — fonte unica pra render,
+        hover e hit testing."""
+        return [
+            b for b in (
+                self.aim_toggle,
+                self.sticky_toggle,
+                self.presentation_toggle,
+                self.reset_button,
+                self.apply_recommended_button,
+            ) if b is not None
+        ]
+
+    def toggle_buttons(self) -> List[ButtonSpec]:
+        """Subconjunto de action_buttons que sao toggles."""
+        return [
+            b for b in (
+                self.aim_toggle,
+                self.sticky_toggle,
+                self.presentation_toggle,
+            ) if b is not None
+        ]
     doc_rows: List[DocRow] = field(default_factory=list)
     show_doc: bool = False
     dragging_slider_key: Optional[str] = None
@@ -390,11 +412,7 @@ class SettingsPanel:
 
         profile_block_h = (BUTTON_HEIGHT * 2) + BUTTON_GAP
 
-        toggles_count = sum(1 for b in [
-            state.aim_toggle, state.sticky_toggle, state.presentation_toggle,
-            state.reset_button, state.apply_recommended_button
-        ] if b is not None)
-        toggles_h = toggles_count * (BUTTON_HEIGHT + BUTTON_GAP)
+        toggles_h = len(state.action_buttons()) * (BUTTON_HEIGHT + BUTTON_GAP)
 
         header_h = 20
         section_label_h = 14
@@ -470,13 +488,10 @@ class SettingsPanel:
             Button.render(frame, btn, bx, by, col_w)
         cy += profile_block_h + SECTION_GAP
 
-        # Toggles
-        for btn in [state.aim_toggle, state.sticky_toggle,
-                    state.presentation_toggle,
-                    state.reset_button, state.apply_recommended_button]:
-            if btn is not None:
-                Button.render(frame, btn, content_x, cy, content_w)
-                cy += BUTTON_HEIGHT + BUTTON_GAP
+        # Toggles + reset + apply (ordem canonica em state.action_buttons)
+        for btn in state.action_buttons():
+            Button.render(frame, btn, content_x, cy, content_w)
+            cy += BUTTON_HEIGHT + BUTTON_GAP
 
         cy += SECTION_GAP - BUTTON_GAP
 
@@ -716,9 +731,8 @@ class UIOverlay:
                     self.callbacks.on_profile_change(btn.key)
                     return True
 
-            for btn in (self.state.aim_toggle, self.state.sticky_toggle,
-                        self.state.presentation_toggle):
-                if btn and btn._bbox and self._hit(btn._bbox, x, y):
+            for btn in self.state.toggle_buttons():
+                if btn._bbox and self._hit(btn._bbox, x, y):
                     new_state = not btn.active
                     btn.active = new_state
                     if btn.key == "aim_toggle":
@@ -758,9 +772,6 @@ class UIOverlay:
         for btn in self.state.profile_buttons:
             if btn._bbox:
                 btn._hover = self._hit(btn._bbox, x, y)
-        for btn in (self.state.aim_toggle, self.state.sticky_toggle,
-                    self.state.presentation_toggle,
-                    self.state.reset_button,
-                    self.state.apply_recommended_button):
-            if btn and btn._bbox:
+        for btn in self.state.action_buttons():
+            if btn._bbox:
                 btn._hover = self._hit(btn._bbox, x, y)

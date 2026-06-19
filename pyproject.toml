@@ -43,9 +43,8 @@ classifiers = [
 dependencies = [
     "opencv-python>=4.10.0,<5.0.0",
     # CRITICAL: mediapipe 0.10.30+ removeu mp.solutions.hands que esse
-    # projeto usa. Range estreito 0.10.18-0.10.21 garante o modulo
-    # solutions presente. Quando migrarmos pro novo Task API podemos
-    # abrir esse range.
+    # projeto usa. Range 0.10.18..0.10.29 garante o modulo solutions
+    # presente. Quando migrarmos pro novo Task API podemos abrir esse range.
     "mediapipe>=0.10.18,<0.10.30",
     "pyautogui>=0.9.54,<1.0.0",
     "numpy>=1.26.0,<2.2.0",
@@ -107,6 +106,9 @@ addopts = [
     "--strict-markers",
     "--strict-config",
 ]
+# Testes 'gpu' (overlay PySide6/ModernGL) precisam de display/driver real
+# e podem crashar em ambientes headless. Sao pulados por default; rodar
+# com `pytest --gpu` (flag definida em tests/conftest.py).
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "gpu: requires GPU (deselect with '-m \"not gpu\"')",

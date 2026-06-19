@@ -53,6 +53,9 @@ secrets/
 *.token
 credentials*
 
+# Estado de runtime: perfis adaptativos, calibracoes locais etc.
+data/
+
 # ============================================================================
 # Sessao de IA / dev local
 # ============================================================================

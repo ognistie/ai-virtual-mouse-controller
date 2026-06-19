@@ -23,6 +23,12 @@ except ImportError:
     _PYSIDE_AVAILABLE = False
 
 
+# Marca todo o modulo como 'gpu': roda apenas com `pytest -m gpu`.
+# Default `pytest` (configurado via addopts no pyproject) ignora — o
+# backend GL pode crashar em ambientes sem driver/display real.
+pytestmark = pytest.mark.gpu
+
+
 @pytest.mark.skipif(
     not _PYSIDE_AVAILABLE,
     reason="PySide6 nao instalado",

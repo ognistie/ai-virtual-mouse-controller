@@ -4,7 +4,7 @@
 # Uso: make <target>. Sem args, lista os targets disponiveis.
 # ============================================================================
 
-.PHONY: help install dev test test-fast lint format type-check check clean run pre-commit
+.PHONY: help install dev test test-fast test-gpu lint format type-check check clean run pre-commit
 
 help:  ## Lista targets disponiveis
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -20,8 +20,11 @@ dev:  ## Instala deps de runtime + dev + hologram
 test:  ## Roda todos os testes
 	pytest tests/ -v
 
-test-fast:  ## Roda so testes rapidos
+test-fast:  ## Roda so testes rapidos (sem gpu, slow, integration)
 	pytest tests/ -v -m "not slow and not integration"
+
+test-gpu:  ## Roda APENAS os testes gpu (precisa de display/driver real)
+	pytest tests/ -v -m gpu --gpu
 
 test-cov:  ## Roda testes com coverage
 	pytest tests/ --cov=core --cov=services --cov-report=term-missing --cov-report=html

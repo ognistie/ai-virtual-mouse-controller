@@ -22,10 +22,12 @@ except ImportError:
     _PYSIDE_AVAILABLE = False
 
 
-pytestmark = pytest.mark.skipif(
-    not _PYSIDE_AVAILABLE,
-    reason="PySide6 nao instalado",
-)
+pytestmark = [
+    pytest.mark.skipif(not _PYSIDE_AVAILABLE, reason="PySide6 nao instalado"),
+    # Marca 'gpu': backend GL pode crashar sem display/driver real.
+    # Rodar so com `pytest -m gpu`. Default pytest (addopts) ignora.
+    pytest.mark.gpu,
+]
 
 
 def _hand_at(cx, cy, scale=0.15, t=0.0):

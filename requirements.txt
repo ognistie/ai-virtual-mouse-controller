@@ -1,11 +1,12 @@
+# Dependencias de runtime (espelha [project.dependencies] do pyproject.toml).
+# Source of truth = pyproject.toml; este arquivo existe pra usuarios que
+# preferem `pip install -r requirements.txt` ao inves de `pip install .`.
+#
+# Mediapipe pinned em <0.10.30: versoes 0.10.30+ removeram mp.solutions.hands.
+
 opencv-python>=4.10.0,<5.0.0
 mediapipe>=0.10.18,<0.10.30
 pyautogui>=0.9.54,<1.0.0
 numpy>=1.26.0,<2.2.0
-pytest>=8.0.0
-
-
-# Opcional: backend ModernGL 3D pro holograma (v6.9.8+).
-# HOLOGRAM_BACKEND="auto" no config tenta GL e cai pra QPainter se nao
-# disponivel — projeto funciona normalmente sem moderngl instalado.
 moderngl>=5.10.0
+PySide6>=6.6.0

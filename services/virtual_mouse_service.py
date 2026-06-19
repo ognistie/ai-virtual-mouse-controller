@@ -134,8 +134,6 @@ class VirtualMouseService:
         else:
             logger.info("Usando cv2.waitKeyEx(1) (fallback)")
 
-        # Modo apresentacao — toggle Z. Quando on, cursor/cliques sao
-        # suspensos; PEACE deitado + swipe direcional dispara left/right.
         self._presentation_mode: bool = False
         self._presentation_toggle_key: str = (
             getattr(config, "PRESENTATION_TOGGLE_KEY", "z") or "z"
@@ -147,13 +145,11 @@ class VirtualMouseService:
             config, "PRESENTATION_PREV_KEY", "left"
         )
         self._presentation = PresentationController(
-            lateral_ratio=getattr(
-                config, "PRESENTATION_PEACE_LATERAL_RATIO", 1.3
+            dead_zone=getattr(config, "PRESENTATION_DEAD_ZONE", 0.20),
+            cooldown_s=getattr(config, "PRESENTATION_COOLDOWN_S", 0.5),
+            extension_threshold=getattr(
+                config, "PRESENTATION_EXTENSION_THRESHOLD", 0.80
             ),
-            swipe_threshold=getattr(
-                config, "PRESENTATION_SWIPE_THRESHOLD", 0.12
-            ),
-            cooldown_s=getattr(config, "PRESENTATION_COOLDOWN_S", 0.8),
         )
 
         # Hologram overlay (mao virtual desenhada sobre o desktop).
@@ -184,7 +180,7 @@ class VirtualMouseService:
             print(
                 f"[AVM] HologramOverlay criado: available={self.hologram.available}, "
                 f"click_through={self.hologram.click_through_active}, "
-                f"tela={self.hologram._screen_w}x{self.hologram._screen_h} | "
+                f"tela={self.hologram.screen_size[0]}x{self.hologram.screen_size[1]} | "
                 f"aperte '{self._hologram_toggle_key.upper()}' pra ligar/desligar",
                 flush=True,
             )
@@ -442,25 +438,19 @@ class VirtualMouseService:
         else:
             self._hand_lost_frames = 0
 
+        # Modos sao mutuamente exclusivos — detector de mouse e
+        # apresentacao nunca rodam juntos no mesmo frame.
         if self._presentation_mode:
-            # Bypass completo do controle de mouse. So observa PEACE
-            # deitado + swipe e dispara teclas de slide.
             with prof.stage("gesture"):
                 slide_event = self._presentation.update(hand)
             with prof.stage("events"):
-                if slide_event is Gesture.NEXT_SLIDE:
-                    self.cursor.press_key(self._presentation_next_key)
-                elif slide_event is Gesture.PREV_SLIDE:
-                    self.cursor.press_key(self._presentation_prev_key)
+                self._handle_slide_event(slide_event)
         else:
             with prof.stage("gesture"):
                 events = self.gesture_detector.update(hand)
             with prof.stage("events"):
                 self._handle_events(events, hand)
 
-        # Holograma: alimenta a pose atual (barato, sempre que possivel)
-        # e bomba os eventos do Tk pra janela continuar responsiva.
-        # Toda a logica acima (smoother, cursor, deteccao) NAO eh afetada.
         with prof.stage("hologram"):
             self._update_hologram(hand)
 
@@ -475,17 +465,14 @@ class VirtualMouseService:
                 return
             if key != -1:
                 key_masked = key & 0xFF if 0 <= key < 256 else key
-                # Tecla T alterna always-on-top em runtime
                 if key_masked in (ord('t'), ord('T')):
                     self._apply_always_on_top(on=not self._always_on_top)
                     logger.info("ALWAYS_ON_TOP = %s", self._always_on_top)
                     return
-                # Tecla Z alterna modo apresentacao
                 pkey = self._presentation_toggle_key
                 if key_masked in (ord(pkey), ord(pkey.upper())):
                     self._set_presentation_mode(not self._presentation_mode)
                     return
-                # Tecla H alterna o holograma em runtime
                 hkey = self._hologram_toggle_key
                 if key_masked in (ord(hkey), ord(hkey.upper())):
                     if self.hologram is not None and self.hologram.available:
@@ -493,12 +480,10 @@ class VirtualMouseService:
                         msg = (
                             f"HOLOGRAM = {new_state} | "
                             f"click_through={self.hologram.click_through_active} | "
-                            f"tela={self.hologram._screen_w}x{self.hologram._screen_h} | "
+                            f"tela={self.hologram.screen_size[0]}x{self.hologram.screen_size[1]} | "
                             f"mao_visivel={hand is not None} | "
-                            f"cursor=({self.cursor._last_x}, {self.cursor._last_y})"
+                            f"cursor={self.cursor.last_position}"
                         )
-                        # print (em vez de logger.info) pra aparecer no terminal
-                        # mesmo sem config de log
                         print(f"[AVM] {msg}", flush=True)
                         logger.info(msg)
                     else:
@@ -510,14 +495,13 @@ class VirtualMouseService:
                         print(f"[AVM] {msg}", flush=True)
                         logger.warning(msg)
                     return
-                # Detecta toggle do painel pra redimensionar a janela
+                # Painel S muda o tamanho da janela
                 panel_was_visible = self.ui.state.panel_visible
                 self.ui.handle_key(key_masked)
                 panel_now_visible = self.ui.state.panel_visible
                 if panel_was_visible != panel_now_visible:
                     self._apply_window_size(panel_visible=panel_now_visible)
 
-        # Marca fim do frame pro report periodico de perf
         prof.tick()
 
     # -----------------------------------------------------------------
@@ -525,80 +509,41 @@ class VirtualMouseService:
     # -----------------------------------------------------------------
 
     def _update_hologram(self, hand) -> None:
-        """
-        Atualiza a pose no holograma e bomba os eventos do Tk.
+        """Atualiza pose + cursor do holograma e bomba eventos do Tk.
 
-        Chamado a cada _tick(). Mantem a janela Tk responsiva mesmo quando
-        desligada (precisa pumpar pra Windows nao marcar como travada).
-        """
-        h = self.hologram
-        if h is None or not h.available:
-            return
-
-        if h.enabled:
-            # 1. Posicao do cursor: prefere _last_x do controller (real),
-            #    fallback pra pyautogui.position() pra desenhar o idle ring
-            #    antes da primeira deteccao de mao.
-            sx = self.cursor._last_x
-            sy = self.cursor._last_y
-            if sx is None or sy is None:
-                try:
-                    import pyautogui
-                    sx, sy = pyautogui.position()
-                except Exception:
-                    sx, sy = self.cursor.screen_width // 2, self.cursor.screen_height // 2
-            h.update_cursor(sx, sy)
-
-            # 2. Pose da mao (ou None se nao detectada nesse frame)
-            if hand is not None:
-                h.update_pose(hand.landmarks, sx, sy)
-            else:
-                h.update_pose(None, 0, 0)
-
-        # Bomba eventos do Tk sempre — janela existe mesmo quando "off"
-        h.pump()
-
-    # -----------------------------------------------------------------
-    # Hologram (mao virtual na tela)
-    # -----------------------------------------------------------------
-
-    def _update_hologram(self, hand) -> None:
-        """
-        Atualiza a pose no holograma e bomba os eventos do Tk.
-
-        Chamado a cada _tick(). Mantem a janela Tk responsiva mesmo quando
-        desligada (precisa pumpar pra Windows nao marcar como travada).
+        Chamado a cada _tick(). O pump precisa rodar mesmo quando o
+        holograma esta off, senao o Windows marca a janela como travada.
         """
         h = self.hologram
         if h is None or not h.available:
             return
 
         if h.enabled:
-            # 1. Posicao do cursor: prefere _last_x do controller (real),
-            #    fallback pra pyautogui.position() pra desenhar o idle ring
-            #    antes da primeira deteccao de mao.
-            sx = self.cursor._last_x
-            sy = self.cursor._last_y
+            # Prefere posicao real do controller; fallback pyautogui pra
+            # desenhar idle ring antes da primeira deteccao de mao.
+            sx, sy = self.cursor.last_position
             if sx is None or sy is None:
                 try:
                     import pyautogui
                     sx, sy = pyautogui.position()
-                except Exception:
-                    sx, sy = self.cursor.screen_width // 2, self.cursor.screen_height // 2
+                except Exception as e:
+                    logger.debug("pyautogui.position() falhou: %s", e)
+                    sx = self.cursor.screen_width // 2
+                    sy = self.cursor.screen_height // 2
             h.update_cursor(sx, sy)
+            h.update_pose(hand.landmarks if hand is not None else None, sx, sy)
 
-            # 2. Pose da mao (ou None se nao detectada nesse frame)
-            if hand is not None:
-                h.update_pose(hand.landmarks, sx, sy)
-            else:
-                h.update_pose(None, 0, 0)
-
-        # Bomba eventos do Tk sempre — janela existe mesmo quando "off"
         h.pump()
 
     # -----------------------------------------------------------------
-    # Event handlers (API real do CursorController)
+    # Event handlers
     # -----------------------------------------------------------------
+
+    def _handle_slide_event(self, slide_event: Optional[Gesture]) -> None:
+        if slide_event is Gesture.NEXT_SLIDE:
+            self.cursor.press_key(self._presentation_next_key)
+        elif slide_event is Gesture.PREV_SLIDE:
+            self.cursor.press_key(self._presentation_prev_key)
 
     def _handle_events(self, events, hand=None) -> None:
         move_event = None
@@ -609,17 +554,14 @@ class VirtualMouseService:
             else:
                 action_events.append(ev)
 
-        # Smoother eh callable (__call__), nao tem .update()
         if move_event is not None and move_event.position is not None:
             x, y = move_event.position
             x_smooth, y_smooth = self.smoother(x, y)
-            # Cursor: metodo eh .move() com coords normalizadas (0-1)
             self.cursor.move(x_smooth, y_smooth)
 
-        # IMPORTANTE: cliques acontecem na POSICAO ATUAL DO CURSOR (que e'
-        # suavizado pelo OneEuroFilter). Isso garante que o clique caia
-        # EXATAMENTE onde o cursor esta visivel. O burst do holograma e'
-        # apenas feedback VISUAL no pinch point (nao define posicao do clique).
+        # Cliques disparam na posicao atual do cursor (ja suavizada pelo
+        # OneEuroFilter), nao no pinch point — garante que o click caia
+        # onde o cursor esta visivel. O burst no holograma e' so visual.
         for ev in action_events:
             if ev.gesture == Gesture.CLICK:
                 self.cursor.click()
@@ -677,8 +619,8 @@ class VirtualMouseService:
         if self.hologram is not None and self.hologram.available and self.hologram.enabled:
             try:
                 self.hologram.fire_burst(kind)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("hologram.fire_burst(%s) falhou: %s", kind, e)
 
     # -----------------------------------------------------------------
     # Mouse callback
@@ -825,8 +767,8 @@ class VirtualMouseService:
         if self.draw_landmarks and raw_results is not None:
             try:
                 self.tracker.draw(frame, raw_results)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("tracker.draw falhou: %s", e)
 
         d = self.gesture_detector
         shape_name = d.current_shape.name if d.current_shape else "UNKNOWN"
@@ -856,43 +798,62 @@ class VirtualMouseService:
                     frame, label, (8, 22),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2, cv2.LINE_AA,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Falha ao renderizar label HOLO: %s", e)
 
-        # Banner do modo apresentacao — bem visivel pra deixar claro
-        # quando cursor esta suspenso.
         if self._presentation_mode:
             try:
-                h, w = frame.shape[:2]
-                text = "MODO APRESENTACAO"
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                scale = 0.7
-                thick = 2
-                (tw, th), _ = cv2.getTextSize(text, font, scale, thick)
-                pad = 10
-                x0 = (w - tw) // 2 - pad
-                y0 = 8
-                x1 = x0 + tw + pad * 2
-                y1 = y0 + th + pad * 2
-                cv2.rectangle(frame, (x0, y0), (x1, y1), (0, 140, 255), -1)
-                cv2.rectangle(frame, (x0, y0), (x1, y1), (255, 255, 255), 2)
-                cv2.putText(
-                    frame, text, (x0 + pad, y0 + th + pad - 2),
-                    font, scale, (255, 255, 255), thick, cv2.LINE_AA,
-                )
-                hint = (
-                    f"swipe PEACE deitado: ->{self._presentation_next_key} "
-                    f"/ <-{self._presentation_prev_key}  |  Z=sair"
-                )
-                cv2.putText(
-                    frame, hint, (x0, y1 + 18),
-                    font, 0.45, (0, 140, 255), 1, cv2.LINE_AA,
-                )
-            except Exception:
-                pass
+                self._draw_presentation_overlay(frame)
+            except Exception as e:
+                logger.debug("Falha ao renderizar overlay apresentacao: %s", e)
+
+    _PRESENTATION_ORANGE = (0, 140, 255)
+
+    def _draw_presentation_overlay(self, frame: np.ndarray) -> None:
+        """Banner do modo apresentacao + hint de teclas. Mostra dica de
+        correcao apenas quando a mao nao esta detectada ou aberta."""
+        h, w = frame.shape[:2]
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        title = "MODO APRESENTACAO"
+        (tw, th), _ = cv2.getTextSize(title, font, 0.7, 2)
+        pad = 10
+        x0 = (w - tw) // 2 - pad
+        y0 = 8
+        x1 = x0 + tw + pad * 2
+        y1 = y0 + th + pad * 2
+
+        cv2.rectangle(frame, (x0, y0), (x1, y1), self._PRESENTATION_ORANGE, -1)
+        cv2.rectangle(frame, (x0, y0), (x1, y1), (255, 255, 255), 2)
+        cv2.putText(frame, title, (x0 + pad, y0 + th + pad - 2),
+                    font, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
+
+        hint1 = (
+            f"mao aberta: meio=neutro  |  "
+            f"esq=<-{self._presentation_prev_key}  dir=->{self._presentation_next_key}"
+        )
+        hint2 = "Z = sair do modo apresentacao"
+        cv2.putText(frame, hint1, (x0, y1 + 18),
+                    font, 0.40, self._PRESENTATION_ORANGE, 1, cv2.LINE_AA)
+        cv2.putText(frame, hint2, (x0, y1 + 34),
+                    font, 0.40, self._PRESENTATION_ORANGE, 1, cv2.LINE_AA)
+
+        warning = self._presentation_warning()
+        if warning is not None:
+            cv2.putText(frame, warning, (x0, y1 + 54),
+                        font, 0.45, (80, 80, 255), 1, cv2.LINE_AA)
+
+    def _presentation_warning(self) -> Optional[str]:
+        """Dica de correcao pro usuario, ou None quando o gesto esta OK
+        (zero clutter visual no caso comum)."""
+        dbg = self._presentation.debug
+        if not dbg.has_hand:
+            return "posicione a mao na frente da camera"
+        if not dbg.open_hand:
+            return "abra a mao (5 dedos extendidos)"
+        return None
 
     # -----------------------------------------------------------------
-    # Cleanup (API real: force_release, close)
+    # Cleanup
     # -----------------------------------------------------------------
 
     def _setup_signal_handlers(self) -> None:
@@ -901,33 +862,30 @@ class VirtualMouseService:
             self.stop()
         signal.signal(signal.SIGINT, _handler)
         try:
+            # SIGTERM nao existe em alguns runtimes do Windows
             signal.signal(signal.SIGTERM, _handler)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("SIGTERM nao registrado: %s", e)
 
     def _cleanup(self) -> None:
-        try:
-            self.cursor.force_release()
-        except Exception:
-            pass
-        try:
-            self.tracker.close()
-        except Exception:
-            pass
-        try:
-            self.camera.close()
-        except Exception:
-            pass
+        for label, fn in (
+            ("cursor.force_release", self.cursor.force_release),
+            ("tracker.close", self.tracker.close),
+            ("camera.close", self.camera.close),
+        ):
+            try:
+                fn()
+            except Exception as e:
+                logger.debug("Cleanup %s falhou: %s", label, e)
         if self.enable_preview:
             try:
                 cv2.destroyAllWindows()
                 for _ in range(3):
                     cv2.waitKey(1)
-            except Exception:
-                pass
-        # Fecha o holograma (idempotente, sem efeito se nao foi criado)
+            except Exception as e:
+                logger.debug("cv2.destroyAllWindows falhou: %s", e)
         if self.hologram is not None:
             try:
                 self.hologram.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("hologram.close falhou: %s", e)

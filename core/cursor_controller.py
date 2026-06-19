@@ -309,14 +309,10 @@ class CursorController:
             logger.warning("Falha em scroll: %s", e)
 
     def press_key(self, key: str) -> None:
-        """Dispara press de uma tecla (sem mover o cursor).
-
-        Usado pelo modo apresentacao (right/left/pagedown/pageup/space).
-        Aceita qualquer key name suportado pelo PyAutoGUI.
-        """
+        """Press de uma tecla (sem mover o cursor). Aceita qualquer key
+        name do PyAutoGUI (e.g. 'right', 'pagedown', 'space')."""
         try:
             pyautogui.press(key, _pause=False)
-            logger.debug("press_key: %s", key)
         except Exception as e:
             logger.warning("Falha em press_key(%s): %s", key, e)
 
@@ -324,10 +320,16 @@ class CursorController:
     def is_dragging(self) -> bool:
         return self._dragging
 
+    @property
+    def last_position(self) -> Tuple[Optional[int], Optional[int]]:
+        """Ultima posicao em pixel pra qual o cursor foi movido; (None, None)
+        antes do primeiro move."""
+        return self._last_x, self._last_y
+
     def force_release(self) -> None:
         if self._dragging:
             try:
                 pyautogui.mouseUp(_pause=False)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("force_release mouseUp falhou: %s", e)
             self._dragging = False
