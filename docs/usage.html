@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-theme="dark">
+<html lang="pt-BR" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,7 +9,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="assets/css/style.css" />
 
@@ -24,18 +24,19 @@
     }
     .docs-hero .hero-eyebrow { margin-bottom: 1.4rem; }
     .docs-title {
-      font-size: clamp(2.2rem, 5vw, 3.6rem);
-      font-weight: 700;
-      letter-spacing: -0.035em;
-      line-height: 1.05;
+      font-family: var(--serif);
+      font-optical-sizing: auto;
+      font-size: clamp(2.2rem, 5vw, 3.8rem);
+      font-weight: 420;
+      letter-spacing: -0.015em;
+      line-height: 1.1;
       margin-bottom: 1.4rem;
       color: var(--ink);
     }
     .docs-title em {
-      font-family: var(--serif);
       font-style: italic;
-      font-weight: 400;
-      color: var(--ink);
+      font-weight: 420;
+      color: var(--cyan);
     }
     .docs-intro {
       font-size: 1.1rem;
@@ -126,17 +127,19 @@
       font-weight: 600;
     }
     .docs-section h2 {
-      font-size: clamp(1.7rem, 3.4vw, 2.4rem);
-      font-weight: 700;
-      letter-spacing: -0.025em;
+      font-family: var(--serif);
+      font-optical-sizing: auto;
+      font-size: clamp(1.7rem, 3.4vw, 2.5rem);
+      font-weight: 440;
+      letter-spacing: -0.015em;
       line-height: 1.15;
       margin-bottom: 1rem;
       color: var(--ink);
     }
     .docs-section h2 em {
-      font-family: var(--serif);
       font-style: italic;
-      font-weight: 400;
+      font-weight: 420;
+      color: var(--cyan);
     }
     .docs-section h2 br { display: block; }
     .docs-lede {

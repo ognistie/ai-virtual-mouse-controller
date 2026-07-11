@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-theme="dark">
+<html lang="pt-BR" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,11 +9,11 @@
 
   <meta property="og:title" content="AI Virtual Mouse Controller" />
   <meta property="og:description" content="Controle o computador com gestos. Interface de mão em tempo real com MediaPipe e visão computacional." />
-  <meta name="theme-color" content="#08090b" />
+  <meta name="theme-color" content="#f4f1ea" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="assets/css/style.css" />
 </head>
@@ -120,197 +120,21 @@
       </div>
 
       <div class="hero-visual">
-        <div class="hand-stage" aria-hidden="true">
-          <!-- Holo backdrop: rotating rings, radar sweep, crosshair guides -->
-          <svg class="holo-radial" viewBox="0 0 520 520" preserveAspectRatio="xMidYMid meet">
-            <defs>
-              <radialGradient id="hrGlow" cx="50%" cy="62%" r="55%">
-                <stop offset="0%"  stop-color="rgba(34,211,238,0.22)"/>
-                <stop offset="55%" stop-color="rgba(34,211,238,0.05)"/>
-                <stop offset="100%" stop-color="transparent"/>
-              </radialGradient>
-              <linearGradient id="hrSweep" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%"   stop-color="rgba(34,211,238,0)"/>
-                <stop offset="100%" stop-color="rgba(34,211,238,0.55)"/>
-              </linearGradient>
-            </defs>
-
-            <!-- soft halo around hand -->
-            <circle cx="260" cy="320" r="220" fill="url(#hrGlow)"/>
-
-            <!-- crosshair guides -->
-            <line x1="260" y1="0"   x2="260" y2="520" stroke="rgba(34,211,238,0.10)" stroke-dasharray="1 7"/>
-            <line x1="0"   y1="320" x2="520" y2="320" stroke="rgba(34,211,238,0.10)" stroke-dasharray="1 7"/>
-
-            <!-- concentric guide rings -->
-            <circle class="hr-ring" cx="260" cy="320" r="90"  fill="none" stroke="rgba(34,211,238,0.18)"/>
-            <circle class="hr-ring" cx="260" cy="320" r="148" fill="none" stroke="rgba(34,211,238,0.12)"/>
-            <circle class="hr-ring" cx="260" cy="320" r="200" fill="none" stroke="rgba(34,211,238,0.10)"/>
-
-            <!-- rotating tick ring (slow) -->
-            <g class="hr-rotate-slow">
-              <circle cx="260" cy="320" r="214" fill="none"
-                      stroke="rgba(34,211,238,0.55)" stroke-width="1"
-                      stroke-dasharray="1 9"/>
-              <!-- cardinal markers -->
-              <circle cx="260" cy="106" r="3" fill="rgba(34,211,238,0.9)"/>
-              <circle cx="474" cy="320" r="3" fill="rgba(34,211,238,0.9)"/>
-              <circle cx="260" cy="534" r="3" fill="rgba(34,211,238,0.9)"/>
-              <circle cx="46"  cy="320" r="3" fill="rgba(34,211,238,0.9)"/>
-            </g>
-
-            <!-- counter-rotating outer ring (fast) -->
-            <g class="hr-rotate-rev">
-              <circle cx="260" cy="320" r="236" fill="none"
-                      stroke="rgba(34,211,238,0.32)" stroke-width="0.6"
-                      stroke-dasharray="3 16"/>
-              <circle cx="260" cy="84"  r="2.2" fill="rgba(34,211,238,0.85)"/>
-              <circle cx="496" cy="320" r="2.2" fill="rgba(34,211,238,0.85)"/>
-            </g>
-
-            <!-- orbital arc on left -->
-            <g class="hr-rotate-mid">
-              <path d="M 60 320 A 200 200 0 0 1 160 158" fill="none"
-                    stroke="rgba(34,211,238,0.65)" stroke-width="1.3"/>
-              <circle cx="60" cy="320" r="3" fill="rgba(34,211,238,0.9)"/>
-            </g>
-
-            <!-- radar sweep cone (rotates) -->
-            <g class="hr-radar">
-              <path d="M 260 320 L 260 110 A 210 210 0 0 1 412 200 Z"
-                    fill="url(#hrSweep)" opacity="0.45"/>
-            </g>
-
-            <!-- bottom bracket ticks -->
-            <g class="hr-ticks-bottom">
-              <line x1="100" y1="500" x2="100" y2="494" stroke="rgba(34,211,238,0.4)"/>
-              <line x1="140" y1="500" x2="140" y2="490" stroke="rgba(34,211,238,0.55)"/>
-              <line x1="180" y1="500" x2="180" y2="494" stroke="rgba(34,211,238,0.4)"/>
-              <line x1="220" y1="500" x2="220" y2="490" stroke="rgba(34,211,238,0.55)"/>
-              <line x1="260" y1="500" x2="260" y2="486" stroke="rgba(34,211,238,0.8)"/>
-              <line x1="300" y1="500" x2="300" y2="490" stroke="rgba(34,211,238,0.55)"/>
-              <line x1="340" y1="500" x2="340" y2="494" stroke="rgba(34,211,238,0.4)"/>
-              <line x1="380" y1="500" x2="380" y2="490" stroke="rgba(34,211,238,0.55)"/>
-              <line x1="420" y1="500" x2="420" y2="494" stroke="rgba(34,211,238,0.4)"/>
-            </g>
-          </svg>
-
-          <canvas id="handCanvas" width="520" height="520"></canvas>
-
-          <!-- Wireframe globe — top-center small element -->
-          <div class="holo-globe" aria-hidden="true">
-            <svg viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(34,211,238,0.55)" stroke-width="0.8"/>
-              <ellipse cx="50" cy="50" rx="46" ry="14" fill="none" stroke="rgba(34,211,238,0.45)" stroke-width="0.5"/>
-              <ellipse cx="50" cy="50" rx="46" ry="28" fill="none" stroke="rgba(34,211,238,0.3)"  stroke-width="0.5"/>
-              <ellipse cx="50" cy="50" rx="14" ry="46" fill="none" stroke="rgba(34,211,238,0.45)" stroke-width="0.5"/>
-              <ellipse cx="50" cy="50" rx="28" ry="46" fill="none" stroke="rgba(34,211,238,0.3)"  stroke-width="0.5"/>
-              <circle cx="50" cy="50" r="3" fill="rgba(34,211,238,0.9)"/>
-              <circle cx="22" cy="40" r="1.2" fill="rgba(34,211,238,0.8)"/>
-              <circle cx="72" cy="62" r="1.2" fill="rgba(34,211,238,0.8)"/>
-              <circle cx="60" cy="28" r="1"   fill="rgba(34,211,238,0.7)"/>
+        <figure class="hand-plate" aria-hidden="true">
+          <div class="plate-frame">
+            <svg class="plate-ring" viewBox="0 0 520 520" preserveAspectRatio="xMidYMid meet">
+              <circle cx="260" cy="272" r="216" fill="none" stroke="currentColor" stroke-width="1" opacity="0.25"/>
+              <circle cx="260" cy="272" r="216" fill="none" stroke="currentColor" stroke-width="1"
+                      stroke-dasharray="2 6" opacity="0.35"/>
             </svg>
-            <div class="holo-globe-label mono">GEO · NODE</div>
+            <canvas id="handCanvas" width="520" height="520"></canvas>
           </div>
-
-          <!-- Floating telemetry pills -->
-          <div class="holo-readouts mono" aria-hidden="true">
-            <span class="hr-pill pill-a">θ <b id="roTheta">+032°</b></span>
-            <span class="hr-pill pill-b">vel <b id="roVel">0.08</b></span>
-            <span class="hr-pill pill-c">x <b id="roX">0.42</b></span>
-            <span class="hr-pill pill-d">y <b id="roY">0.61</b></span>
-            <span class="hr-pill pill-e">depth <b id="roZ">−1.4</b></span>
-          </div>
-
-          <!-- Floating particles drifting upward -->
-          <div class="holo-particles" aria-hidden="true">
-            <span></span><span></span><span></span><span></span><span></span>
-            <span></span><span></span><span></span><span></span><span></span>
-            <span></span><span></span><span></span><span></span><span></span>
-          </div>
-
-          <!-- Mini sparkline readout -->
-          <div class="holo-spark" aria-hidden="true">
-            <div class="hs-cap mono">sinal · landmarks</div>
-            <svg viewBox="0 0 120 32" preserveAspectRatio="none">
-              <polyline class="hs-line" fill="none" stroke="rgba(34,211,238,0.85)" stroke-width="1.2"
-                points="0,22 8,18 16,20 24,14 32,17 40,10 48,12 56,8 64,11 72,6 80,9 88,5 96,8 104,4 112,7 120,3"/>
-              <polyline class="hs-line dim" fill="none" stroke="rgba(34,211,238,0.3)" stroke-width="0.8"
-                points="0,28 8,26 16,27 24,24 32,25 40,22 48,23 56,20 64,21 72,18 80,19 88,16 96,17 104,14 112,15 120,12"/>
-            </svg>
-          </div>
-
-          <!-- Holographic console: floating UI fragments the hand "controls" -->
-          <div class="holo-console" id="holoConsole">
-            <article class="holo-card hc-browser" data-slot="browser">
-              <header class="hc-bar">
-                <span class="hc-dot"></span><span class="hc-dot"></span><span class="hc-dot"></span>
-                <span class="hc-title mono">navegador</span>
-              </header>
-              <div class="hc-body">
-                <div class="hc-url mono"><span>https://</span><span class="hc-cursor"></span></div>
-                <div class="hc-line"></div>
-                <div class="hc-line short"></div>
-                <div class="hc-line"></div>
-              </div>
-              <div class="hc-ripple"></div>
-            </article>
-
-            <article class="holo-card hc-media" data-slot="media">
-              <header class="hc-bar">
-                <span class="hc-title mono">áudio.live</span>
-              </header>
-              <div class="hc-body hc-equalizer" aria-hidden="true">
-                <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
-              </div>
-              <div class="hc-play mono">
-                <span class="hc-play-icon"></span>
-                <span class="hc-play-label">tocando</span>
-              </div>
-            </article>
-
-            <article class="holo-card hc-files" data-slot="files">
-              <header class="hc-bar">
-                <span class="hc-title mono">arquivos</span>
-              </header>
-              <div class="hc-grid">
-                <div class="hc-tile"></div><div class="hc-tile"></div><div class="hc-tile"></div>
-                <div class="hc-tile"></div><div class="hc-tile"></div><div class="hc-tile"></div>
-              </div>
-            </article>
-
-            <article class="holo-card hc-context" data-slot="context">
-              <ul class="hc-menu mono">
-                <li>abrir</li>
-                <li>copiar</li>
-                <li>renomear</li>
-                <li class="sep"></li>
-                <li class="danger">excluir</li>
-              </ul>
-            </article>
-
-            <div class="holo-pause-veil">
-              <span class="mono">pausado</span>
-            </div>
-
-            <div class="holo-stream mono" id="holoStream" aria-hidden="true">
-              <div class="hs-row"><span class="hs-time">--:--:--</span><span class="hs-evt">system.boot</span></div>
-            </div>
-
-            <div class="holo-reticle" id="holoReticle"></div>
-          </div>
-
-          <div class="stage-corners">
-            <span class="corner tl"></span>
-            <span class="corner tr"></span>
-            <span class="corner bl"></span>
-            <span class="corner br"></span>
-          </div>
-          <div class="stage-label mono">
-            <span class="rec-dot"></span>
-            rastreando · 21 landmarks
-          </div>
-        </div>
+          <figcaption class="plate-caption">
+            <span class="plate-fig">Fig. 01</span>
+            <span class="plate-desc">Mão humana · 21 pontos de referência</span>
+            <span class="plate-live"><span class="rec-dot"></span>rastreamento contínuo</span>
+          </figcaption>
+        </figure>
       </div>
     </section>
 
