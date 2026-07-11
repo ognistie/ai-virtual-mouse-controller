@@ -112,7 +112,8 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
 a { color: inherit; text-decoration: none; }
 ul { list-style: none; }
 pre, code { font-family: var(--mono); }
-::selection { background: var(--ink); color: var(--bg); }
+::selection { background: rgba(34, 211, 238, 0.28); color: var(--ink); }
+[data-theme="light"] ::selection { background: rgba(8, 145, 178, 0.22); }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -127,6 +128,14 @@ pre, code { font-family: var(--mono); }
 }
 
 .mono { font-family: var(--mono); }
+
+/* Focus visível para navegação por teclado — anel ciano consistente
+   em todos os elementos interativos, sem afetar cliques de mouse. */
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
 
 /* ============ BACKGROUND DECORATIONS ============ */
 .bg-grid {
@@ -143,7 +152,18 @@ pre, code { font-family: var(--mono); }
   -webkit-mask-image: radial-gradient(ellipse 1100px 800px at 50% 0%, black 30%, transparent 75%);
 }
 
-.bg-glow { display: none; }
+/* Grain sutil por cima de tudo — materialidade de impresso, mata o
+   "flat digital" sem custo de rede (SVG inline via data-URI). */
+.bg-noise {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  pointer-events: none;
+  opacity: 0.32;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+[data-theme="light"] .bg-noise { opacity: 0.18; }
 
 /* ============ NAV ============ */
 .nav {
@@ -294,11 +314,16 @@ pre, code { font-family: var(--mono); }
   background: var(--ink);
   color: var(--bg);
   border-color: var(--ink);
+  box-shadow: var(--shadow-sm);
 }
 .btn-primary:hover {
   background: var(--ink-2);
   border-color: var(--ink-2);
-  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+.btn-primary:active {
+  box-shadow: none;
+  background: var(--ink);
 }
 
 .btn-secondary {
@@ -309,7 +334,9 @@ pre, code { font-family: var(--mono); }
 .btn-secondary:hover {
   background: var(--bg-elev-3);
   border-color: var(--line-3);
-  transform: translateY(-1px);
+}
+.btn-secondary:active {
+  background: var(--bg-elev-2);
 }
 
 .btn-ghost {
@@ -374,24 +401,31 @@ pre, code { font-family: var(--mono); }
   color: var(--ink);
 }
 
+/* Assinatura editorial: o acento do título em serif itálico.
+   Contraste deliberado sans/serif — identidade própria em vez do
+   sans-bold + dot colorido que todo template SaaS usa. */
 .title-accent {
   display: block;
   color: var(--ink);
-  font-family: var(--sans);
-  font-weight: 800;
-  letter-spacing: -0.04em;
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  font-size: 1.06em;
 }
-.title-accent::before {
-  content: "";
+.title-accent .accent-cursor {
   display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
+  width: 3px;
+  height: 0.72em;
+  margin-left: 10px;
   background: var(--cyan);
-  box-shadow: 0 0 16px var(--cyan-glow);
-  margin-right: 14px;
-  margin-bottom: 8px;
-  vertical-align: middle;
+  box-shadow: 0 0 14px var(--cyan-glow);
+  vertical-align: baseline;
+  animation: caret-blink 1.2s step-end infinite;
+}
+@keyframes caret-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
 
 .hero-lede {
@@ -533,6 +567,16 @@ section { position: relative; z-index: 1; }
   margin-bottom: 0.9rem;
   color: var(--ink);
   max-width: 800px;
+}
+/* Palavras-chave em serif itálico dentro de títulos — eco da
+   assinatura do hero, aplicado com <em> no HTML. */
+.section-title em,
+.cta-title em {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  font-size: 1.05em;
 }
 .section-head.center .section-title { margin-left: auto; margin-right: auto; }
 
