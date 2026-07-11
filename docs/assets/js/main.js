@@ -153,27 +153,18 @@
     const root = document.documentElement;
     const KEY = "avm-theme";
     const stored = localStorage.getItem(KEY);
-    // Light e' o default da identidade (papel); dark so por escolha
-    const initial = stored || "light";
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const initial = stored || (prefersDark ? "dark" : "dark"); // default dark
     root.setAttribute("data-theme", initial);
 
     const toggle = $(".theme-toggle");
     if (!toggle) return;
 
     toggle.addEventListener("click", () => {
-      const current = root.getAttribute("data-theme") || "light";
+      const current = root.getAttribute("data-theme") || "dark";
       const next = current === "dark" ? "light" : "dark";
       root.setAttribute("data-theme", next);
       localStorage.setItem(KEY, next);
-      // Repinta os canvases com a paleta do novo tema
-      const pal = canvasPalette();
-      handRenderers.forEach((r) => {
-        if (r && r.opts) {
-          r.opts.accent = pal.accent;
-          r.opts.accentSoft = pal.accentSoft;
-          r.opts.ink = pal.ink;
-        }
-      });
     });
   }
 
@@ -425,46 +416,47 @@
   }
 
   // ============ CANVASES INIT ============
-  // Paleta editorial lida dos tokens CSS — o canvas acompanha o tema
-  // (papel/tinta no light, carvao/creme no dark) sem cores hardcoded.
-  function canvasPalette() {
-    const cs = getComputedStyle(document.documentElement);
-    const accent = cs.getPropertyValue("--cyan").trim() || "#b8552e";
-    const ink = cs.getPropertyValue("--ink-2").trim() || "#46423b";
-    return {
-      accent: accent,
-      accentSoft: cs.getPropertyValue("--cyan-soft").trim() || "rgba(184,85,46,0.09)",
-      ink: ink
-    };
-  }
-
   function initCanvases() {
     if (!window.HandRenderer) return;
-    const pal = canvasPalette();
 
-    // System panel canvas — menor, mais clinico
-    const sysCanvas = $("#systemCanvas");
-    if (sysCanvas) {
-      handRenderers.push(new window.HandRenderer(sysCanvas, {
-        accent: pal.accent,
-        accentSoft: pal.accentSoft,
-        ink: pal.ink,
-        landmarkRadius: 3,
-        landmarkRadiusBig: 4,
-        lineWidth: 1,
-        sway: 4,
-        breathScale: 0.02,
-        fingertipsGlow: false
+    // Hero canvas — main attention-grabbing visualization
+    const heroCanvas = $("#handCanvas");
+    if (heroCanvas) {
+      handRenderers.push(new window.HandRenderer(heroCanvas, {
+        accent: "#22d3ee",
+        accentSoft: "rgba(34, 211, 238, 0.18)",
+        ink: "#cbd5e1",
+        sway: 10,
+        breathScale: 0.045,
+        fingertipsGlow: true
       }));
     }
 
-    // Holographic canvas — mesma linguagem, brilho leve a mais
+    // System panel canvas — smaller, more clinical
+    const sysCanvas = $("#systemCanvas");
+    if (sysCanvas) {
+      handRenderers.push(new window.HandRenderer(sysCanvas, {
+        accent: "#22d3ee",
+        accentSoft: "rgba(34, 211, 238, 0.12)",
+        ink: "#94a3b8",
+        landmarkRadius: 3,
+        landmarkRadiusBig: 4,
+        lineWidth: 1,
+        sway: 5,
+        breathScale: 0.025,
+        fingertipsGlow: true
+      }));
+    }
+
+    // Holographic canvas — mesmo padrao skeleton dos outros 2 canvases
+    // (todos os 21 landmarks visiveis), com brilho um pouco maior pra
+    // marcar a secao "holografica" sem virar visual divergente.
     const holoCanvas = $("#holoCanvas");
     if (holoCanvas) {
       handRenderers.push(new window.HandRenderer(holoCanvas, {
-        accent: pal.accent,
-        accentSoft: pal.accentSoft,
-        ink: pal.ink,
+        accent: "#22d3ee",
+        accentSoft: "rgba(34, 211, 238, 0.22)",
+        ink: "#cbd5e1",
         landmarkRadius: 4,
         landmarkRadiusBig: 5,
         lineWidth: 1.4,

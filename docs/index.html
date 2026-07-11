@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-theme="light">
+<html lang="pt-BR" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,20 +9,18 @@
 
   <meta property="og:title" content="AI Virtual Mouse Controller" />
   <meta property="og:description" content="Controle o computador com gestos. Interface de mão em tempo real com MediaPipe e visão computacional." />
-  <meta name="theme-color" content="#f4f1ea" />
+  <meta name="theme-color" content="#08090b" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="assets/css/style.css" />
-  <link rel="stylesheet" href="assets/css/hero-spatial.css" />
-  <link rel="stylesheet" href="assets/css/spatial-intelligence.css" />
 </head>
 
-<body class="home-page">
+<body>
   <div class="bg-grid" aria-hidden="true"></div>
-  <div class="bg-noise" aria-hidden="true"></div>
+  <div class="bg-glow" aria-hidden="true"></div>
 
   <header class="nav">
     <div class="nav-inner">
@@ -84,12 +82,12 @@
       <div class="hero-content">
         <div class="hero-eyebrow">
           <span class="status-dot"></span>
-          <span class="mono">v1.1.0 · código aberto</span>
+          <span class="mono">v1.0.6 · código aberto</span>
         </div>
 
         <h1 class="hero-title">
           Controle seu computador com
-          <span class="title-accent">gestos da mão.<span class="accent-cursor" aria-hidden="true"></span></span>
+          <span class="title-accent">gestos da mão.</span>
         </h1>
 
         <p class="hero-lede">
@@ -122,37 +120,198 @@
       </div>
 
       <div class="hero-visual">
-        <figure class="spatial-console" aria-label="Visualização abstrata do controle espacial do cursor">
-          <div class="spatial-head mono">
-            <span>AVM / SPATIAL INPUT</span>
-            <span class="spatial-live"><i></i>online</span>
-          </div>
-          <div class="spatial-field" aria-hidden="true">
-            <div class="spatial-axis axis-x"></div>
-            <div class="spatial-axis axis-y"></div>
-            <div class="spatial-zone zone-outer"></div>
-            <div class="spatial-zone zone-inner"></div>
-            <div class="spatial-origin"></div>
-            <div class="motion-path"><i></i><i></i><i></i><i></i><i></i></div>
-            <div class="spatial-pointer"><span></span></div>
-            <span class="field-label label-position mono">x 0.72 / y 0.34</span>
-            <span class="field-label label-gesture mono">gesture / move</span>
-            <span class="field-label label-latency mono">12.7 ms</span>
-          </div>
-          <figcaption class="spatial-foot mono">
-            <span>movimento físico</span><span class="spatial-flow">→</span>
-            <span>intenção</span><span class="spatial-flow">→</span>
-            <span>ação digital</span>
-          </figcaption>
-        </figure>
-      </div>
-    </section>
+        <div class="hand-stage" aria-hidden="true">
+          <!-- Holo backdrop: rotating rings, radar sweep, crosshair guides -->
+          <svg class="holo-radial" viewBox="0 0 520 520" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <radialGradient id="hrGlow" cx="50%" cy="62%" r="55%">
+                <stop offset="0%"  stop-color="rgba(34,211,238,0.22)"/>
+                <stop offset="55%" stop-color="rgba(34,211,238,0.05)"/>
+                <stop offset="100%" stop-color="transparent"/>
+              </radialGradient>
+              <linearGradient id="hrSweep" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%"   stop-color="rgba(34,211,238,0)"/>
+                <stop offset="100%" stop-color="rgba(34,211,238,0.55)"/>
+              </linearGradient>
+            </defs>
 
-    <section class="proof-rail" aria-label="Diferenciais principais">
-      <div class="proof-item"><strong>100%</strong><span>local e privado</span></div>
-      <div class="proof-item"><strong>60 fps</strong><span>rastreamento em CPU</span></div>
-      <div class="proof-item"><strong>21</strong><span>landmarks por mão</span></div>
-      <div class="proof-item"><strong>2 comandos</strong><span>pip install · avmc</span></div>
+            <!-- soft halo around hand -->
+            <circle cx="260" cy="320" r="220" fill="url(#hrGlow)"/>
+
+            <!-- crosshair guides -->
+            <line x1="260" y1="0"   x2="260" y2="520" stroke="rgba(34,211,238,0.10)" stroke-dasharray="1 7"/>
+            <line x1="0"   y1="320" x2="520" y2="320" stroke="rgba(34,211,238,0.10)" stroke-dasharray="1 7"/>
+
+            <!-- concentric guide rings -->
+            <circle class="hr-ring" cx="260" cy="320" r="90"  fill="none" stroke="rgba(34,211,238,0.18)"/>
+            <circle class="hr-ring" cx="260" cy="320" r="148" fill="none" stroke="rgba(34,211,238,0.12)"/>
+            <circle class="hr-ring" cx="260" cy="320" r="200" fill="none" stroke="rgba(34,211,238,0.10)"/>
+
+            <!-- rotating tick ring (slow) -->
+            <g class="hr-rotate-slow">
+              <circle cx="260" cy="320" r="214" fill="none"
+                      stroke="rgba(34,211,238,0.55)" stroke-width="1"
+                      stroke-dasharray="1 9"/>
+              <!-- cardinal markers -->
+              <circle cx="260" cy="106" r="3" fill="rgba(34,211,238,0.9)"/>
+              <circle cx="474" cy="320" r="3" fill="rgba(34,211,238,0.9)"/>
+              <circle cx="260" cy="534" r="3" fill="rgba(34,211,238,0.9)"/>
+              <circle cx="46"  cy="320" r="3" fill="rgba(34,211,238,0.9)"/>
+            </g>
+
+            <!-- counter-rotating outer ring (fast) -->
+            <g class="hr-rotate-rev">
+              <circle cx="260" cy="320" r="236" fill="none"
+                      stroke="rgba(34,211,238,0.32)" stroke-width="0.6"
+                      stroke-dasharray="3 16"/>
+              <circle cx="260" cy="84"  r="2.2" fill="rgba(34,211,238,0.85)"/>
+              <circle cx="496" cy="320" r="2.2" fill="rgba(34,211,238,0.85)"/>
+            </g>
+
+            <!-- orbital arc on left -->
+            <g class="hr-rotate-mid">
+              <path d="M 60 320 A 200 200 0 0 1 160 158" fill="none"
+                    stroke="rgba(34,211,238,0.65)" stroke-width="1.3"/>
+              <circle cx="60" cy="320" r="3" fill="rgba(34,211,238,0.9)"/>
+            </g>
+
+            <!-- radar sweep cone (rotates) -->
+            <g class="hr-radar">
+              <path d="M 260 320 L 260 110 A 210 210 0 0 1 412 200 Z"
+                    fill="url(#hrSweep)" opacity="0.45"/>
+            </g>
+
+            <!-- bottom bracket ticks -->
+            <g class="hr-ticks-bottom">
+              <line x1="100" y1="500" x2="100" y2="494" stroke="rgba(34,211,238,0.4)"/>
+              <line x1="140" y1="500" x2="140" y2="490" stroke="rgba(34,211,238,0.55)"/>
+              <line x1="180" y1="500" x2="180" y2="494" stroke="rgba(34,211,238,0.4)"/>
+              <line x1="220" y1="500" x2="220" y2="490" stroke="rgba(34,211,238,0.55)"/>
+              <line x1="260" y1="500" x2="260" y2="486" stroke="rgba(34,211,238,0.8)"/>
+              <line x1="300" y1="500" x2="300" y2="490" stroke="rgba(34,211,238,0.55)"/>
+              <line x1="340" y1="500" x2="340" y2="494" stroke="rgba(34,211,238,0.4)"/>
+              <line x1="380" y1="500" x2="380" y2="490" stroke="rgba(34,211,238,0.55)"/>
+              <line x1="420" y1="500" x2="420" y2="494" stroke="rgba(34,211,238,0.4)"/>
+            </g>
+          </svg>
+
+          <canvas id="handCanvas" width="520" height="520"></canvas>
+
+          <!-- Wireframe globe — top-center small element -->
+          <div class="holo-globe" aria-hidden="true">
+            <svg viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(34,211,238,0.55)" stroke-width="0.8"/>
+              <ellipse cx="50" cy="50" rx="46" ry="14" fill="none" stroke="rgba(34,211,238,0.45)" stroke-width="0.5"/>
+              <ellipse cx="50" cy="50" rx="46" ry="28" fill="none" stroke="rgba(34,211,238,0.3)"  stroke-width="0.5"/>
+              <ellipse cx="50" cy="50" rx="14" ry="46" fill="none" stroke="rgba(34,211,238,0.45)" stroke-width="0.5"/>
+              <ellipse cx="50" cy="50" rx="28" ry="46" fill="none" stroke="rgba(34,211,238,0.3)"  stroke-width="0.5"/>
+              <circle cx="50" cy="50" r="3" fill="rgba(34,211,238,0.9)"/>
+              <circle cx="22" cy="40" r="1.2" fill="rgba(34,211,238,0.8)"/>
+              <circle cx="72" cy="62" r="1.2" fill="rgba(34,211,238,0.8)"/>
+              <circle cx="60" cy="28" r="1"   fill="rgba(34,211,238,0.7)"/>
+            </svg>
+            <div class="holo-globe-label mono">GEO · NODE</div>
+          </div>
+
+          <!-- Floating telemetry pills -->
+          <div class="holo-readouts mono" aria-hidden="true">
+            <span class="hr-pill pill-a">θ <b id="roTheta">+032°</b></span>
+            <span class="hr-pill pill-b">vel <b id="roVel">0.08</b></span>
+            <span class="hr-pill pill-c">x <b id="roX">0.42</b></span>
+            <span class="hr-pill pill-d">y <b id="roY">0.61</b></span>
+            <span class="hr-pill pill-e">depth <b id="roZ">−1.4</b></span>
+          </div>
+
+          <!-- Floating particles drifting upward -->
+          <div class="holo-particles" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+
+          <!-- Mini sparkline readout -->
+          <div class="holo-spark" aria-hidden="true">
+            <div class="hs-cap mono">sinal · landmarks</div>
+            <svg viewBox="0 0 120 32" preserveAspectRatio="none">
+              <polyline class="hs-line" fill="none" stroke="rgba(34,211,238,0.85)" stroke-width="1.2"
+                points="0,22 8,18 16,20 24,14 32,17 40,10 48,12 56,8 64,11 72,6 80,9 88,5 96,8 104,4 112,7 120,3"/>
+              <polyline class="hs-line dim" fill="none" stroke="rgba(34,211,238,0.3)" stroke-width="0.8"
+                points="0,28 8,26 16,27 24,24 32,25 40,22 48,23 56,20 64,21 72,18 80,19 88,16 96,17 104,14 112,15 120,12"/>
+            </svg>
+          </div>
+
+          <!-- Holographic console: floating UI fragments the hand "controls" -->
+          <div class="holo-console" id="holoConsole">
+            <article class="holo-card hc-browser" data-slot="browser">
+              <header class="hc-bar">
+                <span class="hc-dot"></span><span class="hc-dot"></span><span class="hc-dot"></span>
+                <span class="hc-title mono">navegador</span>
+              </header>
+              <div class="hc-body">
+                <div class="hc-url mono"><span>https://</span><span class="hc-cursor"></span></div>
+                <div class="hc-line"></div>
+                <div class="hc-line short"></div>
+                <div class="hc-line"></div>
+              </div>
+              <div class="hc-ripple"></div>
+            </article>
+
+            <article class="holo-card hc-media" data-slot="media">
+              <header class="hc-bar">
+                <span class="hc-title mono">áudio.live</span>
+              </header>
+              <div class="hc-body hc-equalizer" aria-hidden="true">
+                <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+              </div>
+              <div class="hc-play mono">
+                <span class="hc-play-icon"></span>
+                <span class="hc-play-label">tocando</span>
+              </div>
+            </article>
+
+            <article class="holo-card hc-files" data-slot="files">
+              <header class="hc-bar">
+                <span class="hc-title mono">arquivos</span>
+              </header>
+              <div class="hc-grid">
+                <div class="hc-tile"></div><div class="hc-tile"></div><div class="hc-tile"></div>
+                <div class="hc-tile"></div><div class="hc-tile"></div><div class="hc-tile"></div>
+              </div>
+            </article>
+
+            <article class="holo-card hc-context" data-slot="context">
+              <ul class="hc-menu mono">
+                <li>abrir</li>
+                <li>copiar</li>
+                <li>renomear</li>
+                <li class="sep"></li>
+                <li class="danger">excluir</li>
+              </ul>
+            </article>
+
+            <div class="holo-pause-veil">
+              <span class="mono">pausado</span>
+            </div>
+
+            <div class="holo-stream mono" id="holoStream" aria-hidden="true">
+              <div class="hs-row"><span class="hs-time">--:--:--</span><span class="hs-evt">system.boot</span></div>
+            </div>
+
+            <div class="holo-reticle" id="holoReticle"></div>
+          </div>
+
+          <div class="stage-corners">
+            <span class="corner tl"></span>
+            <span class="corner tr"></span>
+            <span class="corner bl"></span>
+            <span class="corner br"></span>
+          </div>
+          <div class="stage-label mono">
+            <span class="rec-dot"></span>
+            rastreando · 21 landmarks
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="system" id="system">
@@ -289,7 +448,7 @@
     <section class="concept" id="concept">
       <div class="section-head center">
         <span class="section-tag mono">02 · Conceito</span>
-        <h2 class="section-title">Uma nova camada entre <em>mão, câmera e sistema.</em></h2>
+        <h2 class="section-title">Uma nova camada entre mão, câmera e sistema.</h2>
         <p class="section-lede">Três subsistemas trabalham em sequência — capturando, interpretando e traduzindo gestos em ações no sistema operacional.</p>
       </div>
 
@@ -358,7 +517,7 @@
     <section class="features" id="features">
       <div class="section-head">
         <span class="section-tag mono">03 · Capacidades</span>
-        <h2 class="section-title">Feito para <em>interação real.</em></h2>
+        <h2 class="section-title">Feito para interação real.</h2>
         <p class="section-lede">Um conjunto focado de gestos e comportamentos — cada um ajustado para controle de baixa latência sem sacrificar precisão.</p>
       </div>
 
@@ -436,7 +595,7 @@
           <span class="section-tag mono cyan">04 · Interface Holográfica</span>
           <h2 class="section-title">
             A mão holográfica transforma rastreamento invisível em uma
-            <em class="cyan-glow">interface visível.</em>
+            <span class="cyan-glow">interface visível.</span>
           </h2>
           <p class="section-lede">
             Uma segunda camada visual que segue os mesmos 21 landmarks que o sistema usa para interpretar seus gestos. Renderizada em 3D com ModernGL, a mão holográfica é anatomicamente contínua — palma fundida com os dedos, polegar embutido no thenar, curvas orgânicas em cada articulação.
@@ -487,7 +646,7 @@
     <section class="architecture" id="architecture">
       <div class="section-head">
         <span class="section-tag mono">05 · Arquitetura</span>
-        <h2 class="section-title">Pipeline, <em>ponta a ponta.</em></h2>
+        <h2 class="section-title">Pipeline, ponta a ponta.</h2>
         <p class="section-lede">Seis estágios da webcam até o comando do cursor — cada um isolado, observável e substituível.</p>
       </div>
 
@@ -592,7 +751,7 @@
     <section class="opensource" id="opensource">
       <div class="section-head center">
         <span class="section-tag mono">07 · Código aberto</span>
-        <h2 class="section-title">Ainda no começo — <em>contribuições bem-vindas.</em></h2>
+        <h2 class="section-title">Ainda no começo, Contribuições bem-vindas.</h2>
         <p class="section-lede">Experimentos, issues, feedback técnico e pull requests — tudo é apreciado. Este é um projeto guiado por pesquisa.</p>
       </div>
 
@@ -650,7 +809,7 @@
 
     <section class="final-cta">
       <div class="cta-content">
-        <h2 class="cta-title">Construa a próxima camada de <em>interação humano-computador.</em></h2>
+        <h2 class="cta-title">Construa a próxima camada de interação humano-computador.</h2>
         <p class="cta-text">Open source, técnico e feito para builders que se importam com a interação em si.</p>
         <div class="cta-actions">
           <a class="btn btn-primary" href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">
