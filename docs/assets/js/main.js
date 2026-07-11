@@ -442,19 +442,6 @@
     if (!window.HandRenderer) return;
     const pal = canvasPalette();
 
-    // Hero canvas — prancha anatomica: tracos de tinta, pontas clay
-    const heroCanvas = $("#handCanvas");
-    if (heroCanvas) {
-      handRenderers.push(new window.HandRenderer(heroCanvas, {
-        accent: pal.accent,
-        accentSoft: pal.accentSoft,
-        ink: pal.ink,
-        sway: 7,
-        breathScale: 0.035,
-        fingertipsGlow: false
-      }));
-    }
-
     // System panel canvas — menor, mais clinico
     const sysCanvas = $("#systemCanvas");
     if (sysCanvas) {

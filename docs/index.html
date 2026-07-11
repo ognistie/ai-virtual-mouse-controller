@@ -16,6 +16,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="assets/css/style.css" />
+  <link rel="stylesheet" href="assets/css/hero-spatial.css" />
 </head>
 
 <body>
@@ -120,19 +121,27 @@
       </div>
 
       <div class="hero-visual">
-        <figure class="hand-plate" aria-hidden="true">
-          <div class="plate-frame">
-            <svg class="plate-ring" viewBox="0 0 520 520" preserveAspectRatio="xMidYMid meet">
-              <circle cx="260" cy="272" r="216" fill="none" stroke="currentColor" stroke-width="1" opacity="0.25"/>
-              <circle cx="260" cy="272" r="216" fill="none" stroke="currentColor" stroke-width="1"
-                      stroke-dasharray="2 6" opacity="0.35"/>
-            </svg>
-            <canvas id="handCanvas" width="520" height="520"></canvas>
+        <figure class="spatial-console" aria-label="Visualização abstrata do controle espacial do cursor">
+          <div class="spatial-head mono">
+            <span>AVM / SPATIAL INPUT</span>
+            <span class="spatial-live"><i></i>online</span>
           </div>
-          <figcaption class="plate-caption">
-            <span class="plate-fig">Fig. 01</span>
-            <span class="plate-desc">Mão humana · 21 pontos de referência</span>
-            <span class="plate-live"><span class="rec-dot"></span>rastreamento contínuo</span>
+          <div class="spatial-field" aria-hidden="true">
+            <div class="spatial-axis axis-x"></div>
+            <div class="spatial-axis axis-y"></div>
+            <div class="spatial-zone zone-outer"></div>
+            <div class="spatial-zone zone-inner"></div>
+            <div class="spatial-origin"></div>
+            <div class="motion-path"><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="spatial-pointer"><span></span></div>
+            <span class="field-label label-position mono">x 0.72 / y 0.34</span>
+            <span class="field-label label-gesture mono">gesture / move</span>
+            <span class="field-label label-latency mono">12.7 ms</span>
+          </div>
+          <figcaption class="spatial-foot mono">
+            <span>movimento físico</span><span class="spatial-flow">→</span>
+            <span>intenção</span><span class="spatial-flow">→</span>
+            <span>ação digital</span>
           </figcaption>
         </figure>
       </div>
