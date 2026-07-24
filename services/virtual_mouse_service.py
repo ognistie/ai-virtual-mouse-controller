@@ -31,6 +31,7 @@ from core.hologram_overlay import HologramOverlay
 from core.perf_telemetry import configure as configure_perf, get_profiler
 from core.presentation_controller import PresentationController
 from core.runtime_settings import RuntimeSettings
+from core.settings_panel import SettingsPanel
 from core.smoothing import make_smoother
 from core.ui_overlay import UICallbacks, UIOverlay
 from core.utils import FPSCounter
@@ -187,12 +188,31 @@ class VirtualMouseService:
             if getattr(config, "HOLOGRAM_ENABLED", False) and self.hologram.available:
                 self.hologram.set_enabled(True)
                 print(
-                    f"[AVM] Hologram ATIVO no startup", flush=True,
+                    "[AVM] Hologram ATIVO no startup", flush=True,
                 )
         except Exception as e:
             print(f"[AVM] Falha ao iniciar HologramOverlay: {e}", flush=True)
             logger.warning("Falha ao iniciar HologramOverlay: %s", e)
             self.hologram = None
+
+        # Painel de ajustes Qt (handle lateral). Compartilha a mesma
+        # QApplication do holograma. Degrada sozinho sem PySide6 — a
+        # tecla S + painel OpenCV seguem como fallback.
+        self.settings_panel: Optional[SettingsPanel] = None
+        if getattr(config, "SETTINGS_PANEL_QT_ENABLED", True):
+            try:
+                self.settings_panel = SettingsPanel(
+                    callbacks=self._ui_callbacks,
+                    width=getattr(config, "SETTINGS_PANEL_WIDTH", 320),
+                    side=getattr(config, "SETTINGS_PANEL_SIDE", "right"),
+                )
+                if self.settings_panel.available:
+                    self._sync_settings_panel()
+                    print("[AVM] Painel de ajustes Qt ativo (handle lateral)",
+                          flush=True)
+            except Exception as e:
+                logger.warning("Falha ao iniciar SettingsPanel: %s", e)
+                self.settings_panel = None
 
     # -----------------------------------------------------------------
     # Factory (todas as chamadas verificadas contra core/)
@@ -238,6 +258,28 @@ class VirtualMouseService:
             ),
             drag_precision_factor=getattr(
                 config, "DRAG_PRECISION_FACTOR", 0.55,
+            ),
+            y_bottom_boost_enabled=getattr(
+                config, "CURSOR_Y_BOTTOM_BOOST_ENABLED", False,
+            ),
+            y_bottom_boost_knee=getattr(
+                config, "CURSOR_Y_BOTTOM_BOOST_KNEE", 0.72,
+            ),
+            y_bottom_boost_power=getattr(
+                config, "CURSOR_Y_BOTTOM_BOOST_POWER", 1.6,
+            ),
+            edge_snap_px=getattr(config, "CURSOR_EDGE_SNAP_PX", 0),
+            edge_creep_enabled=getattr(
+                config, "CURSOR_EDGE_CREEP_ENABLED", False,
+            ),
+            edge_creep_band_px=getattr(
+                config, "CURSOR_EDGE_CREEP_BAND_PX", 72,
+            ),
+            edge_creep_delay_s=getattr(
+                config, "CURSOR_EDGE_CREEP_DELAY_S", 0.15,
+            ),
+            edge_creep_rate_px_s=getattr(
+                config, "CURSOR_EDGE_CREEP_RATE_PX_S", 320.0,
             ),
         )
 
@@ -454,6 +496,11 @@ class VirtualMouseService:
         with prof.stage("hologram"):
             self._update_hologram(hand)
 
+        # Painel Qt: drena eventos (handle + animacoes). Barato quando
+        # nada mudou; None-safe quando indisponivel.
+        if self.settings_panel is not None:
+            self.settings_panel.pump()
+
         if self.enable_preview:
             with prof.stage("preview"):
                 self._draw_overlays(frame, hand, raw_results)
@@ -465,6 +512,23 @@ class VirtualMouseService:
                 return
             if key != -1:
                 key_masked = key & 0xFF if 0 <= key < 256 else key
+                # Tecla S: painel de ajustes Qt. O painel OpenCV legado
+                # so entra como fallback quando PySide6 nao esta
+                # disponivel — nunca os dois ao mesmo tempo.
+                if key_masked in (ord('s'), ord('S')):
+                    if (
+                        self.settings_panel is not None
+                        and self.settings_panel.available
+                    ):
+                        self.settings_panel.toggle()
+                    else:
+                        panel_was = self.ui.state.panel_visible
+                        self.ui.handle_key(key_masked)
+                        if panel_was != self.ui.state.panel_visible:
+                            self._apply_window_size(
+                                panel_visible=self.ui.state.panel_visible,
+                            )
+                    return
                 if key_masked in (ord('t'), ord('T')):
                     self._apply_always_on_top(on=not self._always_on_top)
                     logger.info("ALWAYS_ON_TOP = %s", self._always_on_top)
@@ -495,12 +559,9 @@ class VirtualMouseService:
                         print(f"[AVM] {msg}", flush=True)
                         logger.warning(msg)
                     return
-                # Painel S muda o tamanho da janela
-                panel_was_visible = self.ui.state.panel_visible
+                # Demais teclas do overlay OpenCV (so agem com o painel
+                # legado visivel — inertes no fluxo normal com painel Qt)
                 self.ui.handle_key(key_masked)
-                panel_now_visible = self.ui.state.panel_visible
-                if panel_was_visible != panel_now_visible:
-                    self._apply_window_size(panel_visible=panel_now_visible)
 
         prof.tick()
 
@@ -640,8 +701,11 @@ class VirtualMouseService:
         updates = self.runtime_settings.set_slider(key, value)
         for setting_key, real_val in updates.items():
             self._apply_setting_live(setting_key, real_val)
-        self.ui.set_slider_display(key, self.runtime_settings.get_slider_display(key))
+        display = self.runtime_settings.get_slider_display(key)
+        self.ui.set_slider_display(key, display)
         self.ui.set_doc_rows(self.runtime_settings.get_doc_rows())
+        if self.settings_panel is not None and self.settings_panel.available:
+            self.settings_panel.set_slider_display(key, display)
 
     def _apply_setting_live(self, key: str, value: float) -> None:
         """Aplica setting individual no detector/smoother sem restart.
@@ -747,16 +811,32 @@ class VirtualMouseService:
         self._apply_smoothing_change("min_cutoff", s.get("one_euro_min_cutoff"))
         self._apply_smoothing_change("beta", s.get("one_euro_beta"))
 
+    _SLIDER_KEYS = (
+        "sensitivity", "aim_assist", "smoothness",
+        "pinch", "sticky", "anchor_freeze",
+    )
+
     def _sync_ui_from_settings(self) -> None:
         s = self.runtime_settings
-        for slider_key in ("sensitivity", "aim_assist", "smoothness",
-                           "pinch", "sticky", "anchor_freeze"):
+        for slider_key in self._SLIDER_KEYS:
             self.ui.set_slider_value(slider_key, s.get_slider_value(slider_key))
             self.ui.set_slider_display(slider_key, s.get_slider_display(slider_key))
         self.ui.set_aim_active(s.aim_enabled)
         self.ui.set_sticky_active(s.sticky_enabled)
         self.ui.set_profile(s.current_profile)
         self.ui.set_doc_rows(s.get_doc_rows())
+        self._sync_settings_panel()
+
+    def _sync_settings_panel(self) -> None:
+        """Empurra o estado atual pro painel Qt (se disponivel)."""
+        panel = getattr(self, "settings_panel", None)
+        if panel is None or not panel.available:
+            return
+        s = self.runtime_settings
+        sliders = {k: s.get_slider_value(k) for k in self._SLIDER_KEYS}
+        displays = {k: s.get_slider_display(k) for k in self._SLIDER_KEYS}
+        panel.sync(sliders, displays, s.aim_enabled, s.sticky_enabled,
+                   s.current_profile)
 
     # -----------------------------------------------------------------
     # Overlay rendering
@@ -889,3 +969,8 @@ class VirtualMouseService:
                 self.hologram.close()
             except Exception as e:
                 logger.debug("hologram.close falhou: %s", e)
+        if self.settings_panel is not None:
+            try:
+                self.settings_panel.close()
+            except Exception as e:
+                logger.debug("settings_panel.close falhou: %s", e)

@@ -104,6 +104,11 @@ class RobustHandAnchor:
 
     # Constantes ajustaveis — defaults bem testados.
     _EDGE_MARGIN: float = 0.06           # 6% das bordas do frame
+    # Taper ASSIMETRICO: margem inferior bem menor que as demais.
+    # A borda de baixo e' o caminho da taskbar — com taper simetrico os
+    # landmarks inferiores (wrist/MCPs) perdiam peso cedo e a media
+    # ponderada puxava a ancora pra CIMA enquanto o usuario descia.
+    _EDGE_MARGIN_BOTTOM: float = 0.02
     _STAB_WINDOW: int = 8                # frames p/ medir variancia
     _STAB_SCALE: float = 220.0           # quao agressivamente penaliza variancia
     _HYSTERESIS_BLEND: float = 0.35      # alpha do blend em low-confidence
@@ -129,6 +134,16 @@ class RobustHandAnchor:
     _EDGE_PROXIMITY: float = 0.30         # ancora a < 30% da borda = "perto"
     _EDGE_CRITICAL_PROXIMITY: float = 0.08  # < 8% = critico, sempre ativo
     _EDGE_CRITICAL_GAIN: float = 1.0      # gain quando em zona critica
+    # Gain reforcado DESCENDO na zona critica: a borda inferior e' a
+    # unica onde a geometria da camera (montada no topo, apontando pra
+    # baixo) trabalha contra o usuario. Simetrico causaria overshoot
+    # nas outras tres bordas, que ja funcionam bem.
+    #
+    # 1.4 (era 2.6): 2.6 empurrava a ancora MUITO alem da mao ao descer;
+    # quando a mao desacelerava (homing) a extrapolacao sumia e a ancora
+    # voltava pra cima -> cursor "descia demais e voltava". 1.4 mantem o
+    # alcance mas sem o overshoot que quebrava a suavidade.
+    _EDGE_CRITICAL_GAIN_DOWN: float = 1.4
 
     def __init__(
         self,
@@ -211,7 +226,10 @@ class RobustHandAnchor:
             w_anat = _ANATOMY_WEIGHTS[i] if i < len(_ANATOMY_WEIGHTS) else 0.4
 
             # (2) Frame edge taper: cai pra 0 nas bordas linearmente
-            edge_factor = _edge_factor(x, y, margin)
+            # (margem inferior menor — ver _EDGE_MARGIN_BOTTOM)
+            edge_factor = _edge_factor(
+                x, y, margin, bottom_margin=self._EDGE_MARGIN_BOTTOM,
+            )
             if edge_factor <= 0.0:
                 continue  # landmark fora do quadro util — nao contribui
 
@@ -283,13 +301,21 @@ class RobustHandAnchor:
                 going_to_edge_x = (vx < 0 and ax < 0.5) or (vx > 0 and ax > 0.5)
                 going_to_edge_y = (vy < 0 and ay < 0.5) or (vy > 0 and ay > 0.5)
                 if in_critical:
-                    gain = self._EDGE_CRITICAL_GAIN
+                    gain_x = self._EDGE_CRITICAL_GAIN
+                    # Descendo (vy > 0) o gain e' reforcado — unica
+                    # borda onde a geometria da camera trava o alcance.
+                    gain_y = (
+                        self._EDGE_CRITICAL_GAIN_DOWN if vy > 0
+                        else self._EDGE_CRITICAL_GAIN
+                    )
                 else:
-                    gain = self._EDGE_VELOCITY_GAIN * (1.0 - confidence)
+                    gain_x = gain_y = (
+                        self._EDGE_VELOCITY_GAIN * (1.0 - confidence)
+                    )
                 if going_to_edge_x:
-                    ax += vx * gain
+                    ax += vx * gain_x
                 if going_to_edge_y:
-                    ay += vy * gain
+                    ay += vy * gain_y
                 ax = 0.0 if ax < 0.0 else (1.0 if ax > 1.0 else ax)
                 ay = 0.0 if ay < 0.0 else (1.0 if ay > 1.0 else ay)
 
@@ -328,16 +354,29 @@ class RobustHandAnchor:
 # Helpers puros (modulo level — testaveis sozinhos)
 # ---------------------------------------------------------------------
 
-def _edge_factor(x: float, y: float, margin: float) -> float:
+def _edge_factor(
+    x: float,
+    y: float,
+    margin: float,
+    bottom_margin: Optional[float] = None,
+) -> float:
     """
     Taper linear: 1.0 dentro do frame com folga; 0.0 nas bordas exatas.
 
     Geometric AND: precisa estar OK em x E y.
+
+    `bottom_margin` habilita taper ASSIMETRICO no eixo y: a borda
+    inferior e' o caminho natural da mao ao mirar a taskbar. Com taper
+    simetrico, os landmarks de baixo (wrist, MCPs) perdiam peso cedo
+    demais e a media ponderada puxava a ancora pra CIMA — na direcao
+    oposta ao movimento do usuario. Margem inferior menor mantem esses
+    landmarks contribuindo ate quase sairem do quadro.
     """
     if margin <= 0.0:
         return 1.0
+    bm = bottom_margin if bottom_margin is not None else margin
     fx = min(x, 1.0 - x) / margin
-    fy = min(y, 1.0 - y) / margin
+    fy = min(y / margin, (1.0 - y) / max(bm, 1e-6))
     fx = 0.0 if fx < 0.0 else (1.0 if fx > 1.0 else fx)
     fy = 0.0 if fy < 0.0 else (1.0 if fy > 1.0 else fy)
     return fx * fy
