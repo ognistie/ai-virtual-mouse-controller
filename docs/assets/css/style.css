@@ -973,8 +973,9 @@ ol {
 }
 
 .installation-video {
-  width: 100%;
+  width: min(100%, 960px);
   aspect-ratio: 16 / 9;
+  margin: 0 auto;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
   background: #090b10;
@@ -993,7 +994,8 @@ ol {
 }
 
 .installation-terminal {
-  margin-top: 18px;
+  width: min(100%, 960px);
+  margin: 18px auto 0;
   box-shadow: var(--shadow-sm);
 }
 
