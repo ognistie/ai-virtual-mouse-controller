@@ -306,11 +306,65 @@ SCREEN_MARGIN_TOP: float = 0.04
 inclinacao leve do braco. Menor que SCREEN_MARGIN_X de proposito.
 """
 
-SCREEN_MARGIN_BOTTOM: float = 0.04
-"""Margem inferior — pequena pra alcancar taskbar / botoes inferiores
-sem forcar a mao pra baixo (onde a camera tipicamente nao enxerga bem,
-porque o usuario senta na altura da tela e a camera fica acima).
+SCREEN_MARGIN_BOTTOM: float = 0.14
+"""Margem inferior — MAIOR que a superior de proposito.
+
+A camera fica no topo do monitor apontando pra baixo: a borda inferior
+do frame corresponde a mao quase na mesa, regiao onde o MediaPipe
+degrada (wrist sai do FOV primeiro). Com 0.08, o fundo da tela e'
+atingido em y=0.86 do frame — antes da zona de degradacao — em vez
+de exigir a mao quase na mesa.
 """
+
+# ---------------------------------------------------------------------
+# ALCANCE DA BORDA INFERIOR (taskbar)
+# ---------------------------------------------------------------------
+# Tres mecanismos complementares pra fechar a "zona morta" acima da
+# taskbar. Causa raiz: (a) edge-taper da ancora enviesa o cursor pra
+# cima quando landmarks inferiores saem do frame; (b) extrapolacao por
+# velocidade zera na fase de homing (aproximacao lenta do alvo, Fitts).
+# Cada mecanismo cobre um elo: mapeamento -> gap terminal -> homing.
+
+CURSOR_Y_BOTTOM_BOOST_ENABLED: bool = True
+"""Remapeamento nao-linear do eixo Y: abaixo do joelho (knee), o
+restante do frame cobre o restante da tela com aceleracao — pequenos
+movimentos de mao perto do fundo viram avancos maiores do cursor."""
+
+CURSOR_Y_BOTTOM_BOOST_KNEE: float = 0.82
+"""Fracao da TELA (0-1, apos margem) onde a curva de boost comeca.
+Acima do joelho o mapeamento e' linear (precisao intacta no miolo).
+
+0.82: boost restrito aos ~18% finais da tela. Com 0.68 o terco
+inferior inteiro (onde ficam icones da area de trabalho) era
+acelerado, deixando o cursor nervoso ao passar por cima dos apps."""
+
+CURSOR_Y_BOTTOM_BOOST_POWER: float = 1.5
+"""Expoente da curva ease-out no trecho boosted. 1.0 = linear (sem
+efeito). 1.5 = curva mais suave que 1.9 — glide sobre os apps sem
+saltos. Aumente pra chegar mais rapido ao fundo; reduza se perder
+precisao / se o cursor 'escorregar' na regiao inferior."""
+
+CURSOR_EDGE_SNAP_PX: int = 48
+"""Magnetismo da borda inferior: movendo pra BAIXO a menos de N pixels
+do fundo, o cursor snap pra borda. Alvos da taskbar ficam colados na
+borda (Fitts: borda = alvo de largura infinita); o snap fecha o gap
+terminal que o vies da ancora deixa. 0 desabilita."""
+
+CURSOR_EDGE_CREEP_ENABLED: bool = True
+"""Border creep: mao parada na banda inferior por mais que o delay =
+cursor desliza suavemente ate a borda. Cobre a fase de homing (usuario
+desacelera ao mirar -> velocidade ~0 -> extrapolacao nao ajuda)."""
+
+CURSOR_EDGE_CREEP_BAND_PX: int = 110
+"""Altura da banda inferior (em px de tela) onde o creep atua."""
+
+CURSOR_EDGE_CREEP_DELAY_S: float = 0.15
+"""Tempo parado dentro da banda antes do creep comecar. Evita disparo
+em travessias rapidas pela regiao."""
+
+CURSOR_EDGE_CREEP_RATE_PX_S: float = 380.0
+"""Velocidade do deslize (px/s). ~350-400 le como 'assistencia suave',
+nao como cursor fugindo do controle."""
 
 # ---------------------------------------------------------------------
 # FEEL DE MOUSE FISICO
@@ -343,6 +397,24 @@ natural da mao no ar (3-5 pixels) atrapalha selecao fina.
 Ajuste UP (0.7-0.8) se o drag estiver lento demais.
 Ajuste DOWN (0.4) pra precisao maxima em telas 4K+.
 """
+
+# ---------------------------------------------------------------------
+# PAINEL DE AJUSTES (Qt)
+# ---------------------------------------------------------------------
+# Painel nativo PySide6 acessivel por um handle discreto na borda da
+# tela — visual clean, independente da janela de preview. Requer PySide6
+# (ja usado pelo holograma). Sem ele, o painel OpenCV da tecla S segue
+# como fallback automatico.
+
+SETTINGS_PANEL_QT_ENABLED: bool = True
+"""Liga o painel Qt + handle lateral. False mantem apenas o painel
+OpenCV da tecla S."""
+
+SETTINGS_PANEL_WIDTH: int = 320
+"""Largura do painel deslizante em pixels."""
+
+SETTINGS_PANEL_SIDE: str = "right"
+"""Borda onde o handle aparece: 'right' ou 'left'."""
 
 # ---------------------------------------------------------------------
 # DEBUG E PREVIEW
