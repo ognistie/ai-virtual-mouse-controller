@@ -100,10 +100,12 @@ export default {
       "X-Frame-Options": "SAMEORIGIN",
     });
 
-    if (!key.endsWith(".html")) {
-      headers.set("Cache-Control", "public, max-age=604800, immutable");
+    if (key.endsWith(".html")) {
+      headers.set("Cache-Control", "no-store");
+    } else if (key.endsWith(".css") || key.endsWith(".js")) {
+      headers.set("Cache-Control", "no-cache");
     } else {
-      headers.set("Cache-Control", "public, max-age=300");
+      headers.set("Cache-Control", "public, max-age=86400");
     }
 
     const body = decodedAssets.get(key);
