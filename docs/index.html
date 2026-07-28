@@ -72,62 +72,71 @@
   <main id="content">
     <section class="hero" id="top">
       <div class="hero-copy">
-        <div class="eyebrow">
-          <span class="eyebrow-dot" aria-hidden="true"></span>
-          Código aberto · execução local
-        </div>
-
-        <h1>Seu computador responde à sua mão.</h1>
+        <h1>Seu computador responde à sua mão</h1>
 
         <p class="hero-lede">
-          O AI Virtual Mouse Controller transforma gestos naturais em movimento,
-          cliques e comandos do sistema — usando apenas uma webcam e processamento local.
+          Controle o cursor, execute cliques e acione comandos com gestos naturais.
+          Uma webcam é tudo o que o sistema precisa.
         </p>
 
         <div class="hero-actions">
           <a class="button button-primary" href="#install">
             Começar agora <span aria-hidden="true">→</span>
           </a>
-          <a class="button button-secondary" href="#how">Ver como funciona</a>
+          <a class="button button-secondary" href="#gestures">Explorar gestos</a>
         </div>
-
-        <ul class="hero-facts" aria-label="Principais características">
-          <li><strong>21</strong><span>pontos da mão</span></li>
-          <li><strong>5+</strong><span>gestos naturais</span></li>
-          <li><strong>Local</strong><span>sem enviar vídeo</span></li>
-        </ul>
       </div>
 
-      <div class="hero-product" aria-label="Prévia real do rastreamento da mão">
-        <div class="product-window">
-          <div class="product-window-bar">
-            <div class="window-dots" aria-hidden="true"><i></i><i></i><i></i></div>
-            <span>avmc.preview</span>
-            <span class="status"><i aria-hidden="true"></i> rastreando</span>
-          </div>
-          <figure class="product-media">
-            <img
-              src="assets/img/gesture_move_real.png"
-              alt="Pessoa usando a mão aberta com os 21 pontos de rastreamento sobrepostos"
-              width="640"
-              height="360"
-            >
-            <figcaption>
-              <span>
-                <small>gesto reconhecido</small>
-                <strong>Mão aberta</strong>
-              </span>
-              <span>
-                <small>ação</small>
-                <strong>Mover cursor</strong>
-              </span>
-            </figcaption>
-          </figure>
+      <div class="tracking-panel" aria-label="Painel ilustrativo do sistema de rastreamento">
+        <div class="tracking-toolbar">
+          <span>AVMC / vision engine</span>
+          <span class="tracking-status"><i aria-hidden="true"></i> processamento local</span>
         </div>
-        <p class="privacy-note">
-          <span aria-hidden="true">●</span>
-          A imagem da câmera é processada no seu computador.
-        </p>
+
+        <div class="tracking-layout">
+          <div class="tracking-column">
+            <article class="tracking-module">
+              <span>entrada</span>
+              <strong>Webcam stream</strong>
+              <small>captura assíncrona · buffer 1</small>
+            </article>
+            <article class="tracking-module tracking-pipeline">
+              <span>pipeline</span>
+              <ol>
+                <li><i></i> Frame RGB</li>
+                <li><i></i> Hand landmarks</li>
+                <li><i></i> Gesture state</li>
+              </ol>
+            </article>
+          </div>
+
+          <div class="tracking-hand" aria-hidden="true">
+            <span class="tracking-axis tracking-axis-x"></span>
+            <span class="tracking-axis tracking-axis-y"></span>
+            <canvas id="heroHandCanvas" width="420" height="420"></canvas>
+            <small>21 pontos · coordenadas XYZ</small>
+          </div>
+
+          <div class="tracking-column">
+            <article class="tracking-module tracking-primary">
+              <span>gesto reconhecido</span>
+              <strong>OPEN_HAND</strong>
+              <small>confiança validada</small>
+            </article>
+            <article class="tracking-module">
+              <span>ação do sistema</span>
+              <strong>MOVE</strong>
+              <small>cursor com suavização adaptativa</small>
+            </article>
+          </div>
+        </div>
+
+        <div class="tracking-footer">
+          <span>OpenCV</span>
+          <span>MediaPipe Hands</span>
+          <span>One Euro Filter</span>
+          <span>PyAutoGUI</span>
+        </div>
       </div>
     </section>
 
@@ -159,107 +168,110 @@
       <div class="section-heading">
         <div>
           <div class="section-label">Tecnologia</div>
-          <h2>Cada parte da stack tem uma função clara.</h2>
+          <h2>Um pipeline técnico, local e modular.</h2>
         </div>
         <p>
-          Uma arquitetura local e modular separa captura, interpretação e execução.
-          Isso mantém a interação responsiva e facilita testes e evolução.
+          Cada camada possui uma responsabilidade definida: adquirir o frame, extrair
+          geometria, interpretar intenção e entregar o comando ao sistema operacional.
         </p>
       </div>
 
       <div class="stack-list">
         <article class="stack-item">
           <span class="stack-index">01</span>
-          <div>
+          <div class="stack-copy">
             <h3>Python</h3>
-            <p>Orquestra o pipeline, as configurações e o ciclo de execução.</p>
+            <p>Runtime principal e ponto de integração entre câmera, inferência, máquina de estados e controladores.</p>
+            <ul class="stack-specs">
+              <li>Python 3.11–3.13</li>
+              <li>CLI <code>avmc</code></li>
+              <li>Serviços desacoplados</li>
+            </ul>
           </div>
-          <span class="stack-role">Aplicação</span>
+          <span class="stack-role">Runtime</span>
         </article>
         <article class="stack-item">
           <span class="stack-index">02</span>
-          <div>
+          <div class="stack-copy">
             <h3>OpenCV</h3>
-            <p>Captura os frames da webcam e prepara as imagens para análise.</p>
+            <p>Opera a captura em thread dedicada, mantém apenas o frame mais recente e prepara a entrada RGB.</p>
+            <ul class="stack-specs">
+              <li><code>VideoCapture</code></li>
+              <li>Buffer mínimo</li>
+              <li>Captura assíncrona</li>
+            </ul>
           </div>
-          <span class="stack-role">Vídeo</span>
+          <span class="stack-role">Aquisição</span>
         </article>
         <article class="stack-item">
           <span class="stack-index">03</span>
-          <div>
+          <div class="stack-copy">
             <h3>MediaPipe Hands</h3>
-            <p>Localiza 21 landmarks e fornece a geometria da mão em tempo real.</p>
+            <p>Infere 21 landmarks tridimensionais, lateralidade e confiança para uma mão em fluxo contínuo.</p>
+            <ul class="stack-specs">
+              <li>Coordenadas XYZ</li>
+              <li>Tracking contínuo</li>
+              <li>Modelo configurável</li>
+            </ul>
           </div>
-          <span class="stack-role">Rastreamento</span>
+          <span class="stack-role">Inferência</span>
         </article>
         <article class="stack-item">
           <span class="stack-index">04</span>
-          <div>
+          <div class="stack-copy">
             <h3>Máquina de gestos + One Euro Filter</h3>
-            <p>Reconhece intenções e suaviza o movimento sem perder responsividade.</p>
+            <p>Combina distâncias normalizadas, postura dos dedos, debounce e cooldowns com filtragem adaptativa.</p>
+            <ul class="stack-specs">
+              <li>Threshold adaptativo</li>
+              <li>Máquina de estados</li>
+              <li>Filtro por eixo</li>
+            </ul>
           </div>
           <span class="stack-role">Interpretação</span>
         </article>
         <article class="stack-item">
           <span class="stack-index">05</span>
-          <div>
+          <div class="stack-copy">
             <h3>PyAutoGUI</h3>
-            <p>Entrega movimentos, cliques, rolagem e teclas ao sistema operacional.</p>
+            <p>Traduz eventos validados em movimento, clique, duplo clique, menu de contexto e arrasto.</p>
+            <ul class="stack-specs">
+              <li>Eventos nativos</li>
+              <li>Âncora de clique</li>
+              <li>Arrasto de precisão</li>
+            </ul>
           </div>
-          <span class="stack-role">Controle</span>
+          <span class="stack-role">Saída</span>
         </article>
         <article class="stack-item">
           <span class="stack-index">06</span>
-          <div>
+          <div class="stack-copy">
             <h3>PySide6 + ModernGL</h3>
-            <p>Renderizam o overlay 3D opcional sem bloquear a interação com o desktop.</p>
+            <p>Compõem o overlay transparente e click-through, com janela Qt e renderização acelerada por GPU.</p>
+            <ul class="stack-specs">
+              <li>Contexto OpenGL</li>
+              <li>Shaders GLSL</li>
+              <li>Fallback seguro</li>
+            </ul>
           </div>
-          <span class="stack-role">Visual opcional</span>
+          <span class="stack-role">Renderização</span>
         </article>
       </div>
-    </section>
-
-    <section class="section how" id="how">
-      <div class="section-heading">
-        <div>
-          <div class="section-label">Como funciona</div>
-          <h2>Da câmera ao comando em três etapas.</h2>
-        </div>
-      </div>
-
-      <ol class="process">
-        <li>
-          <span>1</span>
-          <h3>Capturar</h3>
-          <p>A webcam fornece frames contínuos, processados localmente pelo OpenCV.</p>
-        </li>
-        <li>
-          <span>2</span>
-          <h3>Interpretar</h3>
-          <p>Os landmarks formam gestos estáveis, filtrados por confiança e contexto.</p>
-        </li>
-        <li>
-          <span>3</span>
-          <h3>Executar</h3>
-          <p>A intenção confirmada vira movimento, clique ou comando de teclado.</p>
-        </li>
-      </ol>
     </section>
 
     <section class="section gestures" id="gestures">
       <div class="section-heading">
         <div>
           <div class="section-label">Gestos</div>
-          <h2>Movimentos fáceis de aprender e distinguir.</h2>
+          <h2>Cinco gestos. Comandos diretos.</h2>
         </div>
         <p>
-          Cada gesto foi escolhido para reduzir ativações acidentais e manter o uso
-          confortável ao longo de uma sessão.
+          O vocabulário visual foi desenhado para ser fácil de memorizar e difícil
+          de acionar por acidente.
         </p>
       </div>
 
       <div class="gesture-gallery">
-        <article class="gesture-card gesture-card-wide">
+        <article class="gesture-card">
           <img
             src="assets/img/gesture_move_real.png"
             alt="Mão aberta usada para mover o cursor"
@@ -268,9 +280,9 @@
             height="360"
           >
           <div>
-            <span>01</span>
-            <h3>Mover</h3>
-            <p>Mão aberta acompanha o cursor com suavização adaptativa.</p>
+            <code>MOVE</code>
+            <h3>Mão aberta · mover</h3>
+            <p>Quatro dedos levantados controlam o cursor. O filtro adaptativo reduz tremores sem deixar o movimento lento.</p>
           </div>
         </article>
         <article class="gesture-card">
@@ -282,9 +294,9 @@
             height="360"
           >
           <div>
-            <span>02</span>
-            <h3>Clicar</h3>
-            <p>Pinça rápida entre polegar e indicador.</p>
+            <code>CLICK / DRAG</code>
+            <h3>Pinça · clicar ou arrastar</h3>
+            <p>Encoste indicador e polegar para clicar. Sustente a pinça para iniciar o arrasto e solte para concluir.</p>
           </div>
         </article>
         <article class="gesture-card">
@@ -296,9 +308,9 @@
             height="360"
           >
           <div>
-            <span>03</span>
-            <h3>Clique direito</h3>
-            <p>Polegar e médio acionam o menu de contexto.</p>
+            <code>RIGHT_CLICK</code>
+            <h3>Pinça com o médio · menu</h3>
+            <p>Encoste o dedo médio no polegar, mantendo o indicador afastado, para abrir o menu de contexto.</p>
           </div>
         </article>
         <article class="gesture-card">
@@ -310,9 +322,9 @@
             height="360"
           >
           <div>
-            <span>04</span>
-            <h3>Duplo clique</h3>
-            <p>O sinal de paz confirma uma abertura precisa.</p>
+            <code>DOUBLE_CLICK</code>
+            <h3>Sinal de paz · abrir</h3>
+            <p>Mostre indicador e médio para disparar dois cliques com intervalo controlado pelo sistema.</p>
           </div>
         </article>
         <article class="gesture-card">
@@ -324,9 +336,9 @@
             height="360"
           >
           <div>
-            <span>05</span>
-            <h3>Pausar</h3>
-            <p>Punho fechado congela o cursor imediatamente.</p>
+            <code>PAUSE</code>
+            <h3>Punho fechado · pausar</h3>
+            <p>Congele o cursor enquanto reposiciona a mão. Retirar a mão do quadro também interrompe o controle.</p>
           </div>
         </article>
       </div>
@@ -338,10 +350,6 @@
           <div class="section-label section-label-inverse">Demonstração</div>
           <h2>Painel de rastreamento em tempo real.</h2>
         </div>
-        <p>
-          Esta área receberá a demonstração completa do produto: captura da webcam,
-          reconhecimento dos gestos, resposta do cursor e ativação do overlay.
-        </p>
       </div>
 
       <!--
@@ -358,13 +366,6 @@
           <small>Em preparação</small>
         </div>
       </div>
-
-      <ul class="demo-checkpoints">
-        <li><span>01</span> Detecção dos 21 landmarks</li>
-        <li><span>02</span> Reconhecimento de cada gesto</li>
-        <li><span>03</span> Controle real do sistema</li>
-        <li><span>04</span> Overlay holográfico opcional</li>
-      </ul>
     </section>
 
     <section class="section install" id="install">
@@ -428,7 +429,7 @@ python main.py</code></pre>
     </section>
 
     <section class="section final-cta">
-      <div>
+      <div class="final-copy">
         <div class="section-label">Código aberto</div>
         <h2>Experimente, adapte e contribua.</h2>
         <p>
@@ -436,16 +437,38 @@ python main.py</code></pre>
           ajudam a tornar a interação gestual mais precisa e acessível.
         </p>
       </div>
-      <div class="final-actions">
+      <div class="repository-card">
         <a
-          class="button button-primary"
+          class="repository-qr"
           href="https://github.com/ognistie/ai-virtual-mouse-controller"
           target="_blank"
           rel="noopener"
+          aria-label="Abrir o repositório do AI Virtual Mouse Controller no GitHub"
         >
-          Acessar GitHub <span aria-hidden="true">↗</span>
+          <img
+            src="assets/img/github-repository-qr.png"
+            alt="QR Code para acessar o repositório no GitHub"
+            width="180"
+            height="180"
+            loading="lazy"
+          >
         </a>
-        <a class="button button-secondary" href="usage.html">Abrir guia de uso</a>
+        <div>
+          <span class="repository-kicker">github.com/ognistie</span>
+          <strong>Abra o projeto no celular</strong>
+          <p>Escaneie o QR Code ou acesse diretamente pelo navegador.</p>
+          <div class="final-actions">
+            <a
+              class="button button-primary"
+              href="https://github.com/ognistie/ai-virtual-mouse-controller"
+              target="_blank"
+              rel="noopener"
+            >
+              Acessar GitHub <span aria-hidden="true">↗</span>
+            </a>
+            <a class="button button-secondary" href="usage.html">Guia de uso</a>
+          </div>
+        </div>
       </div>
     </section>
   </main>
@@ -472,6 +495,7 @@ python main.py</code></pre>
     </div>
   </footer>
 
+  <script src="assets/js/hand-viz.js" defer></script>
   <script src="assets/js/main.js" defer></script>
 </body>
 </html>

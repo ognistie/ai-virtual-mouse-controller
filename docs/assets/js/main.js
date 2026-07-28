@@ -5,6 +5,18 @@
   const themeToggle = document.querySelector(".theme-toggle");
   const menuToggle = document.querySelector(".menu-toggle");
   const nav = document.querySelector(".nav-links");
+  const heroHandCanvas = document.getElementById("heroHandCanvas");
+
+  if (heroHandCanvas && window.HandRenderer) {
+    new window.HandRenderer(heroHandCanvas, {
+      accent: "#55dce4",
+      accentSoft: "rgba(85, 220, 228, 0.16)",
+      ink: "#d8f1f2",
+      lineWidth: 1.35,
+      sway: 4,
+      breathScale: 0.018
+    });
+  }
 
   function readStoredTheme() {
     try {
