@@ -6,9 +6,51 @@
   const menuToggle = document.querySelector(".menu-toggle");
   const nav = document.querySelector(".nav-links");
   const heroHandCanvas = document.getElementById("heroHandCanvas");
+  const trackingPanel = document.querySelector(".tracking-panel");
+  const gestureButtons = Array.from(document.querySelectorAll("[data-gesture-pose]"));
+  const heroGestureName = document.getElementById("heroGestureName");
+  const heroGestureCue = document.getElementById("heroGestureCue");
+  const heroActionName = document.getElementById("heroActionName");
+  const heroActionDetail = document.getElementById("heroActionDetail");
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const gestureStates = {
+    open_hand: {
+      gesture: "OPEN_HAND",
+      cue: "mão aberta",
+      action: "MOVE",
+      detail: "move o cursor com suavização adaptativa"
+    },
+    pinch: {
+      gesture: "PINCH",
+      cue: "polegar + indicador",
+      action: "CLICK / DRAG",
+      detail: "clica rapidamente ou arrasta ao sustentar"
+    },
+    pinch_middle: {
+      gesture: "PINCH_MIDDLE",
+      cue: "polegar + dedo médio",
+      action: "RIGHT_CLICK",
+      detail: "abre o menu de contexto do sistema"
+    },
+    peace: {
+      gesture: "PEACE",
+      cue: "indicador + médio",
+      action: "DOUBLE_CLICK",
+      detail: "reproduz dois cliques com intervalo controlado"
+    },
+    fist: {
+      gesture: "FIST",
+      cue: "punho fechado",
+      action: "PAUSE",
+      detail: "congela o cursor durante o reposicionamento"
+    }
+  };
+  let heroHandRenderer = null;
+  let gestureCycle = null;
+  let activeGestureIndex = 0;
 
   if (heroHandCanvas && window.HandRenderer) {
-    new window.HandRenderer(heroHandCanvas, {
+    heroHandRenderer = new window.HandRenderer(heroHandCanvas, {
       accent: "#55dce4",
       accentSoft: "rgba(85, 220, 228, 0.16)",
       ink: "#d8f1f2",
@@ -17,6 +59,58 @@
       breathScale: 0.018
     });
   }
+
+  function activateGesture(index) {
+    const button = gestureButtons[index];
+    const pose = button?.dataset.gesturePose;
+    const state = pose ? gestureStates[pose] : null;
+    if (!button || !pose || !state) return;
+
+    activeGestureIndex = index;
+    gestureButtons.forEach((item, itemIndex) => {
+      item.setAttribute("aria-pressed", String(itemIndex === index));
+    });
+    heroHandRenderer?.setGesture(pose);
+    if (heroGestureName) heroGestureName.textContent = state.gesture;
+    if (heroGestureCue) heroGestureCue.textContent = state.cue;
+    if (heroActionName) heroActionName.textContent = state.action;
+    if (heroActionDetail) heroActionDetail.textContent = state.detail;
+  }
+
+  function stopGestureCycle() {
+    if (gestureCycle === null) return;
+    window.clearInterval(gestureCycle);
+    gestureCycle = null;
+  }
+
+  function startGestureCycle() {
+    stopGestureCycle();
+    if (reducedMotion.matches || gestureButtons.length < 2) return;
+    gestureCycle = window.setInterval(() => {
+      activateGesture((activeGestureIndex + 1) % gestureButtons.length);
+    }, 3600);
+  }
+
+  gestureButtons.forEach((button, index) => {
+    button.addEventListener("click", () => {
+      activateGesture(index);
+      startGestureCycle();
+    });
+  });
+
+  trackingPanel?.addEventListener("pointerenter", stopGestureCycle);
+  trackingPanel?.addEventListener("pointerleave", startGestureCycle);
+  trackingPanel?.addEventListener("focusin", stopGestureCycle);
+  trackingPanel?.addEventListener("focusout", (event) => {
+    if (!trackingPanel.contains(event.relatedTarget)) startGestureCycle();
+  });
+  reducedMotion.addEventListener?.("change", startGestureCycle);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) stopGestureCycle();
+    else startGestureCycle();
+  });
+  activateGesture(0);
+  startGestureCycle();
 
   function readStoredTheme() {
     try {

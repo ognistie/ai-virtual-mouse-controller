@@ -13,6 +13,7 @@ const contentTypes = {
   ".js": "text/javascript; charset=utf-8",
   ".jpeg": "image/jpeg",
   ".jpg": "image/jpeg",
+  ".mp4": "video/mp4",
   ".png": "image/png",
   ".svg": "image/svg+xml",
   ".webp": "image/webp",
@@ -105,7 +106,46 @@ export default {
       headers.set("Cache-Control", "public, max-age=300");
     }
 
-    return new Response(request.method === "HEAD" ? null : decodedAssets.get(key), {
+    const body = decodedAssets.get(key);
+    headers.set("Content-Length", String(body.byteLength));
+
+    const range = request.headers.get("Range");
+    if (asset.type === "video/mp4") {
+      headers.set("Accept-Ranges", "bytes");
+    }
+    if (range && asset.type === "video/mp4") {
+      const match = /^bytes=(\\d*)-(\\d*)$/.exec(range);
+      if (!match || (!match[1] && !match[2])) {
+        return new Response(null, {
+          status: 416,
+          headers: { "Content-Range": \`bytes */\${body.byteLength}\` },
+        });
+      }
+
+      const suffixLength = !match[1] && match[2] ? Number(match[2]) : null;
+      const start = suffixLength === null
+        ? Number(match[1])
+        : Math.max(0, body.byteLength - suffixLength);
+      const end = suffixLength === null && match[2]
+        ? Number(match[2])
+        : body.byteLength - 1;
+      if (start > end || start >= body.byteLength || end >= body.byteLength) {
+        return new Response(null, {
+          status: 416,
+          headers: { "Content-Range": \`bytes */\${body.byteLength}\` },
+        });
+      }
+
+      const partial = body.slice(start, end + 1);
+      headers.set("Content-Range", \`bytes \${start}-\${end}/\${body.byteLength}\`);
+      headers.set("Content-Length", String(partial.byteLength));
+      return new Response(request.method === "HEAD" ? null : partial, {
+        status: 206,
+        headers,
+      });
+    }
+
+    return new Response(request.method === "HEAD" ? null : body, {
       status: 200,
       headers,
     });

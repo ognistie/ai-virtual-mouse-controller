@@ -89,25 +89,37 @@
 
       <div class="tracking-panel" aria-label="Painel ilustrativo do sistema de rastreamento">
         <div class="tracking-toolbar">
-          <span>AVMC / vision engine</span>
+          <span>AVMC / gesture control</span>
           <span class="tracking-status"><i aria-hidden="true"></i> processamento local</span>
         </div>
 
         <div class="tracking-layout">
-          <div class="tracking-column">
-            <article class="tracking-module">
-              <span>entrada</span>
-              <strong>Webcam stream</strong>
-              <small>captura assíncrona · buffer 1</small>
-            </article>
-            <article class="tracking-module tracking-pipeline">
-              <span>pipeline</span>
-              <ol>
-                <li><i></i> Frame RGB</li>
-                <li><i></i> Hand landmarks</li>
-                <li><i></i> Gesture state</li>
-              </ol>
-            </article>
+          <div class="tracking-gesture-list" aria-label="Gestos disponíveis">
+            <button type="button" data-gesture-pose="open_hand" aria-pressed="true">
+              <span>01</span>
+              <strong>Mover</strong>
+              <small>Mão aberta</small>
+            </button>
+            <button type="button" data-gesture-pose="pinch" aria-pressed="false">
+              <span>02</span>
+              <strong>Clicar</strong>
+              <small>Pinça</small>
+            </button>
+            <button type="button" data-gesture-pose="pinch_middle" aria-pressed="false">
+              <span>03</span>
+              <strong>Menu</strong>
+              <small>Pinça média</small>
+            </button>
+            <button type="button" data-gesture-pose="peace" aria-pressed="false">
+              <span>04</span>
+              <strong>Abrir</strong>
+              <small>Sinal de paz</small>
+            </button>
+            <button type="button" data-gesture-pose="fist" aria-pressed="false">
+              <span>05</span>
+              <strong>Pausar</strong>
+              <small>Punho</small>
+            </button>
           </div>
 
           <div class="tracking-hand" aria-hidden="true">
@@ -117,25 +129,28 @@
             <small>21 pontos · coordenadas XYZ</small>
           </div>
 
-          <div class="tracking-column">
+          <div class="tracking-output">
             <article class="tracking-module tracking-primary">
               <span>gesto reconhecido</span>
-              <strong>OPEN_HAND</strong>
-              <small>confiança validada</small>
+              <strong id="heroGestureName">OPEN_HAND</strong>
+              <small id="heroGestureCue">mão aberta</small>
             </article>
+            <span class="tracking-flow" aria-hidden="true">↓</span>
             <article class="tracking-module">
               <span>ação do sistema</span>
-              <strong>MOVE</strong>
-              <small>cursor com suavização adaptativa</small>
+              <strong id="heroActionName">MOVE</strong>
+              <small id="heroActionDetail">move o cursor com suavização adaptativa</small>
             </article>
+            <div class="tracking-response" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span>
+            </div>
           </div>
         </div>
 
         <div class="tracking-footer">
-          <span>OpenCV</span>
-          <span>MediaPipe Hands</span>
-          <span>One Euro Filter</span>
-          <span>PyAutoGUI</span>
+          <span>capturar</span>
+          <span>interpretar</span>
+          <span>reproduzir ação</span>
         </div>
       </div>
     </section>
@@ -168,92 +183,43 @@
       <div class="section-heading">
         <div>
           <div class="section-label">Tecnologia</div>
-          <h2>Um pipeline técnico, local e modular.</h2>
+          <h2>A tecnologia certa em cada etapa.</h2>
         </div>
         <p>
-          Cada camada possui uma responsabilidade definida: adquirir o frame, extrair
-          geometria, interpretar intenção e entregar o comando ao sistema operacional.
+          Seis componentes formam um pipeline local, rápido e fácil de evoluir.
         </p>
       </div>
 
       <div class="stack-list">
         <article class="stack-item">
-          <span class="stack-index">01</span>
-          <div class="stack-copy">
-            <h3>Python</h3>
-            <p>Runtime principal e ponto de integração entre câmera, inferência, máquina de estados e controladores.</p>
-            <ul class="stack-specs">
-              <li>Python 3.11–3.13</li>
-              <li>CLI <code>avmc</code></li>
-              <li>Serviços desacoplados</li>
-            </ul>
-          </div>
-          <span class="stack-role">Runtime</span>
+          <h3>Python</h3>
+          <span class="stack-role">Aplicação</span>
+          <p>Organiza o ciclo de execução e conecta todos os módulos do projeto.</p>
         </article>
         <article class="stack-item">
-          <span class="stack-index">02</span>
-          <div class="stack-copy">
-            <h3>OpenCV</h3>
-            <p>Opera a captura em thread dedicada, mantém apenas o frame mais recente e prepara a entrada RGB.</p>
-            <ul class="stack-specs">
-              <li><code>VideoCapture</code></li>
-              <li>Buffer mínimo</li>
-              <li>Captura assíncrona</li>
-            </ul>
-          </div>
-          <span class="stack-role">Aquisição</span>
+          <h3>OpenCV</h3>
+          <span class="stack-role">Captura</span>
+          <p>Lê a webcam continuamente e prepara cada frame para análise.</p>
         </article>
         <article class="stack-item">
-          <span class="stack-index">03</span>
-          <div class="stack-copy">
-            <h3>MediaPipe Hands</h3>
-            <p>Infere 21 landmarks tridimensionais, lateralidade e confiança para uma mão em fluxo contínuo.</p>
-            <ul class="stack-specs">
-              <li>Coordenadas XYZ</li>
-              <li>Tracking contínuo</li>
-              <li>Modelo configurável</li>
-            </ul>
-          </div>
-          <span class="stack-role">Inferência</span>
+          <h3>MediaPipe Hands</h3>
+          <span class="stack-role">Rastreamento</span>
+          <p>Identifica 21 pontos da mão e entrega sua posição em tempo real.</p>
         </article>
         <article class="stack-item">
-          <span class="stack-index">04</span>
-          <div class="stack-copy">
-            <h3>Máquina de gestos + One Euro Filter</h3>
-            <p>Combina distâncias normalizadas, postura dos dedos, debounce e cooldowns com filtragem adaptativa.</p>
-            <ul class="stack-specs">
-              <li>Threshold adaptativo</li>
-              <li>Máquina de estados</li>
-              <li>Filtro por eixo</li>
-            </ul>
-          </div>
+          <h3>Motor de gestos + One Euro Filter</h3>
           <span class="stack-role">Interpretação</span>
+          <p>Reconhece a intenção e estabiliza o movimento sem adicionar atraso perceptível.</p>
         </article>
         <article class="stack-item">
-          <span class="stack-index">05</span>
-          <div class="stack-copy">
-            <h3>PyAutoGUI</h3>
-            <p>Traduz eventos validados em movimento, clique, duplo clique, menu de contexto e arrasto.</p>
-            <ul class="stack-specs">
-              <li>Eventos nativos</li>
-              <li>Âncora de clique</li>
-              <li>Arrasto de precisão</li>
-            </ul>
-          </div>
-          <span class="stack-role">Saída</span>
+          <h3>PyAutoGUI</h3>
+          <span class="stack-role">Controle</span>
+          <p>Reproduz movimento, cliques e arrasto no sistema operacional.</p>
         </article>
         <article class="stack-item">
-          <span class="stack-index">06</span>
-          <div class="stack-copy">
-            <h3>PySide6 + ModernGL</h3>
-            <p>Compõem o overlay transparente e click-through, com janela Qt e renderização acelerada por GPU.</p>
-            <ul class="stack-specs">
-              <li>Contexto OpenGL</li>
-              <li>Shaders GLSL</li>
-              <li>Fallback seguro</li>
-            </ul>
-          </div>
-          <span class="stack-role">Renderização</span>
+          <h3>PySide6 + ModernGL</h3>
+          <span class="stack-role">Overlay</span>
+          <p>Exibe a mão holográfica opcional sobre o desktop.</p>
         </article>
       </div>
     </section>
@@ -369,50 +335,66 @@
     </section>
 
     <section class="section install" id="install">
-      <div class="install-grid">
-        <div class="install-copy">
+      <div class="install-heading">
+        <div>
           <div class="section-label">Instalação</div>
-          <h2>Comece com dois comandos.</h2>
-          <p>
-            Requer Python 3.11, 3.12 ou 3.13 e uma webcam. A instalação principal não
-            exige GPU.
-          </p>
-          <ul class="requirement-list">
-            <li>Windows, macOS ou Linux X11</li>
-            <li>Processamento executado localmente</li>
-            <li>Overlay 3D incluído e ativado sob demanda</li>
-          </ul>
+          <h2>Instale e execute em poucos minutos.</h2>
         </div>
+        <p>Compatível com Python 3.11 a 3.13. Assista ao passo a passo ou copie os comandos para o seu sistema.</p>
+      </div>
 
-        <div class="terminal">
-          <div class="terminal-tabs">
-            <div class="terminal-tablist" role="tablist" aria-label="Métodos de instalação">
-              <button
-                id="tab-pypi"
-                type="button"
-                role="tab"
-                aria-selected="true"
-                aria-controls="install-pypi"
-                data-tab="pypi"
-              >PyPI</button>
-              <button
-                id="tab-source"
-                type="button"
-                role="tab"
-                aria-selected="false"
-                aria-controls="install-source"
-                data-tab="source"
-              >Código-fonte</button>
-            </div>
-            <button class="copy-button" type="button" data-copy-target="install-pypi">Copiar</button>
+      <video
+        class="installation-video"
+        controls
+        preload="metadata"
+        poster="assets/img/instalacao-avmc-poster.jpg"
+        aria-label="Vídeo demonstrando a instalação do AI Virtual Mouse Controller"
+      >
+        <source src="assets/video/instalacao-avmc.mp4" type="video/mp4">
+        Seu navegador não oferece suporte à reprodução deste vídeo.
+      </video>
+
+      <div class="terminal installation-terminal">
+        <div class="terminal-tabs">
+          <div class="terminal-lights" aria-hidden="true"><i></i><i></i><i></i></div>
+          <div class="terminal-tablist" role="tablist" aria-label="Métodos de instalação">
+            <button
+              id="tab-pypi"
+              type="button"
+              role="tab"
+              aria-selected="true"
+              aria-controls="install-pypi"
+              data-tab="pypi"
+            >PyPI</button>
+            <button
+              id="tab-windows"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="install-windows"
+              data-tab="windows"
+            >Windows</button>
+            <button
+              id="tab-unix"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="install-unix"
+              data-tab="unix"
+            >macOS / Linux</button>
           </div>
-          <pre id="install-pypi" role="tabpanel" aria-labelledby="tab-pypi" data-tab-panel="pypi"><code>pip install ai-virtual-mouse-controller
-avmc</code></pre>
-          <pre id="install-source" role="tabpanel" aria-labelledby="tab-source" data-tab-panel="source" hidden><code>git clone https://github.com/ognistie/ai-virtual-mouse-controller.git
-cd ai-virtual-mouse-controller
-pip install -r requirements.txt
-python main.py</code></pre>
+          <button class="copy-button" type="button" data-copy-target="install-pypi">Copiar</button>
         </div>
+        <pre id="install-pypi" role="tabpanel" aria-labelledby="tab-pypi" data-tab-panel="pypi"><code>pip install ai-virtual-mouse-controller
+avmc</code></pre>
+        <pre id="install-windows" role="tabpanel" aria-labelledby="tab-windows" data-tab-panel="windows" hidden><code>git clone https://github.com/ognistie/ai-virtual-mouse-controller.git
+cd ai-virtual-mouse-controller
+py -m pip install -r requirements.txt
+py main.py</code></pre>
+        <pre id="install-unix" role="tabpanel" aria-labelledby="tab-unix" data-tab-panel="unix" hidden><code>git clone https://github.com/ognistie/ai-virtual-mouse-controller.git
+cd ai-virtual-mouse-controller
+python3 -m pip install -r requirements.txt
+python3 main.py</code></pre>
       </div>
 
       <div class="install-links">
