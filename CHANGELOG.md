@@ -7,6 +7,23 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.1.1] — 2026-07-28
+
+### Added
+- Painel nativo de ajustes em PySide6, acessível pela tecla `S` ou pelo
+  handle lateral, com perfis, sliders e sincronização em tempo real.
+- Testes dedicados ao painel Qt e ao alcance inferior do cursor.
+
+### Fixed
+- Melhor acesso à barra de tarefas com boost progressivo no eixo Y,
+  snap de borda e deslocamento assistido na região inferior.
+- Âncora da mão com tratamento assimétrico na borda inferior, reduzindo
+  perda de alcance quando landmarks próximos ao pulso saem do frame.
+
+### Changed
+- Site do projeto reformulado com apresentação mais limpa, demonstração
+  e instruções de instalação atualizadas.
+
 ## [1.1.0] — 2026-06-17
 
 ### Added
