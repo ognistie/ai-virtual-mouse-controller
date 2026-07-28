@@ -163,46 +163,20 @@ ol {
 }
 
 .brand-symbol {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(3, 5px);
-  grid-template-rows: repeat(3, 5px);
-  place-items: center;
+  display: block;
+  overflow: hidden;
   width: 32px;
   height: 32px;
   border: 1px solid var(--line-strong);
   border-radius: 9px;
-  background: var(--surface);
+  background: #171717;
 }
 
-.brand-symbol i {
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: var(--text-faint);
-}
-
-.brand-symbol i:nth-child(1) {
-  grid-area: 1 / 1;
-}
-
-.brand-symbol i:nth-child(2) {
-  grid-area: 1 / 3;
-}
-
-.brand-symbol i:nth-child(3) {
-  grid-area: 2 / 2;
-  width: 5px;
-  height: 5px;
-  background: var(--accent);
-}
-
-.brand-symbol i:nth-child(4) {
-  grid-area: 3 / 1;
-}
-
-.brand-symbol i:nth-child(5) {
-  grid-area: 3 / 3;
+.brand-symbol img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .brand-copy {
@@ -965,7 +939,13 @@ ol {
   margin-bottom: 44px;
 }
 
-.install-heading > p {
+.install-summary {
+  display: grid;
+  align-content: end;
+  gap: 20px;
+}
+
+.install-summary > p {
   max-width: 390px;
   color: var(--text-soft);
   font-size: 0.94rem;
@@ -1077,9 +1057,6 @@ ol {
   display: flex;
   flex-wrap: wrap;
   gap: 28px;
-  margin-top: 46px;
-  padding-top: 26px;
-  border-top: 1px solid var(--line);
 }
 
 .final-cta {
@@ -1136,15 +1113,8 @@ ol {
   white-space: nowrap;
 }
 
-.repository-card strong {
-  display: block;
-  font-size: 1.1rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
-}
-
 .repository-card p {
-  margin-top: 7px;
+  margin-top: 0;
   color: var(--text-soft);
   font-size: 0.8rem;
 }

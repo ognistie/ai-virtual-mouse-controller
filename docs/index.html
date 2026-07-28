@@ -22,7 +22,7 @@
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
     rel="stylesheet"
   >
-  <link rel="stylesheet" href="assets/css/style.css?v=20260728-video-size">
+  <link rel="stylesheet" href="assets/css/style.css?v=20260728-content-fix">
   <script>document.documentElement.classList.add("js");</script>
 </head>
 
@@ -33,7 +33,7 @@
     <div class="nav-shell">
       <a class="brand" href="#top" aria-label="AI Virtual Mouse Controller — início">
         <span class="brand-symbol" aria-hidden="true">
-          <i></i><i></i><i></i><i></i><i></i>
+          <img src="assets/img/mouse-cursor-brand.jpg" alt="" width="128" height="128">
         </span>
         <span class="brand-copy">
           <strong>AI Virtual Mouse</strong>
@@ -267,7 +267,7 @@
         </article>
         <article class="gesture-card">
           <img
-            src="assets/img/gesture_right_click_real.png"
+            src="assets/img/gesture_left_click_real.png"
             alt="Gesto de clique direito com polegar e dedo médio"
             loading="lazy"
             width="640"
@@ -340,7 +340,20 @@
           <div class="section-label">Instalação</div>
           <h2>Instale e execute em poucos minutos.</h2>
         </div>
-        <p>Compatível com Python 3.11 a 3.13. Assista ao passo a passo ou copie os comandos para o seu sistema.</p>
+        <div class="install-summary">
+          <p>Compatível com Python 3.11 a 3.13. Assista ao passo a passo ou copie os comandos para o seu sistema.</p>
+          <div class="install-links">
+            <a class="text-link" href="usage.html">Instalação passo a passo <span aria-hidden="true">→</span></a>
+            <a
+              class="text-link"
+              href="https://github.com/ognistie/ai-virtual-mouse-controller"
+              target="_blank"
+              rel="noopener"
+            >
+              Ver repositório <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+        </div>
       </div>
 
       <video
@@ -397,17 +410,6 @@ python3 -m pip install -r requirements.txt
 python3 main.py</code></pre>
       </div>
 
-      <div class="install-links">
-        <a class="text-link" href="usage.html">Instalação passo a passo <span aria-hidden="true">→</span></a>
-        <a
-          class="text-link"
-          href="https://github.com/ognistie/ai-virtual-mouse-controller"
-          target="_blank"
-          rel="noopener"
-        >
-          Ver repositório <span aria-hidden="true">↗</span>
-        </a>
-      </div>
     </section>
 
     <section class="section final-cta">
@@ -437,7 +439,6 @@ python3 main.py</code></pre>
         </a>
         <div>
           <span class="repository-kicker">github.com/ognistie</span>
-          <strong>Abra o projeto no celular</strong>
           <p>Escaneie o QR Code ou acesse diretamente pelo navegador.</p>
           <div class="final-actions">
             <a
@@ -459,7 +460,7 @@ python3 main.py</code></pre>
     <div class="footer-grid">
       <a class="brand" href="#top" aria-label="Voltar ao início">
         <span class="brand-symbol" aria-hidden="true">
-          <i></i><i></i><i></i><i></i><i></i>
+          <img src="assets/img/mouse-cursor-brand.jpg" alt="" width="128" height="128">
         </span>
         <span class="brand-copy">
           <strong>AI Virtual Mouse</strong>
