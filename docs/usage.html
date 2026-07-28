@@ -1,481 +1,60 @@
-<!DOCTYPE html>
-<html lang="pt-BR" data-theme="dark">
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <title>Guia detalhado — AI Virtual Mouse Controller</title>
-  <meta name="description" content="Guia passo a passo para instalar e rodar o AI Virtual Mouse Controller, explicado para quem nunca abriu um terminal." />
+  <title>Guia de uso — AI Virtual Mouse Controller</title>
+  <meta
+    name="description"
+    content="Instale, configure e use o AI Virtual Mouse Controller no Windows, macOS ou Linux."
+  >
+  <meta name="theme-color" content="#f6f7f5">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
-
-  <link rel="stylesheet" href="assets/css/style.css" />
-
-  <style>
-    /* ============ DOCS-SPECIFIC ============ */
-    .docs-hero {
-      max-width: 920px;
-      margin: 0 auto;
-      padding: 5rem 32px 3rem;
-      position: relative;
-      z-index: 1;
-    }
-    .docs-hero .hero-eyebrow { margin-bottom: 1.4rem; }
-    .docs-title {
-      font-size: clamp(2.2rem, 5vw, 3.6rem);
-      font-weight: 700;
-      letter-spacing: -0.035em;
-      line-height: 1.05;
-      margin-bottom: 1.4rem;
-      color: var(--ink);
-    }
-    .docs-title em {
-      font-family: var(--serif);
-      font-style: italic;
-      font-weight: 400;
-      color: var(--ink);
-    }
-    .docs-intro {
-      font-size: 1.1rem;
-      color: var(--ink-2);
-      line-height: 1.7;
-      max-width: 720px;
-    }
-    .docs-intro a { color: var(--cyan); }
-    .docs-intro a:hover { color: var(--cyan-light); }
-
-    .toc {
-      max-width: 920px;
-      margin: 0 auto 5rem;
-      padding: 0 32px;
-      position: relative;
-      z-index: 1;
-    }
-    .toc-card {
-      background: var(--bg-elev-1);
-      border: 1px solid var(--line-2);
-      border-radius: var(--rad);
-      padding: 28px 32px;
-    }
-    .toc-title {
-      font-family: var(--mono);
-      font-size: 0.74rem;
-      text-transform: uppercase;
-      letter-spacing: 0.14em;
-      color: var(--mute);
-      margin-bottom: 1.2rem;
-    }
-    .toc-list {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px 32px;
-    }
-    .toc-list li {
-      display: flex;
-      align-items: baseline;
-      gap: 12px;
-      font-size: 0.95rem;
-    }
-    .toc-num {
-      font-family: var(--mono);
-      font-size: 0.74rem;
-      color: var(--mute);
-      min-width: 22px;
-      flex-shrink: 0;
-    }
-    .toc-list a {
-      color: var(--ink-2);
-      transition: color 0.15s var(--ease);
-      border-bottom: 1px solid transparent;
-    }
-    .toc-list a:hover {
-      color: var(--ink);
-      border-bottom-color: var(--ink-3);
-    }
-
-    .docs-section {
-      max-width: 920px;
-      margin: 0 auto 5rem;
-      padding: 0 32px;
-      position: relative;
-      z-index: 1;
-    }
-    .docs-section-tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 1.2rem;
-      font-family: var(--mono);
-      font-size: 0.72rem;
-      color: var(--mute);
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-    }
-    .docs-section-tag .num {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 28px;
-      height: 28px;
-      border-radius: var(--rad-sm);
-      background: var(--bg-elev-2);
-      border: 1px solid var(--line-2);
-      color: var(--ink);
-      font-weight: 600;
-    }
-    .docs-section h2 {
-      font-size: clamp(1.7rem, 3.4vw, 2.4rem);
-      font-weight: 700;
-      letter-spacing: -0.025em;
-      line-height: 1.15;
-      margin-bottom: 1rem;
-      color: var(--ink);
-    }
-    .docs-section h2 em {
-      font-family: var(--serif);
-      font-style: italic;
-      font-weight: 400;
-    }
-    .docs-section h2 br { display: block; }
-    .docs-lede {
-      font-size: 1.05rem;
-      color: var(--ink-2);
-      line-height: 1.65;
-      max-width: 720px;
-      margin-bottom: 2rem;
-    }
-    .docs-lede a { color: var(--cyan); }
-    .docs-lede a:hover { color: var(--cyan-light); }
-    .docs-lede strong { color: var(--ink); font-weight: 600; }
-
-    /* Step cards */
-    .steps {
-      display: grid;
-      gap: 1.2rem;
-    }
-    .steps.cols-2 { grid-template-columns: 1fr 1fr; }
-
-    .step {
-      background: var(--bg-elev-1);
-      border: 1px solid var(--line-2);
-      border-radius: var(--rad);
-      padding: 26px;
-      transition: border-color 0.2s var(--ease);
-    }
-    .step:hover { border-color: var(--line-3); }
-    .step-num {
-      display: inline-block;
-      font-family: var(--mono);
-      font-size: 0.72rem;
-      color: var(--cyan);
-      letter-spacing: 0.08em;
-      margin-bottom: 0.6rem;
-    }
-    .step h3 {
-      font-size: 1.2rem;
-      font-weight: 600;
-      letter-spacing: -0.015em;
-      margin-bottom: 0.8rem;
-      color: var(--ink);
-    }
-    .step p, .step ol, .step ul {
-      font-size: 0.96rem;
-      color: var(--ink-2);
-      line-height: 1.7;
-      margin-bottom: 0.8rem;
-    }
-    .step ol, .step ul { padding-left: 1.3rem; }
-    .step ol li, .step ul li { margin-bottom: 0.4rem; }
-    .step p:last-child, .step ol:last-child, .step ul:last-child { margin-bottom: 0; }
-    .step strong { color: var(--ink); font-weight: 600; }
-    .step em { font-style: italic; }
-    .step a { color: var(--cyan); }
-    .step a:hover { color: var(--cyan-light); }
-    .step code {
-      background: var(--bg-elev-3);
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      padding: 1px 6px;
-      font-size: 0.86em;
-      color: var(--ink);
-    }
-    .step kbd {
-      display: inline-flex;
-      align-items: center;
-      padding: 1px 7px;
-      background: var(--bg-elev-2);
-      border: 1px solid var(--line-3);
-      border-radius: 4px;
-      font-family: var(--mono);
-      font-size: 0.82em;
-      color: var(--ink);
-      font-weight: 500;
-    }
-    .step-aside {
-      margin-top: 0.8rem !important;
-      font-size: 0.82rem !important;
-      color: var(--mute) !important;
-      font-family: var(--mono);
-      line-height: 1.6;
-      padding-left: 12px;
-      border-left: 2px solid var(--line-2);
-    }
-
-    /* Code block within docs */
-    .code-block {
-      background: #06070a;
-      border: 1px solid var(--line-3);
-      border-radius: var(--rad-sm);
-      overflow: hidden;
-      margin: 0.8rem 0;
-    }
-    .code-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 8px 14px;
-      background: #0b0c10;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      font-family: var(--mono);
-      font-size: 0.72rem;
-      color: var(--ink-3);
-    }
-    .code-block pre {
-      padding: 16px 18px;
-      font-family: var(--mono);
-      font-size: 0.84rem;
-      line-height: 1.75;
-      color: #d1d5db;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      margin: 0;
-    }
-    .code-block pre code { color: inherit; background: transparent; border: 0; padding: 0; }
-
-    /* Note callout */
-    .note {
-      background: var(--bg-elev-1);
-      border: 1px solid var(--line-2);
-      border-left: 2px solid var(--amber);
-      border-radius: var(--rad-sm);
-      padding: 20px 22px;
-      margin: 1.5rem 0;
-    }
-    .note-head {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-family: var(--mono);
-      font-size: 0.72rem;
-      color: var(--amber);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      margin-bottom: 0.8rem;
-      font-weight: 600;
-    }
-    .note p {
-      font-size: 0.95rem;
-      color: var(--ink-2);
-      line-height: 1.7;
-    }
-    .note strong { color: var(--ink); }
-    .note em { color: var(--ink); font-style: italic; }
-    .note code {
-      background: var(--bg-elev-3);
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      padding: 1px 6px;
-      font-size: 0.86em;
-      color: var(--ink);
-    }
-
-    /* Requirements grid */
-    .reqs {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1rem;
-    }
-    .req {
-      background: var(--bg-elev-1);
-      border: 1px solid var(--line-2);
-      border-radius: var(--rad);
-      padding: 22px;
-    }
-    .req-num {
-      font-family: var(--mono);
-      font-size: 0.72rem;
-      color: var(--mute);
-      margin-bottom: 0.6rem;
-    }
-    .req h3 {
-      font-size: 1rem;
-      font-weight: 600;
-      letter-spacing: -0.015em;
-      margin-bottom: 0.5rem;
-      color: var(--ink);
-    }
-    .req p {
-      font-size: 0.88rem;
-      color: var(--ink-3);
-      line-height: 1.6;
-    }
-
-    /* Gesture cards */
-    .gestures-grid {
-      display: grid;
-      gap: 1.5rem;
-    }
-    .gesture {
-      display: grid;
-      grid-template-columns: 280px 1fr;
-      gap: 2rem;
-      align-items: start;
-      padding: 20px;
-      background: var(--bg-elev-1);
-      border: 1px solid var(--line-2);
-      border-radius: var(--rad);
-    }
-    .gesture-img {
-      position: relative;
-      aspect-ratio: 4 / 3;
-      background: var(--bg-elev-3);
-      border-radius: var(--rad-sm);
-      overflow: hidden;
-    }
-    .gesture-img img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      filter: grayscale(0.3) contrast(1.1);
-    }
-    .gesture-info h3 {
-      font-size: 1.25rem;
-      font-weight: 600;
-      letter-spacing: -0.02em;
-      margin-bottom: 0.6rem;
-      color: var(--ink);
-    }
-    .gesture-info p {
-      font-size: 0.95rem;
-      color: var(--ink-2);
-      line-height: 1.65;
-      margin-bottom: 0.6rem;
-    }
-    .gesture-info strong { color: var(--ink); }
-
-    /* CTA final docs */
-    .docs-cta {
-      max-width: 920px;
-      margin: 4rem auto 5rem;
-      padding: 4rem 32px;
-      text-align: center;
-      border-top: 1px solid var(--line);
-      position: relative;
-      z-index: 1;
-    }
-    .docs-cta-eyebrow {
-      font-family: var(--mono);
-      font-size: 0.74rem;
-      text-transform: uppercase;
-      letter-spacing: 0.14em;
-      color: var(--mute);
-      margin-bottom: 1.2rem;
-    }
-    .docs-cta-title {
-      font-size: clamp(2rem, 4.5vw, 3rem);
-      font-weight: 700;
-      letter-spacing: -0.03em;
-      line-height: 1.1;
-      margin-bottom: 1rem;
-      color: var(--ink);
-    }
-    .docs-cta-title em {
-      font-family: var(--serif);
-      font-style: italic;
-      font-weight: 400;
-    }
-    .docs-cta-text {
-      font-size: 1.05rem;
-      color: var(--ink-2);
-      max-width: 640px;
-      margin: 0 auto 1.2rem;
-      line-height: 1.65;
-    }
-    .docs-cta-text a { color: var(--cyan); }
-    .docs-cta-text a:hover { color: var(--cyan-light); }
-    .docs-cta-actions {
-      display: inline-flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      justify-content: center;
-      margin-top: 1rem;
-    }
-
-    @media (max-width: 760px) {
-      .toc-list { grid-template-columns: 1fr; }
-      .steps.cols-2 { grid-template-columns: 1fr; }
-      .reqs { grid-template-columns: repeat(2, 1fr); }
-      .gesture { grid-template-columns: 1fr; }
-    }
-    @media (max-width: 480px) {
-      .docs-hero, .toc, .docs-section, .docs-cta { padding-left: 18px; padding-right: 18px; }
-      .reqs { grid-template-columns: 1fr; }
-    }
-  </style>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  >
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script>document.documentElement.classList.add("js");</script>
 </head>
 
 <body>
-  <div class="bg-grid" aria-hidden="true"></div>
+  <a class="skip-link" href="#guide-content">Ir para o guia</a>
 
-  <header class="nav">
-    <div class="nav-inner">
-      <a class="nav-brand" href="index.html" aria-label="AI Virtual Mouse Controller">
-        <span class="brand-mark" aria-hidden="true">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <circle cx="10" cy="10" r="2" fill="currentColor"/>
-            <circle cx="4" cy="4" r="1" fill="currentColor" opacity="0.6"/>
-            <circle cx="16" cy="4" r="1" fill="currentColor" opacity="0.6"/>
-            <circle cx="4" cy="16" r="1" fill="currentColor" opacity="0.6"/>
-            <circle cx="16" cy="16" r="1" fill="currentColor" opacity="0.6"/>
-            <line x1="10" y1="10" x2="4" y2="4" stroke="currentColor" stroke-width="0.5" opacity="0.4"/>
-            <line x1="10" y1="10" x2="16" y2="4" stroke="currentColor" stroke-width="0.5" opacity="0.4"/>
-            <line x1="10" y1="10" x2="4" y2="16" stroke="currentColor" stroke-width="0.5" opacity="0.4"/>
-            <line x1="10" y1="10" x2="16" y2="16" stroke="currentColor" stroke-width="0.5" opacity="0.4"/>
-          </svg>
+  <header class="site-header">
+    <div class="nav-shell">
+      <a class="brand" href="index.html" aria-label="AI Virtual Mouse Controller — início">
+        <span class="brand-symbol" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i>
         </span>
-        <span class="brand-text">
-          <span class="brand-name">AI Virtual Mouse</span>
-          <span class="brand-sub">Controller</span>
+        <span class="brand-copy">
+          <strong>AI Virtual Mouse</strong>
+          <small>Controller</small>
         </span>
       </a>
 
-      <nav class="nav-links" aria-label="Primária">
-        <a href="index.html#system">Sistema</a>
-        <a href="index.html#concept">Conceito</a>
-        <a href="index.html#features">Recursos</a>
-        <a href="index.html#holographic">Holograma</a>
-        <a href="index.html#install">Instalar</a>
-        <a href="usage.html" class="active" aria-current="page">Guia de Uso</a>
+      <nav class="nav-links" aria-label="Navegação principal">
+        <a href="index.html#overview">O projeto</a>
+        <a href="#quickstart">Início rápido</a>
+        <a href="#install-windows">Windows</a>
+        <a href="#gestures-guide">Gestos</a>
+        <a href="#configuration">Configuração</a>
       </nav>
 
       <div class="nav-actions">
-        <button class="theme-toggle" type="button" aria-label="Alternar tema">
-          <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.5"/>
-            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-          <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-          </svg>
+        <button class="theme-toggle" type="button" aria-label="Ativar tema escuro">
+          <span class="theme-icon" aria-hidden="true">◐</span>
         </button>
-        <a class="btn btn-ghost btn-sm" href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">
-          <span>GitHub</span>
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-            <path d="M3 9l6-6M9 3v4M9 3H5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-          </svg>
+        <a
+          class="button button-quiet nav-github"
+          href="https://github.com/ognistie/ai-virtual-mouse-controller"
+          target="_blank"
+          rel="noopener"
+        >
+          GitHub <span aria-hidden="true">↗</span>
         </a>
         <button class="menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false">
           <span></span><span></span>
@@ -484,723 +63,458 @@
     </div>
   </header>
 
-  <main>
-
-    <!-- HERO -->
+  <main id="guide-content">
     <section class="docs-hero">
-      <div class="hero-eyebrow">
-        <span class="status-dot"></span>
-        <span class="mono">guia detalhado · leitura tranquila · ~15 min</span>
+      <div class="eyebrow">
+        <span class="eyebrow-dot" aria-hidden="true"></span>
+        Guia de instalação e operação
       </div>
-
-      <h1 class="docs-title">
-        Senta, pega um café,<br>
-        <em>vamos pelo começo.</em>
-      </h1>
-
-      <p class="docs-intro">
-        Esse é o guia longo. Foi escrito pensando em quem nunca abriu um terminal na vida e quer ver o projeto funcionando hoje. Sem pular etapas, sem assumir que você já sabe nada. Se você já é técnico e quer só os comandos, dá uma olhada no <a href="index.html#install">manual rápido da home</a>.
+      <h1>Do primeiro comando ao primeiro gesto.</h1>
+      <p>
+        Um guia direto para instalar o projeto, liberar as permissões necessárias
+        e começar a controlar o computador com a mão.
       </p>
-    </section>
-
-    <!-- TOC -->
-    <section class="toc">
-      <div class="toc-card">
-        <div class="toc-title">o que tem nesse guia</div>
-        <ol class="toc-list">
-          <li><span class="toc-num">01</span><a href="#o-que-e">O que é isso, na real?</a></li>
-          <li><span class="toc-num">02</span><a href="#requisitos">O que você precisa antes de começar</a></li>
-          <li><span class="toc-num">03</span><a href="#instalar-python">Instalar o Python (versão certa)</a></li>
-          <li><span class="toc-num">04</span><a href="#instalar-git">Instalar o Git (ou baixar ZIP)</a></li>
-          <li><span class="toc-num">05</span><a href="#baixar">Baixar o projeto na sua máquina</a></li>
-          <li><span class="toc-num">06</span><a href="#venv">Criar o ambiente virtual (venv)</a></li>
-          <li><span class="toc-num">07</span><a href="#deps">Instalar as dependências</a></li>
-          <li><span class="toc-num">08</span><a href="#rodar">Rodar pela primeira vez</a></li>
-          <li><span class="toc-num">09</span><a href="#gestos-detalhe">Aprender os gestos com calma</a></li>
-          <li><span class="toc-num">10</span><a href="#encerrar">Encerrar o programa direito</a></li>
-          <li><span class="toc-num">11</span><a href="#proxima-vez">Como abrir da próxima vez</a></li>
-          <li><span class="toc-num">12</span><a href="#customizar">Customizar (só se você quiser)</a></li>
-          <li><span class="toc-num">13</span><a href="#holograma-extra">Ligar o holograma da mão</a></li>
-        </ol>
+      <div class="docs-meta">
+        <span>Python 3.11, 3.12 ou 3.13</span>
+        <span>Windows · macOS · Linux X11</span>
+        <span>Tempo estimado: 10–15 min</span>
       </div>
     </section>
 
-    <!-- O QUE É -->
-    <section id="o-que-e" class="docs-section">
-      <div class="docs-section-tag">
-        <span class="num">01</span>
-        <span>o que é isso, na real</span>
-      </div>
+    <div class="docs-layout">
+      <aside class="docs-sidebar" aria-label="Índice do guia">
+        <strong>Neste guia</strong>
+        <nav>
+          <a href="#quickstart">Início rápido</a>
+          <a href="#requirements">Pré-requisitos</a>
+          <a href="#install-windows">Instalar no Windows</a>
+          <a href="#install-unix">macOS e Linux</a>
+          <a href="#first-run">Primeira execução</a>
+          <a href="#gestures-guide">Gestos</a>
+          <a href="#daily-use">Uso diário</a>
+          <a href="#configuration">Configuração</a>
+          <a href="#troubleshooting">Soluções</a>
+        </nav>
+      </aside>
 
-      <h2>Em uma frase, <em>o que esse projeto faz.</em></h2>
-      <p class="docs-lede">
-        Liga a sua webcam, identifica os pontos da sua mão, e usa o movimento da mão para mover o cursor do mouse. Cada gesto vira uma ação real: mover, clicar, arrastar, pausar.
-      </p>
+      <div class="docs-content">
+        <section class="docs-section" id="quickstart">
+          <div class="section-label">Início rápido</div>
+          <h2>A forma mais curta de começar.</h2>
+          <p class="docs-lede">
+            Se o Python já está instalado, use o pacote publicado no PyPI. A webcam
+            será solicitada quando o aplicativo iniciar.
+          </p>
 
-      <div class="note">
-        <div class="note-head">§ traduzindo do termo técnico</div>
-        <p>
-          A gente vai usar três palavras o tempo todo nesse guia. Vale memorizar agora.<br><br>
-          <strong>Python</strong> — é uma linguagem de programação. Pra rodar esse projeto, você precisa do Python instalado no computador. É um programa, igual qualquer outro.<br><br>
-          <strong>Terminal</strong> — é uma janela preta onde você digita comandos com o teclado, em vez de clicar em botões. Vai parecer estranho no começo. No Windows ele se chama <em>PowerShell</em> ou <em>Prompt de Comando</em>.<br><br>
-          <strong>Repositório</strong> — é como chamamos uma pasta de código de um projeto. O nosso fica no GitHub, num endereço público. Você vai baixar uma cópia dele.
-        </p>
-      </div>
-    </section>
-
-    <!-- REQUISITOS -->
-    <section id="requisitos" class="docs-section">
-      <div class="docs-section-tag">
-        <span class="num">02</span>
-        <span>o que você precisa</span>
-      </div>
-
-      <h2>Antes de começar, <em>confere aí.</em></h2>
-      <p class="docs-lede">
-        Lista honesta. Não precisa de hardware caro, GPU, sensor especial. Mas precisa dessas coisas.
-      </p>
-
-      <div class="reqs">
-        <article class="req">
-          <div class="req-num">01</div>
-          <h3>Computador com Windows 10 ou 11</h3>
-          <p>É a plataforma principal de teste. macOS e Linux funcionam, mas alguns comandos vão ser diferentes. Esse guia usa exemplos de Windows.</p>
-        </article>
-        <article class="req">
-          <div class="req-num">02</div>
-          <h3>Webcam funcionando</h3>
-          <p>Pode ser a integrada do notebook ou uma USB qualquer. 720p ou superior. Se ela aparece em chamada de vídeo do Teams ou Zoom, ela serve aqui.</p>
-        </article>
-        <article class="req">
-          <div class="req-num">03</div>
-          <h3>~500 MB de espaço em disco</h3>
-          <p>O projeto em si é pequeno, mas as dependências (MediaPipe, OpenCV, etc.) ocupam espaço. Garante que tem espaço sobrando antes de começar.</p>
-        </article>
-        <article class="req">
-          <div class="req-num">04</div>
-          <h3>Conexão com a internet</h3>
-          <p>Só para baixar o projeto e as dependências, uma vez. Depois disso funciona offline, sem chamar nenhum servidor.</p>
-        </article>
-        <article class="req">
-          <div class="req-num">05</div>
-          <h3>Luz decente no ambiente</h3>
-          <p>Não precisa ser estúdio. Mas evita contraluz (janela atrás de você). O modelo enxerga melhor quando a mão tá iluminada de frente.</p>
-        </article>
-        <article class="req">
-          <div class="req-num">06</div>
-          <h3>30 minutos da sua atenção</h3>
-          <p>Se for sua primeira vez instalando Python e usando terminal, separa esse tempo. Sem pressa. Vai dar certo.</p>
-        </article>
-      </div>
-    </section>
-
-    <!-- INSTALAR PYTHON -->
-    <section id="instalar-python" class="docs-section">
-      <div class="docs-section-tag">
-        <span class="num">03</span>
-        <span>instalar o python</span>
-      </div>
-
-      <h2>Passo 1 — <em>O Python.</em></h2>
-      <p class="docs-lede">
-        Antes de qualquer coisa, você precisa do Python instalado. <strong>Versão 3.11 ou 3.12</strong>. Não tente com 3.13 ou superior — o MediaPipe ainda não suporta.
-      </p>
-
-      <div class="steps">
-        <article class="step">
-          <div class="step-num">1.1</div>
-          <h3>Verifique se você já tem Python</h3>
-          <p>Abre o PowerShell (procura por "PowerShell" no menu Iniciar) e cola o comando:</p>
           <div class="code-block">
-            <div class="code-head"><span>powershell</span></div>
-            <pre><code>python --version</code></pre>
+            <div class="code-head">
+              <span>terminal</span>
+              <button type="button" data-copy-target="quick-command">Copiar</button>
+            </div>
+            <pre id="quick-command"><code>pip install ai-virtual-mouse-controller
+avmc</code></pre>
           </div>
-          <p>Se aparecer <code>Python 3.11.x</code> ou <code>Python 3.12.x</code>, você já tem — pula para o passo 2. Se aparecer outra coisa, ou erro tipo <code>'python' is not recognized</code>, continua aqui.</p>
-        </article>
 
-        <article class="step">
-          <div class="step-num">1.2</div>
-          <h3>Baixe o instalador oficial</h3>
-          <p>Vai em <a href="https://www.python.org/downloads/release/python-3119/" target="_blank" rel="noopener">python.org/downloads/release/python-3119/</a> e desce a página até "Files". Procure por <strong>Windows installer (64-bit)</strong> e clique para baixar.</p>
-          <p>O arquivo vai pra sua pasta <code>Downloads</code>, com nome parecido com <code>python-3.11.9-amd64.exe</code>.</p>
-        </article>
-
-        <article class="step">
-          <div class="step-num">1.3</div>
-          <h3>Instale — atenção nessa parte</h3>
-          <p>Clica duas vezes no arquivo baixado. Quando o instalador abrir:</p>
-          <ol>
-            <li>Marque a caixa <strong>"Add python.exe to PATH"</strong> na parte de baixo da janela. <em>Essa é a parte mais importante.</em> Se você esquecer, nada vai funcionar depois.</li>
-            <li>Clica em <strong>"Install Now"</strong>.</li>
-            <li>Espera terminar. Quando aparecer "Setup was successful", fecha.</li>
-          </ol>
-          <p class="step-aside">se a tela mostrar "Disable path length limit" no final, clica para habilitar. não é obrigatório, mas evita dor de cabeça futura.</p>
-        </article>
-
-        <article class="step">
-          <div class="step-num">1.4</div>
-          <h3>Confirma que funcionou</h3>
-          <p>Fecha o PowerShell e abre de novo (importante, senão ele não "vê" o Python recém-instalado). Roda:</p>
-          <div class="code-block">
-            <div class="code-head"><span>powershell</span></div>
-            <pre><code>python --version
-pip --version</code></pre>
+          <div class="quick-grid">
+            <article class="quick-card">
+              <span>01</span>
+              <h3>Instale</h3>
+              <p>O pacote baixa as dependências principais.</p>
+            </article>
+            <article class="quick-card">
+              <span>02</span>
+              <h3>Autorize</h3>
+              <p>Libere câmera e acessibilidade quando solicitado.</p>
+            </article>
+            <article class="quick-card">
+              <span>03</span>
+              <h3>Posicione</h3>
+              <p>Mantenha a mão a aproximadamente 50 cm da webcam.</p>
+            </article>
           </div>
-          <p>Deve aparecer algo como <code>Python 3.11.9</code> e <code>pip 24.0 ...</code>. Se aparecer, você tá pronto pro próximo passo.</p>
-        </article>
+        </section>
+
+        <section class="docs-section" id="requirements">
+          <div class="section-label">Pré-requisitos</div>
+          <h2>Confira o ambiente antes de instalar.</h2>
+          <p class="docs-lede">
+            O processamento roda no computador. Uma GPU dedicada não é necessária.
+          </p>
+
+          <div class="requirements-grid">
+            <article class="requirement-card">
+              <span>Sistema</span>
+              <h3>Windows, macOS ou Linux</h3>
+              <p>Linux funciona melhor em sessões X11.</p>
+            </article>
+            <article class="requirement-card">
+              <span>Runtime</span>
+              <h3>Python 3.11, 3.12 ou 3.13</h3>
+              <p>O projeto aceita Python abaixo da versão 3.14.</p>
+            </article>
+            <article class="requirement-card">
+              <span>Entrada</span>
+              <h3>Webcam integrada ou USB</h3>
+              <p>Iluminação frontal melhora a estabilidade.</p>
+            </article>
+          </div>
+
+          <div class="doc-callout">
+            <strong>MediaPipe:</strong> o projeto fixa uma versão compatível abaixo
+            de 0.10.30. Não é necessário instalar essa dependência manualmente.
+          </div>
+        </section>
+
+        <section class="docs-section" id="install-windows">
+          <div class="section-label">Windows</div>
+          <h2>Instalação pelo PowerShell.</h2>
+          <p class="docs-lede">
+            Use o pacote do PyPI para uso normal. Clone o repositório apenas se quiser
+            estudar ou modificar o código.
+          </p>
+
+          <div class="steps">
+            <article class="step">
+              <span class="step-number">01</span>
+              <div class="step-body">
+                <h3>Confirme a versão do Python</h3>
+                <p>Abra o PowerShell e execute:</p>
+                <div class="code-block">
+                  <div class="code-head">
+                    <span>powershell</span>
+                    <button type="button" data-copy-target="windows-python">Copiar</button>
+                  </div>
+                  <pre id="windows-python"><code>py -3.11 --version</code></pre>
+                </div>
+                <p>Se o comando não existir, instale o Python 3.11 pelo site oficial e marque a opção para adicionar o Python ao PATH.</p>
+              </div>
+            </article>
+
+            <article class="step">
+              <span class="step-number">02</span>
+              <div class="step-body">
+                <h3>Crie um ambiente virtual</h3>
+                <p>O ambiente isola as bibliotecas deste projeto.</p>
+                <div class="code-block">
+                  <div class="code-head">
+                    <span>powershell</span>
+                    <button type="button" data-copy-target="windows-venv">Copiar</button>
+                  </div>
+                  <pre id="windows-venv"><code>py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1</code></pre>
+                </div>
+              </div>
+            </article>
+
+            <article class="step">
+              <span class="step-number">03</span>
+              <div class="step-body">
+                <h3>Instale e execute</h3>
+                <div class="code-block">
+                  <div class="code-head">
+                    <span>powershell · ambiente ativo</span>
+                    <button type="button" data-copy-target="windows-install">Copiar</button>
+                  </div>
+                  <pre id="windows-install"><code>pip install ai-virtual-mouse-controller
+avmc</code></pre>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="doc-callout">
+            Se o PowerShell bloquear <code>Activate.ps1</code>, execute uma vez:
+            <code>Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned</code>.
+          </div>
+        </section>
+
+        <section class="docs-section" id="install-unix">
+          <div class="section-label">macOS e Linux</div>
+          <h2>Instalação pelo terminal.</h2>
+
+          <div class="steps">
+            <article class="step">
+              <span class="step-number">macOS</span>
+              <div class="step-body">
+                <h3>Crie o ambiente e instale</h3>
+                <div class="code-block">
+                  <div class="code-head">
+                    <span>zsh</span>
+                    <button type="button" data-copy-target="mac-install">Copiar</button>
+                  </div>
+                  <pre id="mac-install"><code>python3.11 -m venv .venv
+source .venv/bin/activate
+pip install ai-virtual-mouse-controller
+avmc</code></pre>
+                </div>
+                <p>Na primeira execução, libere Câmera e Acessibilidade em Ajustes do Sistema → Privacidade e Segurança.</p>
+              </div>
+            </article>
+
+            <article class="step">
+              <span class="step-number">Linux</span>
+              <div class="step-body">
+                <h3>Instale os pacotes do sistema</h3>
+                <div class="code-block">
+                  <div class="code-head">
+                    <span>ubuntu / debian · X11</span>
+                    <button type="button" data-copy-target="linux-install">Copiar</button>
+                  </div>
+                  <pre id="linux-install"><code>sudo apt install scrot python3-tk python3-dev
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install ai-virtual-mouse-controller
+avmc</code></pre>
+                </div>
+                <p>O PyAutoGUI possui suporte limitado em Wayland. Use uma sessão X11 quando possível.</p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="docs-section" id="first-run">
+          <div class="section-label">Primeira execução</div>
+          <h2>Prepare a câmera e teste o movimento.</h2>
+
+          <div class="steps">
+            <article class="step">
+              <span class="step-number">01</span>
+              <div class="step-body">
+                <h3>Posicione a mão</h3>
+                <p>Fique a aproximadamente 50 cm da webcam, com luz vindo da frente. Mantenha mão, punho e dedos dentro do enquadramento.</p>
+              </div>
+            </article>
+            <article class="step">
+              <span class="step-number">02</span>
+              <div class="step-body">
+                <h3>Abra a mão</h3>
+                <p>O cursor deve acompanhar o centro da mão. Faça movimentos amplos e lentos na primeira tentativa.</p>
+              </div>
+            </article>
+            <article class="step">
+              <span class="step-number">03</span>
+              <div class="step-body">
+                <h3>Encerre corretamente</h3>
+                <p>Pressione <code>ESC</code> com a janela da câmera ativa. Isso libera a webcam e encerra os recursos do aplicativo.</p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="docs-section" id="gestures-guide">
+          <div class="section-label">Gestos</div>
+          <h2>O vocabulário básico da interação.</h2>
+          <p class="docs-lede">
+            Os cliques são disparados quando os dedos se encostam, reproduzindo a
+            resposta imediata de um botão físico.
+          </p>
+
+          <div class="gesture-guide">
+            <article class="gesture-row">
+              <img
+                src="assets/img/gesture_move_real.png"
+                alt="Mão aberta para mover o cursor"
+                loading="lazy"
+                width="640"
+                height="360"
+              >
+              <div>
+                <h3>Mão aberta · mover</h3>
+                <p>Quatro dedos para cima movimentam o cursor. Use o punho para conduzir o gesto sem cansar os dedos.</p>
+              </div>
+            </article>
+            <article class="gesture-row">
+              <img
+                src="assets/img/gesture_left_click_real.png"
+                alt="Pinça entre indicador e polegar para clicar"
+                loading="lazy"
+                width="640"
+                height="360"
+              >
+              <div>
+                <h3>Pinça · clicar ou arrastar</h3>
+                <p>Encoste indicador e polegar para clicar. Sustente a pinça por cerca de 1,5 segundo para iniciar um arrasto.</p>
+              </div>
+            </article>
+            <article class="gesture-row">
+              <img
+                src="assets/img/gesture_right_click_real.png"
+                alt="Pinça entre dedo médio e polegar para clique direito"
+                loading="lazy"
+                width="640"
+                height="360"
+              >
+              <div>
+                <h3>Pinça com o médio · clique direito</h3>
+                <p>Encoste o dedo médio no polegar e mantenha o indicador afastado para abrir o menu de contexto.</p>
+              </div>
+            </article>
+            <article class="gesture-row">
+              <img
+                src="assets/img/gesture_double_click_real.png"
+                alt="Sinal de paz para duplo clique"
+                loading="lazy"
+                width="640"
+                height="360"
+              >
+              <div>
+                <h3>Sinal de paz · duplo clique</h3>
+                <p>Mostre indicador e médio e conclua o gesto para disparar um duplo clique.</p>
+              </div>
+            </article>
+            <article class="gesture-row">
+              <img
+                src="assets/img/gesture_pause_real.png"
+                alt="Punho fechado para pausar o cursor"
+                loading="lazy"
+                width="640"
+                height="360"
+              >
+              <div>
+                <h3>Punho fechado · pausa</h3>
+                <p>Congele o cursor enquanto reposiciona a mão. Retire a mão do quadro para uma pausa automática.</p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="docs-section" id="daily-use">
+          <div class="section-label">Uso diário</div>
+          <h2>Atalhos disponíveis durante a execução.</h2>
+
+          <div class="config-list">
+            <div class="config-item">
+              <code>H</code>
+              <p>Liga ou desliga o overlay holográfico 3D.</p>
+            </div>
+            <div class="config-item">
+              <code>S</code>
+              <p>Abre ou fecha o painel de configurações em tempo real.</p>
+            </div>
+            <div class="config-item">
+              <code>T</code>
+              <p>Alterna a janela da câmera sempre no topo.</p>
+            </div>
+            <div class="config-item">
+              <code>Z</code>
+              <p>Ativa o modo apresentação; gestos direcionais avançam ou voltam slides.</p>
+            </div>
+            <div class="config-item">
+              <code>ESC</code>
+              <p>Encerra o aplicativo e libera a câmera.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="docs-section" id="configuration">
+          <div class="section-label">Configuração</div>
+          <h2>Ajuste o comportamento sem alterar a arquitetura.</h2>
+          <p class="docs-lede">
+            As configurações permanentes ficam em <code>config.py</code>. Durante a
+            execução, pressione <code>S</code> para abrir os controles mais usados.
+          </p>
+
+          <div class="config-list">
+            <div class="config-item">
+              <code>CAMERA_*</code>
+              <p>Seleciona a câmera, resolução e FPS alvo.</p>
+            </div>
+            <div class="config-item">
+              <code>CURSOR_ANCHOR</code>
+              <p>Define qual ponto anatômico conduz o cursor.</p>
+            </div>
+            <div class="config-item">
+              <code>PINCH_*</code>
+              <p>Controla a sensibilidade e os limites dos gestos de pinça.</p>
+            </div>
+            <div class="config-item">
+              <code>SMOOTHING_*</code>
+              <p>Ajusta o One Euro Filter entre estabilidade e resposta.</p>
+            </div>
+            <div class="config-item">
+              <code>SCREEN_MARGIN_*</code>
+              <p>Calibra o alcance das bordas e dos cantos da tela.</p>
+            </div>
+            <div class="config-item">
+              <code>HOLOGRAM_*</code>
+              <p>Configura backend, cor, opacidade e FPS do overlay opcional.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="docs-section" id="troubleshooting">
+          <div class="section-label">Soluções rápidas</div>
+          <h2>Problemas comuns.</h2>
+
+          <div class="troubleshooting">
+            <details>
+              <summary>A câmera não abre</summary>
+              <div>
+                <p>Feche aplicativos que estejam usando a webcam e confira as permissões de câmera do sistema.</p>
+                <p>Se houver mais de uma câmera, altere o índice em <code>CAMERA_INDEX</code>.</p>
+              </div>
+            </details>
+            <details>
+              <summary>A mão aparece, mas o cursor não se move</summary>
+              <div>
+                <p>No macOS, libere Acessibilidade para o terminal ou aplicativo usado. Em Linux, confirme que a sessão é X11.</p>
+              </div>
+            </details>
+            <details>
+              <summary>O cursor está tremendo</summary>
+              <div>
+                <p>Melhore a iluminação, afaste um pouco a mão e selecione o perfil <em>stable</em> ou <em>smooth</em> no painel aberto pela tecla <code>S</code>.</p>
+              </div>
+            </details>
+            <details>
+              <summary>O MediaPipe falha ao importar</summary>
+              <div>
+                <p>Confirme que o ambiente virtual está ativo e reinstale as versões declaradas pelo projeto:</p>
+                <div class="code-block">
+                  <div class="code-head">
+                    <span>terminal</span>
+                    <button type="button" data-copy-target="repair-deps">Copiar</button>
+                  </div>
+                  <pre id="repair-deps"><code>pip install --force-reinstall "mediapipe>=0.10.18,<0.10.30"</code></pre>
+                </div>
+              </div>
+            </details>
+          </div>
+
+          <div class="docs-next">
+            <p>Não encontrou a solução? Abra uma issue com a saída completa do terminal.</p>
+            <a
+              class="button button-secondary"
+              href="https://github.com/ognistie/ai-virtual-mouse-controller/issues"
+              target="_blank"
+              rel="noopener"
+            >
+              Abrir uma issue <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+        </section>
       </div>
-    </section>
-
-    <!-- INSTALAR GIT -->
-    <section id="instalar-git" class="docs-section">
-      <div class="docs-section-tag">
-        <span class="num">04</span>
-        <span>instalar o git</span>
-      </div>
-
-      <h2>Passo 2 — <em>O Git.</em></h2>
-      <p class="docs-lede">
-        Git é o programa que vai baixar o projeto do GitHub pra sua máquina. Se você não quiser instalar Git, pula para a alternativa em ZIP no passo 2.B.
-      </p>
-
-      <div class="steps cols-2">
-        <article class="step">
-          <div class="step-num">2.A</div>
-          <h3>Opção com Git (recomendado)</h3>
-          <p>Baixa o instalador em <a href="https://git-scm.com/downloads" target="_blank" rel="noopener">git-scm.com/downloads</a>. Roda o instalador clicando em <strong>"Next"</strong> em tudo — as opções padrão são boas.</p>
-          <p>Depois, fecha e abre o PowerShell e testa:</p>
-          <div class="code-block">
-            <div class="code-head"><span>powershell</span></div>
-            <pre><code>git --version</code></pre>
-          </div>
-          <p>Deve aparecer algo como <code>git version 2.45.0.windows.1</code>.</p>
-        </article>
-
-        <article class="step">
-          <div class="step-num">2.B</div>
-          <h3>Opção sem Git (atalho)</h3>
-          <p>Se você não quer instalar mais uma coisa, dá pra baixar o projeto direto como arquivo ZIP:</p>
-          <ol>
-            <li>Vai em <a href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">github.com/ognistie/ai-virtual-mouse-controller</a></li>
-            <li>Clica no botão verde <strong>"Code"</strong></li>
-            <li>Escolhe <strong>"Download ZIP"</strong></li>
-            <li>Extrai o ZIP na pasta onde você quer manter o projeto</li>
-          </ol>
-          <p class="step-aside">se você escolher essa opção, pula o passo 3 e vai direto pro passo 4.</p>
-        </article>
-      </div>
-    </section>
-
-    <!-- BAIXAR -->
-    <section id="baixar" class="docs-section">
-      <div class="docs-section-tag">
-        <span class="num">05</span>
-        <span>baixar o projeto</span>
-      </div>
-
-      <h2>Passo 3 — <em>Clonando o repositório.</em></h2>
-      <p class="docs-lede">
-        Agora você vai trazer uma cópia do projeto pra sua máquina. Esse passo é só com Git. Se você baixou ZIP no passo anterior, pula direto pro passo 4.
-      </p>
-
-      <div class="steps">
-        <article class="step">
-          <div class="step-num">3.1</div>
-          <h3>Escolha onde guardar o projeto</h3>
-          <p>Decide uma pasta no seu computador onde você quer que o projeto fique. Por exemplo: <code>C:\Users\Seu_Nome\Documentos\</code>. Vai ser criada uma subpasta chamada <code>ai-virtual-mouse-controller</code> dentro dela.</p>
-          <p>No PowerShell, navega até essa pasta com o comando <code>cd</code>:</p>
-          <div class="code-block">
-            <div class="code-head"><span>powershell</span></div>
-            <pre><code>cd $HOME\Documents</code></pre>
-          </div>
-          <p class="step-aside"><code>$HOME</code> é um atalho que aponta pra <code>C:\Users\Seu_Nome\</code> automaticamente. não precisa digitar seu nome.</p>
-        </article>
-
-        <article class="step">
-          <div class="step-num">3.2</div>
-          <h3>Clone o repositório</h3>
-          <p>Roda esse comando. Ele baixa todos os arquivos do projeto.</p>
-          <div class="code-block">
-            <div class="code-head"><span>powershell</span></div>
-            <pre><code>git clone https://github.com/ognistie/ai-virtual-mouse-controller.git</code></pre>
-          </div>
-          <p>Vai aparecer uma sequência de mensagens tipo <code>Cloning into 'ai-virtual-mouse-controller'...</code> seguida de progresso. Quando voltar pro prompt normal, deu certo.</p>
-        </article>
-
-        <article class="step">
-          <div class="step-num">3.3</div>
-          <h3>Entra na pasta do projeto</h3>
-          <p>Agora você precisa estar <em>dentro</em> da pasta do projeto pra rodar os próximos comandos. Roda:</p>
-          <div class="code-block">
-            <div class="code-head"><span>powershell</span></div>
-            <pre><code>cd ai-virtual-mouse-controller</code></pre>
-          </div>
-          <p>O prompt do PowerShell deve mostrar agora algo como <code>PS C:\Users\Seu_Nome\Documents\ai-virtual-mouse-controller&gt;</code>. Esse caminho é onde você tem que estar pra todos os próximos comandos.</p>
-        </article>
-      </div>
-    </section>
-
-    <!-- VENV -->
-    <section id="venv" class="docs-section">
-      <div class="docs-section-tag">
-        <span class="num">06</span>
-        <span>ambiente virtual</span>
-      </div>
-
-      <h2>Passo 4 — <em>O venv.</em></h2>
-      <p class="docs-lede">
-        O venv (ambiente virtual) é uma "caixinha" isolada que vai segurar todas as dependências desse projeto sem misturar com outros Python da sua máquina. É boa prática. Sempre faça.
-      </p>
-
-      <div class="note">
-        <div class="note-head">§ analogia que talvez ajude</div>
-        <p>
-          Imagina que cada projeto Python é uma receita. Algumas receitas pedem farinha de trigo, outras de amendoim, outras sem glúten. Se você for misturando tudo na mesma cozinha, uma hora vai dar errado. O venv é você ter uma cozinha separada pra cada receita. Mais limpo. Sem briga de ingredientes.
-        </p>
-      </div>
-
-      <div class="steps">
-        <article class="step">
-          <div class="step-num">4.1</div>
-          <h3>Cria o venv</h3>
-          <p>Dentro da pasta do projeto, roda:</p>
-          <div class="code-block">
-            <div class="code-head"><span>powershell</span></div>
-            <pre><code>py -3.11 -m venv .venv</code></pre>
-          </div>
-          <p>Esse comando cria uma pasta chamada <code>.venv</code> (com o ponto na frente, sim) dentro do projeto. Ela tem o Python isolado dentro. Demora uns 10 segundos.</p>
-        </article>
-
-        <article class="step">
-          <div class="step-num">4.2</div>
-          <h3>Ativa o venv</h3>
-          <p>Cada vez que você for usar o projeto, precisa <em>ativar</em> o venv primeiro. Roda:</p>
-          <div class="code-block">
-            <div class="code-head"><span>powershell</span></div>
-            <pre><code>.\.venv\Scripts\Activate.ps1</code></pre>
-          </div>
-          <p>Se deu certo, o prompt do PowerShell vai mudar e mostrar <code>(.venv)</code> antes do caminho. Tipo: <code>(.venv) PS C:\...\ai-virtual-mouse-controller&gt;</code>. Esse <code>(.venv)</code> é seu sinal de que o ambiente tá ativo.</p>
-          <p class="step-aside">se aparecer erro tipo "Activate.ps1 cannot be loaded because running scripts is disabled", roda primeiro: Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned. Tem solução em 30 segundos.</p>
-        </article>
-      </div>
-    </section>
-
-    <!-- DEPS -->
-    <section id="deps" class="docs-section">
-      <div class="docs-section-tag">
-        <span class="num">07</span>
-        <span>dependências</span>
-      </div>
-
-      <h2>Passo 5 — <em>As bibliotecas.</em></h2>
-      <p class="docs-lede">
-        Agora você vai instalar as bibliotecas que o projeto precisa: MediaPipe (visão computacional), OpenCV (manipulação de imagem), PyAutoGUI (controle do cursor), entre outras. Vem uma lista pronta com versões certinhas.
-      </p>
-
-      <div class="steps">
-        <article class="step">
-          <div class="step-num">5.1</div>
-          <h3>Atualiza o pip</h3>
-          <p>Pip é o "gerenciador de pacotes" do Python. Ele que vai baixar e instalar as bibliotecas. Boa prática: atualizar ele primeiro.</p>
-          <div class="code-block">
-            <div class="code-head"><span>powershell · com venv ativo</span></div>
-            <pre><code>pip install --upgrade pip</code></pre>
-          </div>
-        </article>
-
-        <article class="step">
-          <div class="step-num">5.2</div>
-          <h3>Instala tudo de uma vez</h3>
-          <p>O projeto já tem um arquivo <code>requirements.txt</code> com a lista de tudo que precisa. Roda:</p>
-          <div class="code-block">
-            <div class="code-head"><span>powershell · com venv ativo</span></div>
-            <pre><code>pip install -r requirements.txt</code></pre>
-          </div>
-          <p>Vai aparecer uma cascata de "Collecting...", "Downloading...", "Installing...". Demora de 2 a 5 minutos dependendo da sua internet. Não é normal interromper no meio — deixa terminar.</p>
-        </article>
-
-        <article class="step">
-          <div class="step-num">5.3</div>
-          <h3>Confere que instalou</h3>
-          <p>No final, deve aparecer algo como <code>Successfully installed mediapipe-0.10.9 opencv-python-4.x ...</code>. Pra ter certeza, roda:</p>
-          <div class="code-block">
-            <div class="code-head"><span>powershell</span></div>
-            <pre><code>python -c "import cv2, mediapipe; print('tudo certo')"</code></pre>
-          </div>
-          <p>Se imprimir <code>tudo certo</code>, você pode ir pro passo 6. Se reclamar de algum módulo, confere se o venv tá ativo (o <code>(.venv)</code> tem que aparecer no prompt).</p>
-        </article>
-      </div>
-    </section>
-
-    <!-- RODAR -->
-    <section id="rodar" class="docs-section">
-      <div class="docs-section-tag">
-        <span class="num">08</span>
-        <span>rodar pela primeira vez</span>
-      </div>
-
-      <h2>Passo 6 — <em>A primeira execução.</em></h2>
-      <p class="docs-lede">
-        Tudo pronto. Bora ver isso funcionando. Antes de rodar, abre seu navegador ou alguma app que você queira testar o cursor depois — vai ser bom ter algo já aberto pra clicar.
-      </p>
-
-      <div class="steps">
-        <article class="step">
-          <div class="step-num">6.1</div>
-          <h3>Roda o programa principal</h3>
-          <p>Confirma que o venv ainda tá ativo (procura o <code>(.venv)</code> no prompt). Roda:</p>
-          <div class="code-block">
-            <div class="code-head"><span>powershell · com venv ativo</span></div>
-            <pre><code>python main.py</code></pre>
-          </div>
-        </article>
-
-        <article class="step">
-          <div class="step-num">6.2</div>
-          <h3>O que você vai ver</h3>
-          <p>Em alguns segundos, três coisas acontecem:</p>
-          <ol>
-            <li>A luz da webcam acende (se a sua tem uma).</li>
-            <li>Uma janela pequena, de 480×270 pixels, abre no canto inferior direito da tela. Dentro dela aparece o que a câmera tá vendo, com os pontos da mão sobrepostos em vermelho.</li>
-            <li>No terminal, vão aparecer algumas mensagens informativas (FPS, perfil ativo, etc).</li>
-          </ol>
-          <p class="step-aside">se a janela não aparece, olha atrás das outras janelas. às vezes ela abre embaixo de tudo. ou minimizada na barra de tarefas.</p>
-        </article>
-
-        <article class="step">
-          <div class="step-num">6.3</div>
-          <h3>Testa o primeiro gesto</h3>
-          <p>Posiciona sua mão a uns 50 cm da câmera, palma voltada pra frente, dedos abertos. Movimenta a mão lentamente.</p>
-          <p>O cursor da tela vai começar a seguir a sua mão. Se não estiver — checa se sua mão tá visível na janelinha. Se a mão aparece nela mas o cursor não move, pode ser que outro programa esteja capturando o cursor (jogo, RDP, etc).</p>
-        </article>
-      </div>
-    </section>
-
-    <!-- GESTOS -->
-    <section id="gestos-detalhe" class="docs-section">
-      <div class="docs-section-tag">
-        <span class="num">09</span>
-        <span>os gestos · em detalhe</span>
-      </div>
-
-      <h2>Cinco gestos. <em>O sexto é bônus.</em></h2>
-      <p class="docs-lede">
-        Cada um foi desenhado para ser inequívoco e durar uma sessão inteira sem cansar a mão. Pratica em frente ao espelho da janelinha antes de usar na rotina.
-      </p>
-
-      <div class="gestures-grid">
-        <article class="gesture">
-          <div class="gesture-img">
-            <img src="assets/img/gesture_move_real.png" alt="Mão aberta movendo o cursor" loading="lazy">
-          </div>
-          <div class="gesture-info">
-            <h3>1. Mover o cursor</h3>
-            <p>Abre a mão com a palma virada pra câmera. Movimento lento = controle preciso. Movimento amplo = travessia rápida da tela. O cursor segue a base do dedo médio — não a ponta do indicador — pra não pular no momento do clique.</p>
-            <p><strong>Dica de iniciante:</strong> não tente mover o cursor mexendo só o dedo. Move o pulso inteiro, naturalmente. Sua mão cansa menos.</p>
-          </div>
-        </article>
-
-        <article class="gesture">
-          <div class="gesture-img">
-            <img src="assets/img/gesture_left_click_real.png" alt="Pinça polegar e indicador" loading="lazy">
-          </div>
-          <div class="gesture-info">
-            <h3>2. Clique esquerdo</h3>
-            <p>Pinça rápida entre polegar e indicador. O clique dispara <strong>no instante do toque</strong>, não no release. Diferença real: zero latência percebida — porque é literalmente zero, não "quase zero".</p>
-            <p><strong>Dica de iniciante:</strong> não precisa forçar. Encosta de leve. O sistema enxerga o toque mesmo sem você apertar.</p>
-          </div>
-        </article>
-
-        <article class="gesture">
-          <div class="gesture-img">
-            <img src="assets/img/gesture_right_click_real.png" alt="Polegar e médio com indicador estendido" loading="lazy">
-          </div>
-          <div class="gesture-info">
-            <h3>3. Clique direito</h3>
-            <p>Polegar encosta no médio, com o indicador estendido. O indicador estendido é o que evita confusão com o clique esquerdo. Aciona o menu de contexto do sistema operacional.</p>
-            <p><strong>Dica de iniciante:</strong> deixa o indicador bem estendido, não só levemente. Se ele dobrar no meio, o sistema acha que você tá pausando.</p>
-          </div>
-        </article>
-
-        <article class="gesture">
-          <div class="gesture-img">
-            <img src="assets/img/gesture_double_click_real.png" alt="Sinal de paz" loading="lazy">
-          </div>
-          <div class="gesture-info">
-            <h3>4. Duplo clique</h3>
-            <p>Sinal de paz (indicador + médio) mantido por aproximadamente 500 ms. O delay é proposital. Sem ele, o duplo clique virava acidente toda vez que você apontava com dois dedos.</p>
-            <p><strong>Dica de iniciante:</strong> conta um "um e" mentalmente. É o tempo certo.</p>
-          </div>
-        </article>
-
-        <article class="gesture">
-          <div class="gesture-img">
-            <img src="assets/img/gesture_pause_real.png" alt="Punho fechado" loading="lazy">
-          </div>
-          <div class="gesture-info">
-            <h3>5. Pausar o cursor</h3>
-            <p>Fecha a mão em punho. O cursor congela na hora. Útil quando você quer reposicionar a mão sem o cursor surfar pela tela junto. Abre a mão = volta a rastrear.</p>
-            <p><strong>Dica de iniciante:</strong> usa esse gesto sempre que precisar coçar o nariz, mexer no cabelo, atender o celular. Sério.</p>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <!-- ENCERRAR -->
-    <section id="encerrar" class="docs-section">
-      <div class="docs-section-tag">
-        <span class="num">10</span>
-        <span>encerrar</span>
-      </div>
-
-      <h2>Passo 7 — <em>Fechar direito.</em></h2>
-      <p class="docs-lede">
-        Quando você terminar de usar, não feche o terminal pelo X. Encerra o programa direito.
-      </p>
-
-      <div class="steps cols-2">
-        <article class="step">
-          <div class="step-num">opção A</div>
-          <h3>Pela janelinha</h3>
-          <p><strong>Clica na janelinha</strong> (480×270) que mostra a câmera, então pressiona <kbd>ESC</kbd>. É o jeito recomendado.</p>
-        </article>
-        <article class="step">
-          <div class="step-num">opção B</div>
-          <h3>Pelo terminal</h3>
-          <p><strong>No terminal,</strong> pressiona <kbd>Ctrl</kbd>+<kbd>C</kbd>. Funciona, mas pode deixar a câmera ocupada por alguns segundos.</p>
-        </article>
-      </div>
-
-      <p style="margin-top:1.5rem; color: var(--ink-2); font-size: 0.96rem; line-height: 1.7;">Depois de encerrar, a janelinha fecha, a luz da webcam apaga, e o terminal volta pro prompt normal (ainda com <code style="background: var(--bg-elev-3); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; font-size: 0.86em; color: var(--ink);">(.venv)</code> ativo). Você pode rodar <code style="background: var(--bg-elev-3); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; font-size: 0.86em; color: var(--ink);">python main.py</code> de novo a qualquer momento.</p>
-    </section>
-
-    <!-- PROXIMA VEZ -->
-    <section id="proxima-vez" class="docs-section">
-      <div class="docs-section-tag">
-        <span class="num">11</span>
-        <span>da próxima vez</span>
-      </div>
-
-      <h2>Da segunda vez, <em>é mais rápido.</em></h2>
-      <p class="docs-lede">
-        Você não precisa instalar nada de novo. Cada vez que quiser usar o projeto, é só ativar o venv e rodar.
-      </p>
-
-      <div class="steps">
-        <article class="step">
-          <div class="step-num">rotina</div>
-          <h3>Os três comandos diários</h3>
-          <p>Abre o PowerShell, vai pra pasta do projeto, ativa o venv, roda.</p>
-          <div class="code-block">
-            <div class="code-head"><span>powershell · toda vez</span></div>
-            <pre><code>cd $HOME\Documents\ai-virtual-mouse-controller
-.\.venv\Scripts\Activate.ps1
-python main.py</code></pre>
-          </div>
-          <p>Em uns 5 segundos a janelinha abre e você tá pronto pra usar.</p>
-        </article>
-
-        <article class="step">
-          <div class="step-num">atalho</div>
-          <h3>Cria um atalho na área de trabalho (opcional)</h3>
-          <p>Se você usar todo dia, vale criar um arquivo .bat com esses comandos. Clica com botão direito na área de trabalho → Novo → Documento de Texto. Renomeia ele pra <code>ai-mouse.bat</code> (importante a extensão ser <code>.bat</code>, não <code>.txt</code>). Abre com o Bloco de Notas e cola:</p>
-          <div class="code-block">
-            <div class="code-head"><span>ai-mouse.bat</span></div>
-            <pre><code>@echo off
-cd /d %USERPROFILE%\Documents\ai-virtual-mouse-controller
-call .venv\Scripts\activate.bat
-python main.py
-pause</code></pre>
-          </div>
-          <p>Salva. Agora dois cliques no <code>ai-mouse.bat</code> e o projeto abre direto, sem terminal manual.</p>
-        </article>
-      </div>
-    </section>
-
-    <!-- CUSTOMIZAR -->
-    <section id="customizar" class="docs-section">
-      <div class="docs-section-tag">
-        <span class="num">12</span>
-        <span>customizar · opcional</span>
-      </div>
-
-      <h2>Quer mexer? <em>Dá.</em></h2>
-      <p class="docs-lede">
-        Só se você quiser. O projeto funciona sem nenhuma alteração. Mas algumas constantes podem ser ajustadas se você tem motivo específico.
-      </p>
-
-      <div class="note">
-        <div class="note-head">§ caminho do arquivo de configuração</div>
-        <p>
-          O arquivo se chama <code>config.py</code> e fica na raiz do projeto:<br><br>
-          <code>C:\Users\Seu_Nome\Documents\ai-virtual-mouse-controller\config.py</code><br><br>
-          Abre com qualquer editor de texto (Bloco de Notas serve). Você vai ver variáveis em maiúsculo no início. As mais úteis pra ajustar estão abaixo.
-        </p>
-      </div>
-
-      <div class="steps cols-2">
-        <article class="step">
-          <div class="step-num">config.py</div>
-          <h3>Trocar de webcam</h3>
-          <p>Se você tem mais de uma câmera (notebook + USB, por exemplo) e quer usar a outra:</p>
-          <div class="code-block">
-            <div class="code-head"><span>config.py</span></div>
-            <pre><code>CAMERA_INDEX = 0    # webcam padrão
-# CAMERA_INDEX = 1  # segunda câmera
-# CAMERA_INDEX = 2  # terceira</code></pre>
-          </div>
-        </article>
-
-        <article class="step">
-          <div class="step-num">config.py</div>
-          <h3>Performance em máquina lenta</h3>
-          <p>Se o seu FPS tá baixo (abaixo de 30):</p>
-          <div class="code-block">
-            <div class="code-head"><span>config.py</span></div>
-            <pre><code>MODEL_COMPLEXITY = 0    # 0=lite, 1=full
-CAMERA_WIDTH = 640      # menor = mais leve
-CAMERA_HEIGHT = 360</code></pre>
-          </div>
-        </article>
-
-        <article class="step">
-          <div class="step-num">config.py</div>
-          <h3>Margem da tela</h3>
-          <p>Se o cursor tem dificuldade de chegar nos cantos:</p>
-          <div class="code-block">
-            <div class="code-head"><span>config.py</span></div>
-            <pre><code>SCREEN_MARGIN_PERCENTAGE = 0.15    # padrão é 0.20</code></pre>
-          </div>
-          <p>Valor menor = mão precisa ir até mais perto da borda da câmera pra cursor chegar no canto da tela.</p>
-        </article>
-
-        <article class="step">
-          <div class="step-num">config.py</div>
-          <h3>Âncora do cursor</h3>
-          <p>Por padrão é landmark 9 (base do médio). Se você quiser experimentar:</p>
-          <div class="code-block">
-            <div class="code-head"><span>config.py</span></div>
-            <pre><code>CURSOR_ANCHOR_LANDMARK = 9     # padrão
-# CURSOR_ANCHOR_LANDMARK = 8   # ponta do indicador
-# CURSOR_ANCHOR_LANDMARK = 0   # pulso</code></pre>
-          </div>
-          <p>Sai do padrão por sua conta e risco. A escolha do 9 tem motivação técnica documentada no README.</p>
-        </article>
-      </div>
-    </section>
-
-    <!-- HOLOGRAMA -->
-    <section id="holograma-extra" class="docs-section">
-      <div class="docs-section-tag">
-        <span class="num">13</span>
-        <span>holograma · opcional</span>
-      </div>
-
-      <h2>Quer ver sua mão <em>na tela?</em></h2>
-      <p class="docs-lede">
-        O projeto tem um modo opt-in: uma mão holográfica azul-ciano que aparece sobreposta ao desktop e segue seus movimentos em tempo real. <strong>Click-through</strong> — não bloqueia nada que você tenha na tela.
-      </p>
-
-      <div class="steps">
-        <article class="step">
-          <div class="step-num">passo 1</div>
-          <h3>Instala o PySide6 e o ModernGL</h3>
-          <p>O holograma usa PySide6 (Qt for Python) + ModernGL pra renderizar em 3D. São dependências <strong>opcionais</strong> — o projeto roda normalmente sem elas.</p>
-          <div class="code-block">
-            <div class="code-head"><span>pip · com venv ativo</span></div>
-            <pre><code>pip install PySide6 moderngl</code></pre>
-          </div>
-        </article>
-
-        <article class="step">
-          <div class="step-num">passo 2</div>
-          <h3>Roda o projeto e aperta <kbd>H</kbd></h3>
-          <p>No log do startup, você deve ver:</p>
-          <div class="code-block">
-            <div class="code-head"><span>terminal</span></div>
-            <pre><code>[AVM] HologramOverlay criado: available=True, click_through=True</code></pre>
-          </div>
-          <p>Aperta <kbd>H</kbd> em runtime. A mão aparece em ~1s.</p>
-        </article>
-
-        <article class="step">
-          <div class="step-num">passo 3</div>
-          <h3>O que você vai ver</h3>
-          <ul>
-            <li><strong>Silhueta azul-ciano</strong> da mão sobre o desktop, seguindo cada movimento</li>
-            <li><strong>Anel pulsante</strong> no ponto onde os dedos vão se tocar (o cursor)</li>
-            <li><strong>Bursts no clique:</strong> anel ciano expande quando você pinça (esquerdo), azul pro direito</li>
-            <li><strong>Click-through:</strong> você continua clicando, selecionando, navegando normal — o overlay não intercepta nada</li>
-          </ul>
-        </article>
-
-        <article class="step">
-          <div class="step-num">passo 4</div>
-          <h3>Customizar (opcional)</h3>
-          <p>Em <code>config.py</code>:</p>
-          <div class="code-block">
-            <div class="code-head"><span>config.py</span></div>
-            <pre><code>HOLOGRAM_ENABLED = True              # liga no startup (sem precisar H)
-HOLOGRAM_HAND_SIZE_PX = 180          # tamanho da mão em px
-HOLOGRAM_VIEW_DORSAL = False         # palm view (alinhado com webcam)
-HOLOGRAM_PARTICLES_ENABLED = False   # nuvem de particles (default off)
-HOLOGRAM_BACKEND = "auto"            # auto / gl / qpainter</code></pre>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <!-- CTA FINAL -->
-    <section class="docs-cta">
-      <div class="docs-cta-eyebrow">— chegou até aqui?</div>
-      <h2 class="docs-cta-title">
-        Agora é prática. <em>Boa sorte.</em>
-      </h2>
-      <p class="docs-cta-text">
-        Em alguns minutos de uso, você vai parar de pensar nos gestos. Eles viram instinto. Promete.
-      </p>
-      <p class="docs-cta-text">
-        Se algum passo travou ou alguma mensagem de erro apareceu, abre uma <a href="https://github.com/ognistie/ai-virtual-mouse-controller/issues" target="_blank" rel="noopener">issue no repositório</a> com a saída completa do terminal — vamos ler.
-      </p>
-      <div class="docs-cta-actions">
-        <a class="btn btn-primary" href="index.html#install">
-          Voltar pro manual rápido
-        </a>
-        <a class="btn btn-ghost" href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">
-          Ir pro GitHub
-        </a>
-      </div>
-    </section>
+    </div>
   </main>
 
-  <footer class="footer">
-    <div class="footer-inner">
-      <div class="footer-brand">
-        <span class="brand-mark small" aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-            <circle cx="10" cy="10" r="2" fill="currentColor"/>
-            <circle cx="4" cy="4" r="1" fill="currentColor" opacity="0.6"/>
-            <circle cx="16" cy="4" r="1" fill="currentColor" opacity="0.6"/>
-            <circle cx="4" cy="16" r="1" fill="currentColor" opacity="0.6"/>
-            <circle cx="16" cy="16" r="1" fill="currentColor" opacity="0.6"/>
-          </svg>
+  <footer class="site-footer">
+    <div class="footer-grid">
+      <a class="brand" href="index.html" aria-label="Voltar à página inicial">
+        <span class="brand-symbol" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i>
         </span>
-        <span>AI Virtual Mouse Controller</span>
-      </div>
-
+        <span class="brand-copy">
+          <strong>AI Virtual Mouse</strong>
+          <small>Controller</small>
+        </span>
+      </a>
       <div class="footer-links">
         <a href="index.html">Início</a>
-        <a href="usage.html">Guia de Uso</a>
-        <a href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">GitHub</a>
-        <a href="index.html#concept">Conceito</a>
-        <a href="index.html#install">Instalar</a>
+        <a href="#quickstart">Início rápido</a>
+        <a href="#gestures-guide">Gestos</a>
+        <a href="#configuration">Configuração</a>
       </div>
-
-      <div class="footer-meta mono">
-        <span>open source · MIT</span>
-        <span class="dot-sep">·</span>
-        <span>feito para builders</span>
-      </div>
+      <p>Open source · licença MIT</p>
     </div>
   </footer>
 

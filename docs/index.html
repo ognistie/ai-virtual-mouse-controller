@@ -1,73 +1,66 @@
-<!DOCTYPE html>
-<html lang="pt-BR" data-theme="dark">
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <title>AI Virtual Mouse Controller — controle o computador com gestos</title>
-  <meta name="description" content="Controle o computador com gestos da mão. AI Virtual Mouse Controller transforma movimentos reais da mão em comandos do sistema operacional usando visão computacional, reconhecimento de gestos e uma interface holográfica em tempo real." />
-
-  <meta property="og:title" content="AI Virtual Mouse Controller" />
-  <meta property="og:description" content="Controle o computador com gestos. Interface de mão em tempo real com MediaPipe e visão computacional." />
-  <meta name="theme-color" content="#08090b" />
+  <title>AI Virtual Mouse Controller — controle por gestos</title>
+  <meta
+    name="description"
+    content="Controle o cursor, cliques e apresentações com gestos da mão. Um projeto open source em Python, MediaPipe e OpenCV, executado localmente."
+  >
+  <meta name="theme-color" content="#f6f7f5">
+  <meta property="og:title" content="AI Virtual Mouse Controller">
+  <meta
+    property="og:description"
+    content="Transforme gestos naturais da mão em comandos do computador com visão computacional executada localmente."
+  >
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
-
-  <link rel="stylesheet" href="assets/css/style.css" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  >
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script>document.documentElement.classList.add("js");</script>
 </head>
 
 <body>
-  <div class="bg-grid" aria-hidden="true"></div>
-  <div class="bg-glow" aria-hidden="true"></div>
+  <a class="skip-link" href="#content">Ir para o conteúdo</a>
 
-  <header class="nav">
-    <div class="nav-inner">
-      <a class="nav-brand" href="#top" aria-label="AI Virtual Mouse Controller">
-        <span class="brand-mark" aria-hidden="true">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <circle cx="10" cy="10" r="2" fill="currentColor"/>
-            <circle cx="4" cy="4" r="1" fill="currentColor" opacity="0.6"/>
-            <circle cx="16" cy="4" r="1" fill="currentColor" opacity="0.6"/>
-            <circle cx="4" cy="16" r="1" fill="currentColor" opacity="0.6"/>
-            <circle cx="16" cy="16" r="1" fill="currentColor" opacity="0.6"/>
-            <line x1="10" y1="10" x2="4" y2="4" stroke="currentColor" stroke-width="0.5" opacity="0.4"/>
-            <line x1="10" y1="10" x2="16" y2="4" stroke="currentColor" stroke-width="0.5" opacity="0.4"/>
-            <line x1="10" y1="10" x2="4" y2="16" stroke="currentColor" stroke-width="0.5" opacity="0.4"/>
-            <line x1="10" y1="10" x2="16" y2="16" stroke="currentColor" stroke-width="0.5" opacity="0.4"/>
-          </svg>
+  <header class="site-header">
+    <div class="nav-shell">
+      <a class="brand" href="#top" aria-label="AI Virtual Mouse Controller — início">
+        <span class="brand-symbol" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i>
         </span>
-        <span class="brand-text">
-          <span class="brand-name">AI Virtual Mouse</span>
-          <span class="brand-sub">Controller</span>
+        <span class="brand-copy">
+          <strong>AI Virtual Mouse</strong>
+          <small>Controller</small>
         </span>
       </a>
 
-      <nav class="nav-links" aria-label="Primária">
-        <a href="#system">Sistema</a>
-        <a href="#concept">Conceito</a>
-        <a href="#features">Recursos</a>
-        <a href="#holographic">Holograma</a>
+      <nav class="nav-links" aria-label="Navegação principal">
+        <a href="#overview">O projeto</a>
+        <a href="#technology">Tecnologia</a>
+        <a href="#gestures">Gestos</a>
+        <a href="#demo">Demonstração</a>
         <a href="#install">Instalar</a>
-        <a href="usage.html">Guia de Uso</a>
+        <a href="usage.html">Guia de uso</a>
       </nav>
 
       <div class="nav-actions">
-        <button class="theme-toggle" type="button" aria-label="Alternar tema">
-          <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.5"/>
-            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-          <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-          </svg>
+        <button class="theme-toggle" type="button" aria-label="Ativar tema escuro">
+          <span class="theme-icon" aria-hidden="true">◐</span>
         </button>
-        <a class="btn btn-ghost btn-sm" href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">
-          <span>GitHub</span>
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-            <path d="M3 9l6-6M9 3v4M9 3H5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-          </svg>
+        <a
+          class="button button-quiet nav-github"
+          href="https://github.com/ognistie/ai-virtual-mouse-controller"
+          target="_blank"
+          rel="noopener"
+        >
+          GitHub <span aria-hidden="true">↗</span>
         </a>
         <button class="menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false">
           <span></span><span></span>
@@ -76,787 +69,409 @@
     </div>
   </header>
 
-  <main id="top">
-
-    <section class="hero">
-      <div class="hero-content">
-        <div class="hero-eyebrow">
-          <span class="status-dot"></span>
-          <span class="mono">v1.0.6 · código aberto</span>
+  <main id="content">
+    <section class="hero" id="top">
+      <div class="hero-copy">
+        <div class="eyebrow">
+          <span class="eyebrow-dot" aria-hidden="true"></span>
+          Código aberto · execução local
         </div>
 
-        <h1 class="hero-title">
-          Controle seu computador com
-          <span class="title-accent">gestos da mão.</span>
-        </h1>
+        <h1>Seu computador responde à sua mão.</h1>
 
         <p class="hero-lede">
-          O AI Virtual Mouse Controller transforma movimentos reais da mão em comandos do sistema operacional usando visão computacional, reconhecimento de gestos e uma interface holográfica em tempo real.
+          O AI Virtual Mouse Controller transforma gestos naturais em movimento,
+          cliques e comandos do sistema — usando apenas uma webcam e processamento local.
         </p>
 
-        <div class="hero-badges">
-          <span class="badge"><span class="badge-dot"></span>MediaPipe</span>
-          <span class="badge">Visão Computacional</span>
-          <span class="badge">Reconhecimento de Gestos</span>
-          <span class="badge">Overlay Holográfico</span>
-          <span class="badge">Python</span>
-          <span class="badge">Open Source</span>
-        </div>
-
         <div class="hero-actions">
-          <a class="btn btn-primary" href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.55 0-.27-.01-1.16-.02-2.11-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.18 1.18.92-.26 1.91-.39 2.9-.39.99 0 1.97.13 2.9.39 2.2-1.49 3.18-1.18 3.18-1.18.62 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.44-2.7 5.41-5.27 5.69.41.35.78 1.05.78 2.11 0 1.53-.01 2.76-.01 3.13 0 .3.21.66.8.55C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"/>
-            </svg>
-            Ver no GitHub
+          <a class="button button-primary" href="#install">
+            Começar agora <span aria-hidden="true">→</span>
           </a>
-          <a class="btn btn-secondary" href="#system">
-            Explorar o sistema
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-              <path d="M3 6h6m0 0L7 4m2 2L7 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </a>
+          <a class="button button-secondary" href="#how">Ver como funciona</a>
         </div>
+
+        <ul class="hero-facts" aria-label="Principais características">
+          <li><strong>21</strong><span>pontos da mão</span></li>
+          <li><strong>5+</strong><span>gestos naturais</span></li>
+          <li><strong>Local</strong><span>sem enviar vídeo</span></li>
+        </ul>
       </div>
 
-      <div class="hero-visual">
-        <div class="hand-stage" aria-hidden="true">
-          <!-- Holo backdrop: rotating rings, radar sweep, crosshair guides -->
-          <svg class="holo-radial" viewBox="0 0 520 520" preserveAspectRatio="xMidYMid meet">
-            <defs>
-              <radialGradient id="hrGlow" cx="50%" cy="62%" r="55%">
-                <stop offset="0%"  stop-color="rgba(34,211,238,0.22)"/>
-                <stop offset="55%" stop-color="rgba(34,211,238,0.05)"/>
-                <stop offset="100%" stop-color="transparent"/>
-              </radialGradient>
-              <linearGradient id="hrSweep" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%"   stop-color="rgba(34,211,238,0)"/>
-                <stop offset="100%" stop-color="rgba(34,211,238,0.55)"/>
-              </linearGradient>
-            </defs>
-
-            <!-- soft halo around hand -->
-            <circle cx="260" cy="320" r="220" fill="url(#hrGlow)"/>
-
-            <!-- crosshair guides -->
-            <line x1="260" y1="0"   x2="260" y2="520" stroke="rgba(34,211,238,0.10)" stroke-dasharray="1 7"/>
-            <line x1="0"   y1="320" x2="520" y2="320" stroke="rgba(34,211,238,0.10)" stroke-dasharray="1 7"/>
-
-            <!-- concentric guide rings -->
-            <circle class="hr-ring" cx="260" cy="320" r="90"  fill="none" stroke="rgba(34,211,238,0.18)"/>
-            <circle class="hr-ring" cx="260" cy="320" r="148" fill="none" stroke="rgba(34,211,238,0.12)"/>
-            <circle class="hr-ring" cx="260" cy="320" r="200" fill="none" stroke="rgba(34,211,238,0.10)"/>
-
-            <!-- rotating tick ring (slow) -->
-            <g class="hr-rotate-slow">
-              <circle cx="260" cy="320" r="214" fill="none"
-                      stroke="rgba(34,211,238,0.55)" stroke-width="1"
-                      stroke-dasharray="1 9"/>
-              <!-- cardinal markers -->
-              <circle cx="260" cy="106" r="3" fill="rgba(34,211,238,0.9)"/>
-              <circle cx="474" cy="320" r="3" fill="rgba(34,211,238,0.9)"/>
-              <circle cx="260" cy="534" r="3" fill="rgba(34,211,238,0.9)"/>
-              <circle cx="46"  cy="320" r="3" fill="rgba(34,211,238,0.9)"/>
-            </g>
-
-            <!-- counter-rotating outer ring (fast) -->
-            <g class="hr-rotate-rev">
-              <circle cx="260" cy="320" r="236" fill="none"
-                      stroke="rgba(34,211,238,0.32)" stroke-width="0.6"
-                      stroke-dasharray="3 16"/>
-              <circle cx="260" cy="84"  r="2.2" fill="rgba(34,211,238,0.85)"/>
-              <circle cx="496" cy="320" r="2.2" fill="rgba(34,211,238,0.85)"/>
-            </g>
-
-            <!-- orbital arc on left -->
-            <g class="hr-rotate-mid">
-              <path d="M 60 320 A 200 200 0 0 1 160 158" fill="none"
-                    stroke="rgba(34,211,238,0.65)" stroke-width="1.3"/>
-              <circle cx="60" cy="320" r="3" fill="rgba(34,211,238,0.9)"/>
-            </g>
-
-            <!-- radar sweep cone (rotates) -->
-            <g class="hr-radar">
-              <path d="M 260 320 L 260 110 A 210 210 0 0 1 412 200 Z"
-                    fill="url(#hrSweep)" opacity="0.45"/>
-            </g>
-
-            <!-- bottom bracket ticks -->
-            <g class="hr-ticks-bottom">
-              <line x1="100" y1="500" x2="100" y2="494" stroke="rgba(34,211,238,0.4)"/>
-              <line x1="140" y1="500" x2="140" y2="490" stroke="rgba(34,211,238,0.55)"/>
-              <line x1="180" y1="500" x2="180" y2="494" stroke="rgba(34,211,238,0.4)"/>
-              <line x1="220" y1="500" x2="220" y2="490" stroke="rgba(34,211,238,0.55)"/>
-              <line x1="260" y1="500" x2="260" y2="486" stroke="rgba(34,211,238,0.8)"/>
-              <line x1="300" y1="500" x2="300" y2="490" stroke="rgba(34,211,238,0.55)"/>
-              <line x1="340" y1="500" x2="340" y2="494" stroke="rgba(34,211,238,0.4)"/>
-              <line x1="380" y1="500" x2="380" y2="490" stroke="rgba(34,211,238,0.55)"/>
-              <line x1="420" y1="500" x2="420" y2="494" stroke="rgba(34,211,238,0.4)"/>
-            </g>
-          </svg>
-
-          <canvas id="handCanvas" width="520" height="520"></canvas>
-
-          <!-- Wireframe globe — top-center small element -->
-          <div class="holo-globe" aria-hidden="true">
-            <svg viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(34,211,238,0.55)" stroke-width="0.8"/>
-              <ellipse cx="50" cy="50" rx="46" ry="14" fill="none" stroke="rgba(34,211,238,0.45)" stroke-width="0.5"/>
-              <ellipse cx="50" cy="50" rx="46" ry="28" fill="none" stroke="rgba(34,211,238,0.3)"  stroke-width="0.5"/>
-              <ellipse cx="50" cy="50" rx="14" ry="46" fill="none" stroke="rgba(34,211,238,0.45)" stroke-width="0.5"/>
-              <ellipse cx="50" cy="50" rx="28" ry="46" fill="none" stroke="rgba(34,211,238,0.3)"  stroke-width="0.5"/>
-              <circle cx="50" cy="50" r="3" fill="rgba(34,211,238,0.9)"/>
-              <circle cx="22" cy="40" r="1.2" fill="rgba(34,211,238,0.8)"/>
-              <circle cx="72" cy="62" r="1.2" fill="rgba(34,211,238,0.8)"/>
-              <circle cx="60" cy="28" r="1"   fill="rgba(34,211,238,0.7)"/>
-            </svg>
-            <div class="holo-globe-label mono">GEO · NODE</div>
+      <div class="hero-product" aria-label="Prévia real do rastreamento da mão">
+        <div class="product-window">
+          <div class="product-window-bar">
+            <div class="window-dots" aria-hidden="true"><i></i><i></i><i></i></div>
+            <span>avmc.preview</span>
+            <span class="status"><i aria-hidden="true"></i> rastreando</span>
           </div>
-
-          <!-- Floating telemetry pills -->
-          <div class="holo-readouts mono" aria-hidden="true">
-            <span class="hr-pill pill-a">θ <b id="roTheta">+032°</b></span>
-            <span class="hr-pill pill-b">vel <b id="roVel">0.08</b></span>
-            <span class="hr-pill pill-c">x <b id="roX">0.42</b></span>
-            <span class="hr-pill pill-d">y <b id="roY">0.61</b></span>
-            <span class="hr-pill pill-e">depth <b id="roZ">−1.4</b></span>
-          </div>
-
-          <!-- Floating particles drifting upward -->
-          <div class="holo-particles" aria-hidden="true">
-            <span></span><span></span><span></span><span></span><span></span>
-            <span></span><span></span><span></span><span></span><span></span>
-            <span></span><span></span><span></span><span></span><span></span>
-          </div>
-
-          <!-- Mini sparkline readout -->
-          <div class="holo-spark" aria-hidden="true">
-            <div class="hs-cap mono">sinal · landmarks</div>
-            <svg viewBox="0 0 120 32" preserveAspectRatio="none">
-              <polyline class="hs-line" fill="none" stroke="rgba(34,211,238,0.85)" stroke-width="1.2"
-                points="0,22 8,18 16,20 24,14 32,17 40,10 48,12 56,8 64,11 72,6 80,9 88,5 96,8 104,4 112,7 120,3"/>
-              <polyline class="hs-line dim" fill="none" stroke="rgba(34,211,238,0.3)" stroke-width="0.8"
-                points="0,28 8,26 16,27 24,24 32,25 40,22 48,23 56,20 64,21 72,18 80,19 88,16 96,17 104,14 112,15 120,12"/>
-            </svg>
-          </div>
-
-          <!-- Holographic console: floating UI fragments the hand "controls" -->
-          <div class="holo-console" id="holoConsole">
-            <article class="holo-card hc-browser" data-slot="browser">
-              <header class="hc-bar">
-                <span class="hc-dot"></span><span class="hc-dot"></span><span class="hc-dot"></span>
-                <span class="hc-title mono">navegador</span>
-              </header>
-              <div class="hc-body">
-                <div class="hc-url mono"><span>https://</span><span class="hc-cursor"></span></div>
-                <div class="hc-line"></div>
-                <div class="hc-line short"></div>
-                <div class="hc-line"></div>
-              </div>
-              <div class="hc-ripple"></div>
-            </article>
-
-            <article class="holo-card hc-media" data-slot="media">
-              <header class="hc-bar">
-                <span class="hc-title mono">áudio.live</span>
-              </header>
-              <div class="hc-body hc-equalizer" aria-hidden="true">
-                <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
-              </div>
-              <div class="hc-play mono">
-                <span class="hc-play-icon"></span>
-                <span class="hc-play-label">tocando</span>
-              </div>
-            </article>
-
-            <article class="holo-card hc-files" data-slot="files">
-              <header class="hc-bar">
-                <span class="hc-title mono">arquivos</span>
-              </header>
-              <div class="hc-grid">
-                <div class="hc-tile"></div><div class="hc-tile"></div><div class="hc-tile"></div>
-                <div class="hc-tile"></div><div class="hc-tile"></div><div class="hc-tile"></div>
-              </div>
-            </article>
-
-            <article class="holo-card hc-context" data-slot="context">
-              <ul class="hc-menu mono">
-                <li>abrir</li>
-                <li>copiar</li>
-                <li>renomear</li>
-                <li class="sep"></li>
-                <li class="danger">excluir</li>
-              </ul>
-            </article>
-
-            <div class="holo-pause-veil">
-              <span class="mono">pausado</span>
-            </div>
-
-            <div class="holo-stream mono" id="holoStream" aria-hidden="true">
-              <div class="hs-row"><span class="hs-time">--:--:--</span><span class="hs-evt">system.boot</span></div>
-            </div>
-
-            <div class="holo-reticle" id="holoReticle"></div>
-          </div>
-
-          <div class="stage-corners">
-            <span class="corner tl"></span>
-            <span class="corner tr"></span>
-            <span class="corner bl"></span>
-            <span class="corner br"></span>
-          </div>
-          <div class="stage-label mono">
-            <span class="rec-dot"></span>
-            rastreando · 21 landmarks
-          </div>
+          <figure class="product-media">
+            <img
+              src="assets/img/gesture_move_real.png"
+              alt="Pessoa usando a mão aberta com os 21 pontos de rastreamento sobrepostos"
+              width="640"
+              height="360"
+            >
+            <figcaption>
+              <span>
+                <small>gesto reconhecido</small>
+                <strong>Mão aberta</strong>
+              </span>
+              <span>
+                <small>ação</small>
+                <strong>Mover cursor</strong>
+              </span>
+            </figcaption>
+          </figure>
         </div>
+        <p class="privacy-note">
+          <span aria-hidden="true">●</span>
+          A imagem da câmera é processada no seu computador.
+        </p>
       </div>
     </section>
 
-    <section class="system" id="system">
-      <div class="section-head">
-        <span class="section-tag mono">01 · Sistema ao vivo</span>
-        <h2 class="section-title">Painel de rastreamento em tempo real</h2>
-        <p class="section-lede">Um vislumbre do que o sistema vê, interpreta e executa — landmark por landmark, frame por frame.</p>
-      </div>
-
-      <div class="panel">
-        <div class="panel-bar">
-          <div class="panel-dots">
-            <span></span><span></span><span></span>
-          </div>
-          <span class="panel-title mono">avm.tracker — main</span>
-          <span class="panel-state mono">rodando</span>
+    <section class="section overview" id="overview">
+      <div class="section-label">O projeto</div>
+      <div class="overview-grid">
+        <div>
+          <h2>Uma interface gestual simples, construída sobre visão computacional.</h2>
         </div>
-
-        <div class="panel-grid">
-          <div class="panel-col panel-left">
-            <div class="metric">
-              <div class="metric-label mono">fps</div>
-              <div class="metric-value"><span id="metricFps">58.4</span><span class="metric-unit">/60</span></div>
-              <div class="metric-bar"><span id="metricFpsBar" style="width: 96%"></span></div>
-            </div>
-            <div class="metric">
-              <div class="metric-label mono">latência</div>
-              <div class="metric-value"><span id="metricLat">12.7</span><span class="metric-unit">ms</span></div>
-              <div class="metric-bar"><span id="metricLatBar" style="width: 22%"></span></div>
-            </div>
-            <div class="metric">
-              <div class="metric-label mono">confiança</div>
-              <div class="metric-value"><span id="metricConf">0.94</span><span class="metric-unit"></span></div>
-              <div class="metric-bar"><span id="metricConfBar" style="width: 94%"></span></div>
-            </div>
-            <div class="metric">
-              <div class="metric-label mono">cursor</div>
-              <div class="metric-value mono small"><span id="metricCursor">847, 412</span></div>
-            </div>
-          </div>
-
-          <div class="panel-col panel-center">
-            <div class="hand-display">
-              <canvas id="systemCanvas" width="420" height="420"></canvas>
-              <div class="hand-display-label mono">
-                <span class="rec-dot"></span>
-                entrada · stream webcam
-              </div>
-            </div>
-          </div>
-
-          <div class="panel-col panel-right">
-            <div class="state-block">
-              <div class="state-label mono">gesto atual</div>
-              <div class="state-value" id="gestureName">open_hand</div>
-              <div class="state-bar"><span id="gestureBar" style="width:100%"></span></div>
-            </div>
-            <div class="state-block">
-              <div class="state-label mono">ação</div>
-              <div class="state-value action" id="actionName">MOVE</div>
-            </div>
-            <div class="state-block">
-              <div class="state-label mono">overlay holográfico</div>
-              <div class="state-value flag">
-                <span class="flag-dot on"></span> ativo
-              </div>
-            </div>
-            <div class="state-block">
-              <div class="state-label mono">landmarks</div>
-              <div class="state-value small">
-                <span>21</span><span class="metric-unit">rastreados</span>
-              </div>
-            </div>
-
-            <div class="state-block gesture-legend">
-              <div class="state-label mono">mapa de gestos</div>
-              <ul class="legend-list mono" id="gestureLegend">
-                <li data-gesture="open_hand">
-                  <span class="legend-icon" data-glyph="open">
-                    <i></i><i></i><i></i><i></i><i></i>
-                  </span>
-                  <span class="legend-gest">open_hand</span>
-                  <span class="legend-arr">→</span>
-                  <span class="legend-act">MOVE</span>
-                </li>
-                <li data-gesture="pinch">
-                  <span class="legend-icon" data-glyph="pinch">
-                    <i></i><i></i>
-                  </span>
-                  <span class="legend-gest">pinch</span>
-                  <span class="legend-arr">→</span>
-                  <span class="legend-act">CLICK</span>
-                </li>
-                <li data-gesture="pinch_middle">
-                  <span class="legend-icon" data-glyph="pinch-mid">
-                    <i></i><i></i>
-                  </span>
-                  <span class="legend-gest">pinch_middle</span>
-                  <span class="legend-arr">→</span>
-                  <span class="legend-act">RIGHT_CLICK</span>
-                </li>
-                <li data-gesture="peace">
-                  <span class="legend-icon" data-glyph="peace">
-                    <i></i><i></i>
-                  </span>
-                  <span class="legend-gest">peace</span>
-                  <span class="legend-arr">→</span>
-                  <span class="legend-act">DOUBLE_CLICK</span>
-                </li>
-                <li data-gesture="fist">
-                  <span class="legend-icon" data-glyph="fist">
-                    <i></i>
-                  </span>
-                  <span class="legend-gest">fist</span>
-                  <span class="legend-arr">→</span>
-                  <span class="legend-act">PAUSE</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <div class="panel-foot mono">
-          <span>polegar: 4 landmarks</span>
-          <span>indicador: 4</span>
-          <span>médio: 4</span>
-          <span>anelar: 4</span>
-          <span>mindinho: 4</span>
-          <span>palma: 1 origem</span>
-        </div>
-      </div>
-    </section>
-
-    <section class="concept" id="concept">
-      <div class="section-head center">
-        <span class="section-tag mono">02 · Conceito</span>
-        <h2 class="section-title">Uma nova camada entre mão, câmera e sistema.</h2>
-        <p class="section-lede">Três subsistemas trabalham em sequência — capturando, interpretando e traduzindo gestos em ações no sistema operacional.</p>
-      </div>
-
-      <div class="triad">
-        <article class="triad-card">
-          <div class="triad-num mono">VER</div>
-          <h3 class="triad-title">Capturar</h3>
-          <p class="triad-text">O stream da webcam é processado pelo MediaPipe Hands, que detecta 21 landmarks por frame com baixa latência na CPU.</p>
-          <div class="triad-meta mono">
-            <span>webcam</span>
-            <span>·</span>
-            <span>21 landmarks/frame</span>
-          </div>
-          <svg class="triad-graphic" width="100" height="50" viewBox="0 0 120 60" aria-hidden="true">
-            <rect x="2" y="2" width="116" height="56" rx="4" fill="none" stroke="currentColor" stroke-width="0.5" opacity="0.5"/>
-            <circle cx="60" cy="30" r="3" fill="currentColor"/>
-            <circle cx="40" cy="20" r="1.5" fill="currentColor" opacity="0.6"/>
-            <circle cx="80" cy="20" r="1.5" fill="currentColor" opacity="0.6"/>
-            <circle cx="40" cy="40" r="1.5" fill="currentColor" opacity="0.6"/>
-            <circle cx="80" cy="40" r="1.5" fill="currentColor" opacity="0.6"/>
-            <line x1="60" y1="30" x2="40" y2="20" stroke="currentColor" stroke-width="0.5"/>
-            <line x1="60" y1="30" x2="80" y2="20" stroke="currentColor" stroke-width="0.5"/>
-            <line x1="60" y1="30" x2="40" y2="40" stroke="currentColor" stroke-width="0.5"/>
-            <line x1="60" y1="30" x2="80" y2="40" stroke="currentColor" stroke-width="0.5"/>
-          </svg>
-        </article>
-
-        <article class="triad-card">
-          <div class="triad-num mono">ENTENDER</div>
-          <h3 class="triad-title">Interpretar</h3>
-          <p class="triad-text">Landmarks alimentam uma máquina de estados de gestos. Distâncias, ângulos e velocidades dirigem a classificação com debounce e gating de confiança.</p>
-          <div class="triad-meta mono">
-            <span>máquina de estados</span>
-            <span>·</span>
-            <span>6 gestos</span>
-          </div>
-          <svg class="triad-graphic" width="100" height="50" viewBox="0 0 120 60" aria-hidden="true">
-            <rect x="10" y="20" width="20" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="0.6"/>
-            <rect x="50" y="20" width="20" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="0.6"/>
-            <rect x="90" y="20" width="20" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="0.6"/>
-            <line x1="30" y1="30" x2="50" y2="30" stroke="currentColor" stroke-width="0.6"/>
-            <line x1="70" y1="30" x2="90" y2="30" stroke="currentColor" stroke-width="0.6"/>
-            <circle cx="60" cy="30" r="2.5" fill="currentColor"/>
-          </svg>
-        </article>
-
-        <article class="triad-card">
-          <div class="triad-num mono">AGIR</div>
-          <h3 class="triad-title">Executar</h3>
-          <p class="triad-text">Gestos confirmados se traduzem em eventos do sistema — movimento de cursor, cliques, arrastes e pausas entregues via pyautogui.</p>
-          <div class="triad-meta mono">
-            <span>pyautogui</span>
-            <span>·</span>
-            <span>comandos de cursor</span>
-          </div>
-          <svg class="triad-graphic" width="100" height="50" viewBox="0 0 120 60" aria-hidden="true">
-            <path d="M30 15 L60 30 L40 30 L45 45 L35 50 L30 35 L18 38 Z" fill="none" stroke="currentColor" stroke-width="0.8"/>
-            <line x1="80" y1="20" x2="100" y2="20" stroke="currentColor" stroke-width="0.6"/>
-            <line x1="80" y1="30" x2="100" y2="30" stroke="currentColor" stroke-width="0.6"/>
-            <line x1="80" y1="40" x2="100" y2="40" stroke="currentColor" stroke-width="0.6"/>
-          </svg>
-        </article>
-      </div>
-    </section>
-
-    <section class="features" id="features">
-      <div class="section-head">
-        <span class="section-tag mono">03 · Capacidades</span>
-        <h2 class="section-title">Feito para interação real.</h2>
-        <p class="section-lede">Um conjunto focado de gestos e comportamentos — cada um ajustado para controle de baixa latência sem sacrificar precisão.</p>
-      </div>
-
-      <div class="features-grid">
-        <article class="feature-card">
-          <div class="feature-icon"><span class="dot-cursor"></span></div>
-          <div class="feature-badge mono">cursor</div>
-          <h3 class="feature-title">Controle do cursor</h3>
-          <p class="feature-text">Move o cursor do sistema traduzindo suavemente a posição da mão, com filtragem adaptativa e zona morta.</p>
-        </article>
-
-        <article class="feature-card">
-          <div class="feature-icon"><span class="dot-pinch"></span></div>
-          <div class="feature-badge mono">click</div>
-          <h3 class="feature-title">Clique esquerdo</h3>
-          <p class="feature-text">Gesto de pinça entre polegar e indicador detecta a intenção via velocidade e threshold de contato.</p>
-        </article>
-
-        <article class="feature-card">
-          <div class="feature-icon"><span class="dot-right"></span></div>
-          <div class="feature-badge mono">right_click</div>
-          <h3 class="feature-title">Clique direito</h3>
-          <p class="feature-text">Pinça polegar-médio com guard do indicador isola a intenção de menu de contexto do clique normal.</p>
-        </article>
-
-        <article class="feature-card">
-          <div class="feature-icon"><span class="dot-drag"></span></div>
-          <div class="feature-badge mono">drag</div>
-          <h3 class="feature-title">Arrastar e soltar</h3>
-          <p class="feature-text">Pinça sustentada além do hold threshold entra em modo de arrasto, soltando ao abrir a mão.</p>
-        </article>
-
-        <article class="feature-card">
-          <div class="feature-icon"><span class="dot-double"></span></div>
-          <div class="feature-badge mono">double_click</div>
-          <h3 class="feature-title">Duplo clique</h3>
-          <p class="feature-text">Sinal de paz dispara um duplo clique preciso com intervalo sintético reconhecido pelo SO nativo.</p>
-        </article>
-
-        <article class="feature-card">
-          <div class="feature-icon"><span class="dot-pause"></span></div>
-          <div class="feature-badge mono">pause</div>
-          <h3 class="feature-title">Gesto de pausa</h3>
-          <p class="feature-text">Punho fechado congela o cursor — útil para leitura estável ou reposicionamento da mão.</p>
-        </article>
-
-        <article class="feature-card">
-          <div class="feature-icon"><span class="dot-holo"></span></div>
-          <div class="feature-badge mono">overlay</div>
-          <h3 class="feature-title">Mão holográfica</h3>
-          <p class="feature-text">Overlay de mesh 3D renderizado com ModernGL — palma anatômica, dedos e polegar rastreados em tempo real.</p>
-        </article>
-
-        <article class="feature-card">
-          <div class="feature-icon"><span class="dot-smooth"></span></div>
-          <div class="feature-badge mono">smoothing</div>
-          <h3 class="feature-title">Rastreamento suave</h3>
-          <p class="feature-text">Filtro OneEuro adapta à velocidade do movimento — estável quando parado, responsivo quando se move.</p>
-        </article>
-
-        <article class="feature-card">
-          <div class="feature-icon"><span class="dot-cpu"></span></div>
-          <div class="feature-badge mono">cpu</div>
-          <h3 class="feature-title">Sem GPU</h3>
-          <p class="feature-text">GPU não é necessária. O modelo lite do MediaPipe entrega rastreamento a 60 fps em CPUs modernas.</p>
-        </article>
-      </div>
-    </section>
-
-    <section class="holographic" id="holographic">
-      <div class="holo-bg" aria-hidden="true"></div>
-
-      <div class="holo-content">
-        <div class="holo-text">
-          <span class="section-tag mono cyan">04 · Interface Holográfica</span>
-          <h2 class="section-title">
-            A mão holográfica transforma rastreamento invisível em uma
-            <span class="cyan-glow">interface visível.</span>
-          </h2>
-          <p class="section-lede">
-            Uma segunda camada visual que segue os mesmos 21 landmarks que o sistema usa para interpretar seus gestos. Renderizada em 3D com ModernGL, a mão holográfica é anatomicamente contínua — palma fundida com os dedos, polegar embutido no thenar, curvas orgânicas em cada articulação.
+        <div class="overview-copy">
+          <p>
+            A webcam identifica a posição da mão. O sistema interpreta a postura e
+            converte a intenção em eventos reais do sistema operacional, como mover,
+            clicar, arrastar e avançar slides.
           </p>
-
-          <ul class="holo-features">
-            <li>
-              <span class="holo-feat-label mono">render</span>
-              <span>Mesh 3D via ModernGL + shaders GLSL. VBOs persistentes, cache de mesh, caps hemisféricos nos dedos.</span>
-            </li>
-            <li>
-              <span class="holo-feat-label mono">material</span>
-              <span>Corpo azul profundo com rim ciano via fresnel — visível em qualquer fundo, claro ou escuro.</span>
-            </li>
-            <li>
-              <span class="holo-feat-label mono">anatomia</span>
-              <span>Palma em superfície lofted, dedos com seção elíptica, knuckle bulge no PIP, fusão com a thenar.</span>
-            </li>
-            <li>
-              <span class="holo-feat-label mono">overlay</span>
-              <span>Janela transparente fullscreen, click-through nativo, opcional via a tecla H.</span>
-            </li>
-          </ul>
-
-          <div class="holo-actions">
-            <code class="key-hint"><span>pressione</span><kbd>H</kbd><span>para alternar</span></code>
-          </div>
-        </div>
-
-        <div class="holo-visual">
-          <div class="holo-frame">
-            <canvas id="holoCanvas" width="480" height="600"></canvas>
-            <div class="holo-frame-label mono">
-              <span class="rec-dot cyan"></span>
-              holograma · prévia ao vivo
-            </div>
-            <div class="holo-readout mono">
-              <div><span>vértices</span><span>769</span></div>
-              <div><span>triângulos</span><span>1528</span></div>
-              <div><span>backend</span><span>ModernGL</span></div>
-              <div><span>fps</span><span>60</span></div>
-            </div>
-          </div>
+          <p>
+            Tudo acontece localmente, sem conta, servidor externo ou envio do vídeo
+            para a nuvem. O projeto é aberto e pode ser ajustado para diferentes
+            câmeras, telas e formas de interação.
+          </p>
+          <a class="text-link" href="usage.html">
+            Ler o guia completo <span aria-hidden="true">→</span>
+          </a>
         </div>
       </div>
     </section>
 
-    <section class="architecture" id="architecture">
-      <div class="section-head">
-        <span class="section-tag mono">05 · Arquitetura</span>
-        <h2 class="section-title">Pipeline, ponta a ponta.</h2>
-        <p class="section-lede">Seis estágios da webcam até o comando do cursor — cada um isolado, observável e substituível.</p>
+    <section class="section technology" id="technology">
+      <div class="section-heading">
+        <div>
+          <div class="section-label">Tecnologia</div>
+          <h2>Cada parte da stack tem uma função clara.</h2>
+        </div>
+        <p>
+          Uma arquitetura local e modular separa captura, interpretação e execução.
+          Isso mantém a interação responsiva e facilita testes e evolução.
+        </p>
       </div>
 
-      <div class="pipeline">
-        <div class="pipeline-node">
-          <div class="node-num mono">01</div>
-          <div class="node-title">Entrada webcam</div>
-          <div class="node-meta mono">OpenCV · 60 fps · threaded</div>
-        </div>
-        <div class="pipeline-arrow" aria-hidden="true"></div>
-
-        <div class="pipeline-node">
-          <div class="node-num mono">02</div>
-          <div class="node-title">MediaPipe Hands</div>
-          <div class="node-meta mono">21 landmarks · modelo lite</div>
-        </div>
-        <div class="pipeline-arrow" aria-hidden="true"></div>
-
-        <div class="pipeline-node">
-          <div class="node-num mono">03</div>
-          <div class="node-title">Processamento</div>
-          <div class="node-meta mono">OneEuro · normalização</div>
-        </div>
-        <div class="pipeline-arrow" aria-hidden="true"></div>
-
-        <div class="pipeline-node">
-          <div class="node-num mono">04</div>
-          <div class="node-title">Máquina de gestos</div>
-          <div class="node-meta mono">debounce · gate de intenção</div>
-        </div>
-        <div class="pipeline-arrow" aria-hidden="true"></div>
-
-        <div class="pipeline-node">
-          <div class="node-num mono">05</div>
-          <div class="node-title">Camada de cursor</div>
-          <div class="node-meta mono">pyautogui · atração de borda</div>
-        </div>
-        <div class="pipeline-arrow" aria-hidden="true"></div>
-
-        <div class="pipeline-node holo">
-          <div class="node-num mono">06</div>
-          <div class="node-title">Renderer holográfico</div>
-          <div class="node-meta mono">ModernGL · mesh 3D · GLSL</div>
-        </div>
+      <div class="stack-list">
+        <article class="stack-item">
+          <span class="stack-index">01</span>
+          <div>
+            <h3>Python</h3>
+            <p>Orquestra o pipeline, as configurações e o ciclo de execução.</p>
+          </div>
+          <span class="stack-role">Aplicação</span>
+        </article>
+        <article class="stack-item">
+          <span class="stack-index">02</span>
+          <div>
+            <h3>OpenCV</h3>
+            <p>Captura os frames da webcam e prepara as imagens para análise.</p>
+          </div>
+          <span class="stack-role">Vídeo</span>
+        </article>
+        <article class="stack-item">
+          <span class="stack-index">03</span>
+          <div>
+            <h3>MediaPipe Hands</h3>
+            <p>Localiza 21 landmarks e fornece a geometria da mão em tempo real.</p>
+          </div>
+          <span class="stack-role">Rastreamento</span>
+        </article>
+        <article class="stack-item">
+          <span class="stack-index">04</span>
+          <div>
+            <h3>Máquina de gestos + One Euro Filter</h3>
+            <p>Reconhece intenções e suaviza o movimento sem perder responsividade.</p>
+          </div>
+          <span class="stack-role">Interpretação</span>
+        </article>
+        <article class="stack-item">
+          <span class="stack-index">05</span>
+          <div>
+            <h3>PyAutoGUI</h3>
+            <p>Entrega movimentos, cliques, rolagem e teclas ao sistema operacional.</p>
+          </div>
+          <span class="stack-role">Controle</span>
+        </article>
+        <article class="stack-item">
+          <span class="stack-index">06</span>
+          <div>
+            <h3>PySide6 + ModernGL</h3>
+            <p>Renderizam o overlay 3D opcional sem bloquear a interação com o desktop.</p>
+          </div>
+          <span class="stack-role">Visual opcional</span>
+        </article>
       </div>
     </section>
 
-    <section class="install" id="install">
+    <section class="section how" id="how">
+      <div class="section-heading">
+        <div>
+          <div class="section-label">Como funciona</div>
+          <h2>Da câmera ao comando em três etapas.</h2>
+        </div>
+      </div>
+
+      <ol class="process">
+        <li>
+          <span>1</span>
+          <h3>Capturar</h3>
+          <p>A webcam fornece frames contínuos, processados localmente pelo OpenCV.</p>
+        </li>
+        <li>
+          <span>2</span>
+          <h3>Interpretar</h3>
+          <p>Os landmarks formam gestos estáveis, filtrados por confiança e contexto.</p>
+        </li>
+        <li>
+          <span>3</span>
+          <h3>Executar</h3>
+          <p>A intenção confirmada vira movimento, clique ou comando de teclado.</p>
+        </li>
+      </ol>
+    </section>
+
+    <section class="section gestures" id="gestures">
+      <div class="section-heading">
+        <div>
+          <div class="section-label">Gestos</div>
+          <h2>Movimentos fáceis de aprender e distinguir.</h2>
+        </div>
+        <p>
+          Cada gesto foi escolhido para reduzir ativações acidentais e manter o uso
+          confortável ao longo de uma sessão.
+        </p>
+      </div>
+
+      <div class="gesture-gallery">
+        <article class="gesture-card gesture-card-wide">
+          <img
+            src="assets/img/gesture_move_real.png"
+            alt="Mão aberta usada para mover o cursor"
+            loading="lazy"
+            width="640"
+            height="360"
+          >
+          <div>
+            <span>01</span>
+            <h3>Mover</h3>
+            <p>Mão aberta acompanha o cursor com suavização adaptativa.</p>
+          </div>
+        </article>
+        <article class="gesture-card">
+          <img
+            src="assets/img/gesture_left_click_real.png"
+            alt="Pinça entre polegar e indicador para clique esquerdo"
+            loading="lazy"
+            width="640"
+            height="360"
+          >
+          <div>
+            <span>02</span>
+            <h3>Clicar</h3>
+            <p>Pinça rápida entre polegar e indicador.</p>
+          </div>
+        </article>
+        <article class="gesture-card">
+          <img
+            src="assets/img/gesture_right_click_real.png"
+            alt="Gesto de clique direito com polegar e dedo médio"
+            loading="lazy"
+            width="640"
+            height="360"
+          >
+          <div>
+            <span>03</span>
+            <h3>Clique direito</h3>
+            <p>Polegar e médio acionam o menu de contexto.</p>
+          </div>
+        </article>
+        <article class="gesture-card">
+          <img
+            src="assets/img/gesture_double_click_real.png"
+            alt="Sinal de paz usado para duplo clique"
+            loading="lazy"
+            width="640"
+            height="360"
+          >
+          <div>
+            <span>04</span>
+            <h3>Duplo clique</h3>
+            <p>O sinal de paz confirma uma abertura precisa.</p>
+          </div>
+        </article>
+        <article class="gesture-card">
+          <img
+            src="assets/img/gesture_pause_real.png"
+            alt="Punho fechado usado para pausar o cursor"
+            loading="lazy"
+            width="640"
+            height="360"
+          >
+          <div>
+            <span>05</span>
+            <h3>Pausar</h3>
+            <p>Punho fechado congela o cursor imediatamente.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section demo" id="demo">
+      <div class="demo-intro">
+        <div>
+          <div class="section-label section-label-inverse">Demonstração</div>
+          <h2>Painel de rastreamento em tempo real.</h2>
+        </div>
+        <p>
+          Esta área receberá a demonstração completa do produto: captura da webcam,
+          reconhecimento dos gestos, resposta do cursor e ativação do overlay.
+        </p>
+      </div>
+
+      <!--
+        PONTO DE INSERÇÃO DO VÍDEO:
+        substitua .video-placeholder por:
+        <video class="demo-video" controls preload="metadata" poster="assets/img/video-poster.jpg">
+          <source src="assets/video/avmc-demo.mp4" type="video/mp4">
+        </video>
+      -->
+      <div class="video-placeholder" role="img" aria-label="Espaço reservado para o futuro vídeo de demonstração">
+        <span class="play-mark" aria-hidden="true">▶</span>
+        <div>
+          <strong>Vídeo de demonstração</strong>
+          <small>Em preparação</small>
+        </div>
+      </div>
+
+      <ul class="demo-checkpoints">
+        <li><span>01</span> Detecção dos 21 landmarks</li>
+        <li><span>02</span> Reconhecimento de cada gesto</li>
+        <li><span>03</span> Controle real do sistema</li>
+        <li><span>04</span> Overlay holográfico opcional</li>
+      </ul>
+    </section>
+
+    <section class="section install" id="install">
       <div class="install-grid">
-        <div class="install-text">
-          <span class="section-tag mono">06 · Instalar</span>
-          <h2 class="section-title">Rode localmente em minutos.</h2>
-          <p class="section-lede">Clone, instale as dependências e inicie o controller. Funciona no Windows, macOS e Linux.</p>
-
-          <ul class="install-reqs">
-            <li><span class="req-dot"></span>Python 3.10 ou superior</li>
-            <li><span class="req-dot"></span>Webcam (integrada ou USB)</li>
-            <li><span class="req-dot"></span>2GB de RAM, CPU moderna</li>
-            <li><span class="req-dot"></span>GPU não é necessária</li>
+        <div class="install-copy">
+          <div class="section-label">Instalação</div>
+          <h2>Comece com dois comandos.</h2>
+          <p>
+            Requer Python 3.11, 3.12 ou 3.13 e uma webcam. A instalação principal não
+            exige GPU.
+          </p>
+          <ul class="requirement-list">
+            <li>Windows, macOS ou Linux X11</li>
+            <li>Processamento executado localmente</li>
+            <li>Overlay 3D incluído e ativado sob demanda</li>
           </ul>
         </div>
 
         <div class="terminal">
-          <div class="terminal-bar">
-            <div class="terminal-dots">
-              <span></span><span></span><span></span>
+          <div class="terminal-tabs">
+            <div class="terminal-tablist" role="tablist" aria-label="Métodos de instalação">
+              <button
+                id="tab-pypi"
+                type="button"
+                role="tab"
+                aria-selected="true"
+                aria-controls="install-pypi"
+                data-tab="pypi"
+              >PyPI</button>
+              <button
+                id="tab-source"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="install-source"
+                data-tab="source"
+              >Código-fonte</button>
             </div>
-            <div class="terminal-tabs">
-              <button class="tab active" data-tab="pypi">PyPI</button>
-              <button class="tab" data-tab="win">Windows</button>
-              <button class="tab" data-tab="unix">macOS / Linux</button>
-            </div>
-            <button class="copy-btn" data-target="active" aria-label="Copiar comandos">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <rect x="3" y="3" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
-                <path d="M5.5 1.5h5a1 1 0 0 1 1 1v5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-              </svg>
-              <span>copiar</span>
-            </button>
+            <button class="copy-button" type="button" data-copy-target="install-pypi">Copiar</button>
           </div>
-
-          <pre class="terminal-body" data-tab-content="pypi"><code><span class="ln">$</span> <span class="cmd">pip install</span> ai-virtual-mouse-controller
-<span class="ln">$</span> <span class="cmd">avmc</span></code></pre>
-
-          <pre class="terminal-body hidden" data-tab-content="win"><code><span class="ln">$</span> <span class="cmd">git clone</span> https://github.com/ognistie/ai-virtual-mouse-controller.git
-<span class="ln">$</span> <span class="cmd">cd</span> ai-virtual-mouse-controller
-<span class="ln">$</span> <span class="cmd">python</span> -m venv .venv
-<span class="ln">$</span> .venv\Scripts\activate
-<span class="ln">$</span> <span class="cmd">pip install</span> -r requirements.txt
-<span class="ln">$</span> <span class="cmd">python</span> main.py</code></pre>
-
-          <pre class="terminal-body hidden" data-tab-content="unix"><code><span class="ln">$</span> <span class="cmd">git clone</span> https://github.com/ognistie/ai-virtual-mouse-controller.git
-<span class="ln">$</span> <span class="cmd">cd</span> ai-virtual-mouse-controller
-<span class="ln">$</span> <span class="cmd">python3</span> -m venv .venv
-<span class="ln">$</span> <span class="cmd">source</span> .venv/bin/activate
-<span class="ln">$</span> <span class="cmd">pip install</span> -r requirements.txt
-<span class="ln">$</span> <span class="cmd">python</span> main.py</code></pre>
+          <pre id="install-pypi" role="tabpanel" aria-labelledby="tab-pypi" data-tab-panel="pypi"><code>pip install ai-virtual-mouse-controller
+avmc</code></pre>
+          <pre id="install-source" role="tabpanel" aria-labelledby="tab-source" data-tab-panel="source" hidden><code>git clone https://github.com/ognistie/ai-virtual-mouse-controller.git
+cd ai-virtual-mouse-controller
+pip install -r requirements.txt
+python main.py</code></pre>
         </div>
       </div>
-    </section>
 
-    <section class="opensource" id="opensource">
-      <div class="section-head center">
-        <span class="section-tag mono">07 · Código aberto</span>
-        <h2 class="section-title">Ainda no começo, Contribuições bem-vindas.</h2>
-        <p class="section-lede">Experimentos, issues, feedback técnico e pull requests — tudo é apreciado. Este é um projeto guiado por pesquisa.</p>
-      </div>
-
-      <div class="oss-grid">
-        <a class="oss-card" href="https://github.com/ognistie/ai-virtual-mouse-controller/issues" target="_blank" rel="noopener">
-          <div class="oss-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/>
-              <circle cx="12" cy="12" r="3" fill="currentColor"/>
-            </svg>
-          </div>
-          <h3>Issues</h3>
-          <p>Reporte bugs, peça recursos, compartilhe casos extremos.</p>
-          <span class="oss-cta mono">github →</span>
-        </a>
-
-        <a class="oss-card" href="https://github.com/ognistie/ai-virtual-mouse-controller/pulls" target="_blank" rel="noopener">
-          <div class="oss-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <circle cx="6" cy="6" r="2" stroke="currentColor" stroke-width="1.5"/>
-              <circle cx="6" cy="18" r="2" stroke="currentColor" stroke-width="1.5"/>
-              <circle cx="18" cy="18" r="2" stroke="currentColor" stroke-width="1.5"/>
-              <path d="M6 8v8M8 18h8" stroke="currentColor" stroke-width="1.5"/>
-            </svg>
-          </div>
-          <h3>Pull Requests</h3>
-          <p>Envie código. Melhorias, refatorações, otimizações.</p>
-          <span class="oss-cta mono">github →</span>
-        </a>
-
-        <a class="oss-card" href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">
-          <div class="oss-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2L4 7v10l8 5 8-5V7l-8-5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-              <path d="M12 22V12M4 7l8 5 8-5" stroke="currentColor" stroke-width="1.5"/>
-            </svg>
-          </div>
-          <h3>Experimentos</h3>
-          <p>Novos gestos, render passes, modelos — faça fork e experimente.</p>
-          <span class="oss-cta mono">github →</span>
-        </a>
-
-        <a class="oss-card" href="https://github.com/ognistie/ai-virtual-mouse-controller#roadmap" target="_blank" rel="noopener">
-          <div class="oss-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M3 12h18M3 6h18M3 18h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-          </div>
-          <h3>Roadmap</h3>
-          <p>O que vem: modelo MANO, suporte multi-mão, perfis customizáveis.</p>
-          <span class="oss-cta mono">github →</span>
+      <div class="install-links">
+        <a class="text-link" href="usage.html">Instalação passo a passo <span aria-hidden="true">→</span></a>
+        <a
+          class="text-link"
+          href="https://github.com/ognistie/ai-virtual-mouse-controller"
+          target="_blank"
+          rel="noopener"
+        >
+          Ver repositório <span aria-hidden="true">↗</span>
         </a>
       </div>
     </section>
 
-    <section class="final-cta">
-      <div class="cta-content">
-        <h2 class="cta-title">Construa a próxima camada de interação humano-computador.</h2>
-        <p class="cta-text">Open source, técnico e feito para builders que se importam com a interação em si.</p>
-        <div class="cta-actions">
-          <a class="btn btn-primary" href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">
-            Repositório GitHub
-          </a>
-          <a class="btn btn-secondary" href="usage.html">
-            Guia de uso
-          </a>
-          <a class="btn btn-ghost" href="#install">
-            Rodar localmente
-          </a>
-        </div>
+    <section class="section final-cta">
+      <div>
+        <div class="section-label">Código aberto</div>
+        <h2>Experimente, adapte e contribua.</h2>
+        <p>
+          O projeto é distribuído sob licença MIT. Issues, testes e pull requests
+          ajudam a tornar a interação gestual mais precisa e acessível.
+        </p>
+      </div>
+      <div class="final-actions">
+        <a
+          class="button button-primary"
+          href="https://github.com/ognistie/ai-virtual-mouse-controller"
+          target="_blank"
+          rel="noopener"
+        >
+          Acessar GitHub <span aria-hidden="true">↗</span>
+        </a>
+        <a class="button button-secondary" href="usage.html">Abrir guia de uso</a>
       </div>
     </section>
   </main>
 
-  <footer class="footer">
-    <div class="footer-inner">
-      <div class="footer-brand">
-        <span class="brand-mark small" aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-            <circle cx="10" cy="10" r="2" fill="currentColor"/>
-            <circle cx="4" cy="4" r="1" fill="currentColor" opacity="0.6"/>
-            <circle cx="16" cy="4" r="1" fill="currentColor" opacity="0.6"/>
-            <circle cx="4" cy="16" r="1" fill="currentColor" opacity="0.6"/>
-            <circle cx="16" cy="16" r="1" fill="currentColor" opacity="0.6"/>
-          </svg>
+  <footer class="site-footer">
+    <div class="footer-grid">
+      <a class="brand" href="#top" aria-label="Voltar ao início">
+        <span class="brand-symbol" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i>
         </span>
-        <span>AI Virtual Mouse Controller</span>
-      </div>
-
+        <span class="brand-copy">
+          <strong>AI Virtual Mouse</strong>
+          <small>Controller</small>
+        </span>
+      </a>
       <div class="footer-links">
-        <a href="https://github.com/ognistie/ai-virtual-mouse-controller" target="_blank" rel="noopener">GitHub</a>
-        <a href="usage.html">Guia de Uso</a>
-        <a href="#concept">Conceito</a>
+        <a href="#overview">O projeto</a>
+        <a href="#technology">Tecnologia</a>
+        <a href="#gestures">Gestos</a>
         <a href="#install">Instalar</a>
+        <a href="usage.html">Guia</a>
       </div>
-
-      <div class="footer-meta mono">
-        <span>open source · MIT</span>
-        <span class="dot-sep">·</span>
-        <span>feito para builders</span>
-      </div>
+      <p>Open source · MIT · feito no Brasil</p>
     </div>
   </footer>
 
-  <script src="assets/js/hand-viz.js" defer></script>
   <script src="assets/js/main.js" defer></script>
 </body>
 </html>
