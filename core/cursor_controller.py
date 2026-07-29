@@ -55,6 +55,10 @@ class CursorController:
         edge_creep_band_px: int = 72,
         edge_creep_delay_s: float = 0.15,
         edge_creep_rate_px_s: float = 320.0,
+        bottom_reach_enabled: bool = False,
+        bottom_reach_band_px: int = 120,
+        bottom_reach_max_gain: float = 3.0,
+        bottom_reach_max_extra_px: int = 60,
     ) -> None:
         # Margens assimetricas: top/bottom geralmente menores que X.
         # Anatomia + camera 16:9 — alcance horizontal e' mais confortavel
@@ -105,6 +109,18 @@ class CursorController:
         self.edge_creep_band_px = max(1, int(edge_creep_band_px))
         self.edge_creep_delay_s = max(0.0, float(edge_creep_delay_s))
         self.edge_creep_rate_px_s = max(0.0, float(edge_creep_rate_px_s))
+
+        # Assistencia suave da borda inferior (substitui snap + creep).
+        # Empurra o cursor um pouco MAIS pra baixo, proporcional ao quanto
+        # o usuario ja esta descendo e a proximidade da borda. Sem
+        # teleporte, sem mover cursor parado. Ver _apply_bottom_reach.
+        self.bottom_reach_enabled = bool(bottom_reach_enabled)
+        self.bottom_reach_band_px = max(1, int(bottom_reach_band_px))
+        self.bottom_reach_max_gain = max(1.0, float(bottom_reach_max_gain))
+        self.bottom_reach_max_extra_px = max(0, int(bottom_reach_max_extra_px))
+        # Movimento descendente abaixo deste piso (px/frame) conta como
+        # "parado" — nao dispara assistencia (evita deriva com jitter).
+        self._bottom_reach_eps_px = 1
 
         self.screen_width, self.screen_height = pyautogui.size()
         self._last_x: Optional[int] = None
@@ -205,23 +221,30 @@ class CursorController:
         self._last_y = y
 
     def _apply_bottom_reach(self, y: int) -> int:
-        """Fecha a zona morta acima da taskbar em dois estagios.
+        """Fecha o gap terminal acima da taskbar.
 
-        Edge snap: movendo pra BAIXO a menos de edge_snap_px do fundo,
-        salta direto pra borda — alvos da taskbar sao colados na borda
-        (Fitts: alvo de largura infinita), o gap terminal nao tem valor.
+        Assistencia suave (padrao, bottom_reach_enabled): descendo dentro
+        da faixa inferior, o cursor ganha um empurrao EXTRA proporcional a
+        (a) quanto o usuario esta descendo NESTE frame e (b) proximidade
+        da borda (smoothstep). Propriedades:
+          - sem teleporte: o empurrao e' um ganho sobre o passo do
+            usuario, limitado por bottom_reach_max_extra_px;
+          - cursor parado nao se move (raw_dy ~ 0 => empurrao ~ 0);
+          - subir cancela na hora;
+          - C1 na entrada da faixa (smoothstep tem derivada zero), entao
+            entrar na faixa nao muda a velocidade aparente em degrau.
 
-        Border creep: mao parada dentro da banda inferior alem do delay
-        faz o cursor deslizar ate a borda. Cobre a fase de homing: o
-        usuario desacelera ao mirar, a velocidade zera e a extrapolacao
-        da ancora deixa de ajudar — o creep completa o trajeto.
+        Edge snap e border creep (legado) seguem implementados abaixo,
+        porem desligados por padrao (ver config.py). O snap saltava direto
+        pro ultimo pixel; o creep deslizava com a mao parada.
 
-        Subir a mao cancela os dois imediatamente (sem cursor "preso").
+        Subir a mao cancela qualquer assistencia imediatamente.
         """
         bottom = self.screen_height - 1
-        # Direcao decidida pelo y CRU (pre-assistencia), com ~3px de
-        # tolerancia pro jitter natural da mao parada.
-        moving_down = self._last_raw_y is None or y >= self._last_raw_y - 3
+        # Direcao/velocidade decididas pelo y CRU (pre-assistencia), com
+        # ~3px de tolerancia pro jitter natural da mao parada.
+        prev_raw = self._last_raw_y
+        moving_down = prev_raw is None or y >= prev_raw - 3
         self._last_raw_y = y
 
         # Subiu de verdade: cancela assistencias, cursor volta ao controle
@@ -229,12 +252,32 @@ class CursorController:
             self._reset_creep()
             return y
 
-        # Edge snap — gap terminal
+        # Edge snap (legado) — gap terminal por teleporte. Desligado (0).
         if self.edge_snap_px > 0 and y >= bottom - self.edge_snap_px:
             self._reset_creep()
             return bottom
 
-        # Border creep — homing parado na banda
+        # Assistencia suave (padrao): ganho no movimento descendente perto
+        # da borda. Como e' proporcional ao passo do usuario, mao parada
+        # nao gera empurrao — o cursor nao foge sozinho.
+        if self.bottom_reach_enabled and prev_raw is not None:
+            raw_dy = y - prev_raw
+            if raw_dy <= self._bottom_reach_eps_px:
+                return y  # parado ou quase: sem assistencia
+            band = self.bottom_reach_band_px
+            prox = (y - (bottom - band)) / band
+            if prox <= 0.0:
+                return y  # acima da faixa
+            if prox > 1.0:
+                prox = 1.0
+            ramp = prox * prox * (3.0 - 2.0 * prox)  # smoothstep -> C1
+            extra = (self.bottom_reach_max_gain - 1.0) * ramp * raw_dy
+            if extra > self.bottom_reach_max_extra_px:
+                extra = float(self.bottom_reach_max_extra_px)
+            y_assisted = y + int(round(extra))
+            return bottom if y_assisted > bottom else y_assisted
+
+        # Border creep (legado) — homing parado na banda. Desligado.
         if not self.edge_creep_enabled:
             return y
         in_band = y >= self.screen_height - self.edge_creep_band_px
