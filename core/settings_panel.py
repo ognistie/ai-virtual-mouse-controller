@@ -28,7 +28,8 @@ API publica:
 `callbacks` segue o contrato de core.ui_overlay.UICallbacks:
     on_slider_change(key, value)   value 0-1
     on_profile_change(profile)
-    on_toggle(key, value)          key in {"aim", "sticky"}
+    on_toggle(key, value)          key in {"aim", "sticky",
+                                            "presentation", "hologram"}
     on_reset()
     on_apply_recommended()
 """
@@ -217,6 +218,17 @@ if _PYSIDE_OK:
 
             col.addWidget(self._divider())
 
+            # Modos (apresentacao / holograma da mao)
+            col.addWidget(self._section_label("MODOS"))
+            self._presentation_switch = self._make_toggle(
+                col, "Modo apresentação", "presentation",
+            )
+            self._hologram_switch = self._make_toggle(
+                col, "Modo holograma", "hologram",
+            )
+
+            col.addWidget(self._divider())
+
             # Acoes
             actions = QHBoxLayout()
             actions.setSpacing(8)
@@ -289,6 +301,8 @@ if _PYSIDE_OK:
             aim: bool,
             sticky: bool,
             profile: str,
+            presentation: bool = False,
+            hologram: bool = False,
         ) -> None:
             for key, s in self._sliders.items():
                 s.blockSignals(True)
@@ -299,6 +313,8 @@ if _PYSIDE_OK:
                 btn.setChecked(k == profile)
             self._aim_switch.set_on(aim)
             self._sticky_switch.set_on(sticky)
+            self._presentation_switch.set_on(presentation)
+            self._hologram_switch.set_on(hologram)
 
         def set_slider_display(self, key: str, text: str) -> None:
             if key in self._slider_vals:
@@ -555,10 +571,15 @@ class SettingsPanel:
         aim: bool,
         sticky: bool,
         profile: str,
+        presentation: bool = False,
+        hologram: bool = False,
     ) -> None:
         """Popula o painel com o estado atual do RuntimeSettings."""
         if self._panel is not None:
-            self._panel.apply_snapshot(sliders, displays, aim, sticky, profile)
+            self._panel.apply_snapshot(
+                sliders, displays, aim, sticky, profile,
+                presentation, hologram,
+            )
 
     def set_slider_display(self, key: str, text: str) -> None:
         """Atualiza so o rotulo de valor de um slider (feedback ao vivo
