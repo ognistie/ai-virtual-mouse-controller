@@ -7,6 +7,74 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Added
+- **`core/cursor_motion.py`**: pipeline de movimento adaptativo puro e
+  testavel (ganho por distancia, precisao continua, assistencia da borda
+  inferior). `dt` injetado — sem relogio proprio, sem I/O. Ver
+  `docs/adr/0002-adaptive-cursor-motion.md`.
+- **Ganho adaptativo por distancia**: escala aparente da palma estimada
+  por mediana de cinco segmentos estaveis (nao usa o `z` do MediaPipe),
+  com filtro temporal, zona morta e limite de variacao. Mao longe ganha
+  alcance (`DISTANCE_GAIN_FAR = 1.40`), mao perto ganha precisao
+  (`DISTANCE_GAIN_NEAR = 0.75`).
+- `MOTION_DEBUG_ENABLED` / `MOTION_DEBUG_EVERY_N_FRAMES`: log de escala,
+  ganhos, pesos de precisao, assistencia inferior e re-ancoragem. So
+  `logger.debug`, sem salvar frame e sem telemetria externa.
+- `tests/test_cursor_motion.py` e `tests/test_cursor_pipeline.py`:
+  monotonicidade e limites do ganho, invariancia com ancora parada,
+  continuidade nas transicoes, ausencia de degrau no joelho, jitter em
+  pixel, equivalencia 30/60 FPS, alcance e liberacao da borda inferior,
+  perda/re-ancoragem da mao, semantica dos gestos e propagacao de
+  perfis. Deterministas, sem `sleep`.
+
+### Changed
+- **BREAKING (comportamento)**: o cursor passa a usar movimento
+  RELATIVO (integra deltas da ancora) em vez de posicao absoluta
+  escalada. Mudanca de ganho, distancia, perfil ou aim assist nao
+  reposiciona mais o cursor — so afeta movimentos futuros. Em
+  contrapartida, a posicao da mao nao indica mais 1-pra-1 a posicao do
+  cursor; congelar com ✊/✌️ e' o equivalente a levantar o mouse.
+- **Aim assist e sticky viraram continuos** (peso em [0,1] com envelope
+  attack/release de 100/220 ms). O holdover por timer foi substituido
+  por liberacao progressiva. Em regime, o fator 0.40 passa a de fato
+  reduzir a sensibilidade — antes a razao medida era 1.00.
+- **Borda inferior**: os quatro mecanismos empilhados (Y boost, edge
+  snap, border creep e gain de descida reforcado na ancora) dao lugar a
+  UMA assistencia por ganho, C1 na entrada e proporcional ao movimento
+  do proprio usuario.
+- `RobustHandAnchor.compute()` passa a ser chamado exatamente uma vez
+  por mao/frame (eram ate tres).
+- Os thresholds da curva balistica passam a valer por SEGUNDO (com
+  `velocity_reference_fps = 60` preservando o feel a 60 FPS). O
+  comportamento agora e' identico a 30 e a 60 FPS.
+- `DPI_FIXED_MULTIPLIER` (slider de sensibilidade) e' explicitamente o
+  ganho BASE da composicao `base x distancia x precisao`.
+- `RobustHandAnchor._EDGE_CRITICAL_GAIN_DOWN`: 1.4 -> 1.0. A
+  assistencia especifica da borda inferior passa a viver em um lugar so.
+
+### Deprecated
+- `compute_dpi_multiplier()` e `apply_dpi_to_position()`: continuam
+  exportadas mas nao sao mais usadas pelo pipeline.
+- `CURSOR_EDGE_SNAP_PX` agora e' `0` por padrao (era 48) — o snap
+  teleportava o cursor pro ultimo pixel.
+- `CURSOR_Y_BOTTOM_BOOST_ENABLED` e `CURSOR_EDGE_CREEP_ENABLED` agora
+  sao `False` por padrao. A implementacao continua no `CursorController`
+  pra quem quiser religar.
+- `AIM_ASSIST_HOLDOVER_SECONDS` e `DPI_MULTIPLIER_MIN`/`_MAX`: mantidos
+  por compatibilidade, sem efeito no pipeline atual.
+
+### Fixed
+- Cursor se deslocava com a mao PARADA quando a escala estimada da mao
+  oscilava (o ganho escalava uma posicao absoluta em torno do centro da
+  tela). Medido: 38 px de varredura com ±4% de oscilacao; agora 0 px.
+- Ganho por distancia estava INVERTIDO: mao perto da webcam recebia
+  multiplicador alto e mao longe, baixo.
+- Aim assist multiplicava um ERRO (alvo − saida) em vez de um delta de
+  entrada, o que fazia dele um filtro de lag: nao reduzia sensibilidade
+  e ainda deixava o cursor escorregar ~8 px depois da mao parar.
+- Descontinuidade de derivada no joelho da curva da borda inferior
+  (inclinacao saltava de 1.0 para 1.5).
+
 ## [1.1.0] — 2026-06-17
 
 ### Added

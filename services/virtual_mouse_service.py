@@ -98,6 +98,7 @@ class VirtualMouseService:
         self.window_name = window_name
 
         self._fps = FPSCounter(window=30)
+        self._motion_debug_tick = 0
         self._should_stop = False
         self._hand_lost_frames = 0
         self._always_on_top: bool = getattr(config, "DISPLAY_ALWAYS_ON_TOP", True)
@@ -351,6 +352,49 @@ class VirtualMouseService:
             ),
             pinch_middle_middle_extension_max=getattr(
                 config, "PINCH_MIDDLE_MIDDLE_EXTENSION_MAX", 0.92,
+            ),
+            # Movimento adaptativo (core/cursor_motion.py)
+            distance_gain_enabled=getattr(
+                config, "DPI_ADAPTIVE_ENABLED", True,
+            ),
+            distance_gain_far=getattr(config, "DISTANCE_GAIN_FAR", 1.40),
+            distance_gain_near=getattr(config, "DISTANCE_GAIN_NEAR", 0.75),
+            distance_scale_far_ratio=getattr(
+                config, "DISTANCE_SCALE_FAR_RATIO", 0.60,
+            ),
+            distance_scale_near_ratio=getattr(
+                config, "DISTANCE_SCALE_NEAR_RATIO", 1.55,
+            ),
+            distance_scale_filter_hz=getattr(
+                config, "DISTANCE_SCALE_FILTER_HZ", 1.2,
+            ),
+            distance_gain_rate_per_second=getattr(
+                config, "DISTANCE_GAIN_RATE_PER_SECOND", 1.5,
+            ),
+            precision_attack_seconds=getattr(
+                config, "PRECISION_ATTACK_SECONDS", 0.10,
+            ),
+            precision_release_seconds=getattr(
+                config, "PRECISION_RELEASE_SECONDS", 0.22,
+            ),
+            bottom_assist_enabled=getattr(
+                config, "BOTTOM_ASSIST_ENABLED", True,
+            ),
+            # A borda inferior no espaco da ANCORA e' exatamente onde o
+            # CursorController mapeia o ultimo pixel da tela.
+            bottom_assist_edge=1.0 - getattr(
+                config, "SCREEN_MARGIN_BOTTOM",
+                config.SCREEN_MARGIN_PERCENTAGE,
+            ),
+            bottom_assist_band=getattr(config, "BOTTOM_ASSIST_BAND", 0.22),
+            bottom_assist_max_gain=getattr(
+                config, "BOTTOM_ASSIST_MAX_GAIN", 3.2,
+            ),
+            bottom_assist_max_extra_rate=getattr(
+                config, "BOTTOM_ASSIST_MAX_EXTRA_RATE", 0.60,
+            ),
+            bottom_assist_intent_speed=getattr(
+                config, "BOTTOM_ASSIST_INTENT_SPEED", 0.12,
             ),
             followthrough_frames=getattr(
                 config, "CURSOR_FOLLOWTHROUGH_FRAMES", 6,
@@ -842,6 +886,32 @@ class VirtualMouseService:
     # Overlay rendering
     # -----------------------------------------------------------------
 
+    def _log_motion_debug(self) -> None:
+        """Estado do pipeline de movimento no log, em modo debug.
+
+        Sai por `logger.debug` e so quando MOTION_DEBUG_ENABLED esta
+        ligado. Nao salva frames da webcam, nao escreve imagem, nao
+        manda nada pra fora da maquina.
+        """
+        if not getattr(config, "MOTION_DEBUG_ENABLED", False):
+            return
+        every = max(1, int(getattr(config, "MOTION_DEBUG_EVERY_N_FRAMES", 30)))
+        self._motion_debug_tick += 1
+        if self._motion_debug_tick % every:
+            return
+        motion = getattr(self.gesture_detector, "motion", None)
+        if motion is None:
+            return
+        s = motion.debug_snapshot()
+        logger.debug(
+            "motion | scale raw=%.4f filt=%.4f | gain dist=%.3f total=%.3f | "
+            "precision=%.2f sticky=%.2f | bottom=%.2f | speed=%.3f/s | "
+            "reanchored=%s",
+            s.scale_raw, s.scale_filtered, s.distance_gain, s.total_gain,
+            s.precision_weight, s.sticky_weight, s.bottom_strength,
+            s.speed, s.reanchored,
+        )
+
     def _draw_overlays(self, frame: np.ndarray, hand, raw_results) -> None:
         # Landmarks (HandTracker.draw aceita raw_results)
         if self.draw_landmarks and raw_results is not None:
@@ -866,6 +936,8 @@ class VirtualMouseService:
             sticky_active=d.sticky_active,
             anchor_frozen=anchor_frozen,
         )
+
+        self._log_motion_debug()
 
         # Indicador de estado do holograma no preview cv2 — garante
         # que o usuario veja se o toggle por tecla H funcionou, mesmo

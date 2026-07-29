@@ -18,9 +18,15 @@ Gestos:
 - ✌️  PEACE                            -> DOUBLE_CLICK ao soltar
 - ✊  FIST                             -> congelado
 
-Recursos: sticky targeting, aim assist com pre-ativacao, curva
-ballistica suavizada, histerese (debounce/exit frames), threshold
-adaptativo de pinch com piso minimo, cooldown anti-bounce.
+Recursos: histerese (debounce/exit frames), threshold adaptativo de
+pinch com piso minimo, cooldown anti-bounce, follow-through quando a
+mao sai do FOV.
+
+A MATEMATICA DE MOVIMENTO nao mora aqui. Ganho adaptativo por
+distancia, precisao continua (aim assist + sticky), curva balistica e
+assistencia da borda inferior vivem em `core/cursor_motion.py` — modulo
+puro, com `dt` injetado. Este arquivo classifica gestos, calcula a
+ancora UMA vez por frame e alimenta aquele pipeline.
 """
 
 from __future__ import annotations
@@ -33,6 +39,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Deque, List, Optional, Tuple
 
+from .cursor_motion import CursorMotion, MotionConfig, clamp as _clamp
 from .finger_posture import (
     FINGER_CHAIN_INDEX,
     FINGER_CHAIN_MIDDLE,
@@ -186,6 +193,14 @@ def get_anchor_position(
 
 
 def compute_dpi_multiplier(hand_size, reference_size, min_mult, max_mult, enabled=True):
+    """DEPRECATED — nao e' mais usada pelo pipeline de movimento.
+
+    Mantida apenas por compatibilidade de API. A relacao aqui e' o
+    INVERSO da UX desejada (mao perto = multiplicador alto), o que era a
+    causa raiz do cursor "morrer" com a mao longe da webcam. O ganho
+    adaptativo correto vive em ``core.cursor_motion.distance_gain``, que
+    e' monotonico e inverso na escala aparente da palma.
+    """
     if not enabled or reference_size <= 0:
         return 1.0
     ratio = hand_size / reference_size
@@ -198,6 +213,13 @@ def compute_dpi_multiplier(hand_size, reference_size, min_mult, max_mult, enable
 
 
 def apply_dpi_to_position(pos, dpi_mult, center=(0.5, 0.5)):
+    """DEPRECATED — nao e' mais usada pelo pipeline de movimento.
+
+    Escalar uma POSICAO ABSOLUTA em torno do centro faz o cursor se
+    deslocar sempre que o ganho oscila, mesmo com a mao parada. O
+    pipeline atual integra DELTAS (ver ``core.cursor_motion``), onde
+    mudanca de ganho so afeta movimentos futuros.
+    """
     if dpi_mult == 1.0:
         return pos
     dx = (pos[0] - center[0]) * dpi_mult
@@ -423,6 +445,23 @@ class GestureDetector:
         # Cinematic follow-through quando a mao sai do FOV
         followthrough_frames: int = 6,
         followthrough_damping: float = 0.82,
+        # Movimento adaptativo (core/cursor_motion.py). Todos opcionais:
+        # os defaults reproduzem os do MotionConfig.
+        distance_gain_enabled: bool = True,
+        distance_gain_far: float = 1.40,
+        distance_gain_near: float = 0.75,
+        distance_scale_far_ratio: float = 0.60,
+        distance_scale_near_ratio: float = 1.55,
+        distance_scale_filter_hz: float = 1.2,
+        distance_gain_rate_per_second: float = 1.5,
+        precision_attack_seconds: float = 0.10,
+        precision_release_seconds: float = 0.22,
+        bottom_assist_enabled: bool = True,
+        bottom_assist_edge: float = 0.86,
+        bottom_assist_band: float = 0.22,
+        bottom_assist_max_gain: float = 3.2,
+        bottom_assist_max_extra_rate: float = 0.60,
+        bottom_assist_intent_speed: float = 0.12,
     ) -> None:
         self.anchor_landmark = anchor_landmark
         self.pinch_threshold = pinch_threshold
@@ -444,16 +483,36 @@ class GestureDetector:
         self.position_hold_frames = max(0, position_hold_frames)
 
         self.aim_assist_enabled = aim_assist_enabled
-        self.aim_assist_slowdown_factor = aim_assist_slowdown_factor
+        self._aim_assist_slowdown_factor = aim_assist_slowdown_factor
         self.aim_assist_trigger_shapes = tuple(aim_assist_trigger_shapes)
         self.aim_assist_pre_activation = aim_assist_pre_activation
         self.aim_assist_pre_pinch_threshold = aim_assist_pre_pinch_threshold
+        # Mantido por compatibilidade de API/config. O holdover por timer
+        # foi substituido pela liberacao progressiva do envelope de
+        # precisao (release), que nao troca o fator em degrau.
         self.aim_assist_holdover_seconds = aim_assist_holdover_seconds
 
-        self.sticky_targeting_enabled = sticky_targeting_enabled
+        self._sticky_targeting_enabled = sticky_targeting_enabled
         self.sticky_deceleration_threshold = sticky_deceleration_threshold
-        self.sticky_friction_factor = sticky_friction_factor
+        self._sticky_friction_factor = sticky_friction_factor
         self.sticky_min_velocity = sticky_min_velocity
+
+        # Parametros do pipeline de movimento adaptativo.
+        self._distance_gain_enabled = distance_gain_enabled
+        self._distance_gain_far = distance_gain_far
+        self._distance_gain_near = distance_gain_near
+        self._distance_scale_far_ratio = distance_scale_far_ratio
+        self._distance_scale_near_ratio = distance_scale_near_ratio
+        self._distance_scale_filter_hz = distance_scale_filter_hz
+        self._distance_gain_rate_per_second = distance_gain_rate_per_second
+        self._precision_attack_seconds = precision_attack_seconds
+        self._precision_release_seconds = precision_release_seconds
+        self._bottom_assist_enabled = bottom_assist_enabled
+        self._bottom_assist_edge = bottom_assist_edge
+        self._bottom_assist_band = bottom_assist_band
+        self._bottom_assist_max_gain = bottom_assist_max_gain
+        self._bottom_assist_max_extra_rate = bottom_assist_max_extra_rate
+        self._bottom_assist_intent_speed = bottom_assist_intent_speed
 
         self.velocity_curve_enabled = velocity_curve_enabled
         self.velocity_tremor_threshold = velocity_tremor_threshold
@@ -477,6 +536,12 @@ class GestureDetector:
         # como atributo permite reset() pelo proprio detector quando
         # convem (mao perdida, modo trocado em runtime, etc).
         self._robust_anchor: RobustHandAnchor = RobustHandAnchor()
+
+        # Pipeline de movimento adaptativo (ganho por distancia, precisao
+        # continua, assistencia de borda). Toda a matematica de movimento
+        # mora la — aqui so classificamos gestos e alimentamos o dt.
+        self._motion: CursorMotion = CursorMotion(self._build_motion_config())
+        self._last_frame_t: Optional[float] = None
 
         # Estado interno
         self._candidate_shape: HandShape = HandShape.UNKNOWN
@@ -515,9 +580,6 @@ class GestureDetector:
         self._followthrough_consumed: int = 0
         self._followthrough_velocity: Tuple[float, float] = (0.0, 0.0)
 
-        # Aim assist com holdover
-        self._aim_assist_last_active_at: float = 0.0
-
         # Pinca dual
         self._pinch_dist_history: Deque[Tuple[float, float]] = deque(maxlen=3)
 
@@ -528,6 +590,95 @@ class GestureDetector:
         self._last_event_gesture: Gesture = Gesture.NONE
         self._aim_assist_active: bool = False
         self._sticky_active: bool = False
+
+    # -----------------------------------------------------------------
+    # Configuracao do pipeline de movimento
+    # -----------------------------------------------------------------
+
+    def _build_motion_config(self) -> MotionConfig:
+        """Monta o MotionConfig a partir do estado atual do detector.
+
+        Chamado no __init__ e sempre que um slider/perfil altera um
+        parametro que vive dentro do MotionConfig (que e' frozen).
+        """
+        return MotionConfig(
+            scale_reference=self.hand_size_reference,
+            scale_far_ratio=self._distance_scale_far_ratio,
+            scale_near_ratio=self._distance_scale_near_ratio,
+            gain_far=self._distance_gain_far,
+            gain_near=self._distance_gain_near,
+            distance_gain_enabled=(
+                self._distance_gain_enabled and self.dpi_adaptive_enabled
+            ),
+            scale_filter_hz=self._distance_scale_filter_hz,
+            gain_rate_per_second=self._distance_gain_rate_per_second,
+            aim_slowdown_factor=self._aim_assist_slowdown_factor,
+            sticky_friction_factor=self._sticky_friction_factor,
+            sticky_enabled=self._sticky_targeting_enabled,
+            sticky_deceleration_threshold=self.sticky_deceleration_threshold,
+            precision_attack_seconds=self._precision_attack_seconds,
+            precision_release_seconds=self._precision_release_seconds,
+            velocity_curve_enabled=self.velocity_curve_enabled,
+            velocity_tremor_threshold=self.velocity_tremor_threshold,
+            velocity_precision_zone=self.velocity_precision_zone,
+            velocity_fast_threshold=self.velocity_fast_threshold,
+            velocity_slow_factor=self.velocity_slow_factor,
+            velocity_fast_factor=self.velocity_fast_factor,
+            bottom_assist_enabled=self._bottom_assist_enabled,
+            bottom_edge=self._bottom_assist_edge,
+            bottom_band=self._bottom_assist_band,
+            bottom_max_gain=self._bottom_assist_max_gain,
+            bottom_max_extra_rate=self._bottom_assist_max_extra_rate,
+            bottom_intent_speed=self._bottom_assist_intent_speed,
+        )
+
+    def _sync_motion_config(self) -> None:
+        """Propaga mudancas de runtime sem mover o cursor.
+
+        ``CursorMotion.set_config`` preserva a posicao de saida — trocar
+        de perfil no meio do uso ajusta o proximo movimento, nunca
+        reposiciona o cursor.
+        """
+        motion = getattr(self, "_motion", None)
+        if motion is not None:
+            motion.set_config(self._build_motion_config())
+
+    # Sliders/perfis mudam estes valores em runtime (ver
+    # VirtualMouseService._apply_setting_live). Como MotionConfig e'
+    # frozen, os setters reconstroem a config em vez de deixar o valor
+    # divergir silenciosamente do que o pipeline usa.
+
+    @property
+    def aim_assist_slowdown_factor(self) -> float:
+        return self._aim_assist_slowdown_factor
+
+    @aim_assist_slowdown_factor.setter
+    def aim_assist_slowdown_factor(self, value: float) -> None:
+        self._aim_assist_slowdown_factor = float(value)
+        self._sync_motion_config()
+
+    @property
+    def sticky_friction_factor(self) -> float:
+        return self._sticky_friction_factor
+
+    @sticky_friction_factor.setter
+    def sticky_friction_factor(self, value: float) -> None:
+        self._sticky_friction_factor = float(value)
+        self._sync_motion_config()
+
+    @property
+    def sticky_targeting_enabled(self) -> bool:
+        return self._sticky_targeting_enabled
+
+    @sticky_targeting_enabled.setter
+    def sticky_targeting_enabled(self, value: bool) -> None:
+        self._sticky_targeting_enabled = bool(value)
+        self._sync_motion_config()
+
+    @property
+    def motion(self) -> CursorMotion:
+        """Pipeline de movimento — exposto pra HUD/debug e testes."""
+        return self._motion
 
     def reset(self) -> None:
         self._candidate_shape = HandShape.UNKNOWN
@@ -548,122 +699,87 @@ class GestureDetector:
         # Ancora robusta: limpa historico de landmarks (mao saiu por muito
         # tempo, comecaremos do zero ao re-detectar).
         self._robust_anchor.reset()
+        # Movimento: descarta entrada/escala/assistencias mas PRESERVA a
+        # posicao de saida. Quando a mao volta, a entrada re-ancora e o
+        # cursor continua de onde parou — sem salto e sem voltar ao centro.
+        self._motion.soft_reset()
+        self._last_frame_t = None
 
     # -----------------------------------------------------------------
     # AIM ASSIST com pre-ativacao + holdover
     # -----------------------------------------------------------------
 
-    def _is_aim_assist_active(self, shape: HandShape, hand: HandLandmarks, now: float) -> bool:
+    def _aim_target(self, shape: HandShape, pinch_dist: float) -> float:
+        """Alvo de precisao em [0, 1] — GRADUAL, nunca liga/desliga.
+
+        Antes isto era booleano com holdover por timer: a troca entre
+        1.0 e AIM_ASSIST_SLOWDOWN_FACTOR acontecia num unico frame e a
+        mudanca de velocidade era perceptivel. Agora:
+
+        - shape confirmado (PINCH/PEACE) => alvo 1.0
+        - pre-ativacao => rampa linear na PROXIMIDADE do pinch, entre o
+          threshold de pre-ativacao (0) e o de pinch (1)
+        - solto => alvo 0, e o envelope de release faz a liberacao
+          progressiva que o holdover fazia em degrau
+        """
         if not self.aim_assist_enabled:
-            return False
+            return 0.0
 
-        # 1. Shape em ✌️ ou 🤏
         if shape.value in self.aim_assist_trigger_shapes:
-            self._aim_assist_last_active_at = now
-            return True
+            return 1.0
 
-        # 2. Pre-ativacao: dedos preparando pinca (3D pra detectar mesmo
-        # quando a mao esta de lado)
         if self.aim_assist_pre_activation:
-            pinch_dist = _pinch_distance(
-                hand.landmarks[LM_THUMB_TIP],
-                hand.landmarks[LM_INDEX_TIP],
-            )
-            if self.pinch_threshold < pinch_dist < self.aim_assist_pre_pinch_threshold:
-                self._aim_assist_last_active_at = now
-                return True
+            hi = self.aim_assist_pre_pinch_threshold
+            lo = self.pinch_threshold
+            if hi > lo and pinch_dist < hi:
+                return _clamp((hi - pinch_dist) / (hi - lo), 0.0, 1.0)
 
-        # 3. Holdover (300ms apos soltar)
-        if (now - self._aim_assist_last_active_at) <= self.aim_assist_holdover_seconds:
-            return True
-
-        return False
+        return 0.0
 
     # -----------------------------------------------------------------
-    # STICKY TARGETING
+    # PIPELINE DE PRECISAO
     # -----------------------------------------------------------------
+    # A matematica (ganho por distancia, curva balistica, sticky gradual,
+    # aim assist continuo, borda inferior) vive em core/cursor_motion.py.
+    # Aqui so alimentamos o pipeline e espelhamos o estado pro HUD.
 
-    def _compute_sticky_friction(self, current_velocity: float) -> float:
-        if not self.sticky_targeting_enabled:
-            self._sticky_active = False
-            return 1.0
+    def _frame_dt(self, now: float) -> float:
+        """Tempo desde o frame anterior. Nada aqui depende de FPS nominal."""
+        if self._last_frame_t is None:
+            dt = 1.0 / 60.0
+        else:
+            dt = now - self._last_frame_t
+        self._last_frame_t = now
+        if dt <= 0.0:
+            dt = 1.0 / 60.0
+        return dt
 
-        if current_velocity < self.sticky_min_velocity:
-            self._sticky_active = False
-            return 1.0
-
-        if len(self._velocity_history) < 3:
-            self._sticky_active = False
-            return 1.0
-
-        recent = list(self._velocity_history)[-3:]
-        avg_recent = sum(recent) / len(recent)
-
-        if avg_recent < 1e-6:
-            self._sticky_active = False
-            return 1.0
-
-        ratio = current_velocity / avg_recent
-
-        if ratio < self.sticky_deceleration_threshold:
-            self._sticky_active = True
-            return self.sticky_friction_factor
-
-        self._sticky_active = False
-        return 1.0
-
-    # -----------------------------------------------------------------
-    # PIPELINE DE PRECISAO (curva + sticky + aim assist)
-    # -----------------------------------------------------------------
-
-    def _apply_precision_pipeline(
+    def _run_motion(
         self,
-        target_pos: Tuple[float, float],
-        is_aim_assist: bool,
+        anchor: Tuple[float, float],
+        hand: HandLandmarks,
+        dt: float,
+        aim_target: float,
+        precision_hold: bool,
     ) -> Tuple[float, float]:
-        if self._last_smoothed_pos is None:
-            self._last_smoothed_pos = target_pos
-            self._last_velocity = 0.0
-            self._velocity_history.append(0.0)
-            return target_pos
-
-        dx = target_pos[0] - self._last_smoothed_pos[0]
-        dy = target_pos[1] - self._last_smoothed_pos[1]
-        velocity = math.sqrt(dx * dx + dy * dy)
-
-        # Adiciona ao historico ANTES (sticky usa o passado)
-        self._velocity_history.append(velocity)
-        self._last_velocity = velocity
-        # Vetor preservado pra follow-through quando a mao some.
-        self._last_velocity_vec = (dx, dy)
-
-        # 1. Curva ballistica suavizada
-        if self.velocity_curve_enabled:
-            dx, dy = apply_velocity_curve_smooth(
-                (dx, dy), velocity,
-                self.velocity_tremor_threshold,
-                self.velocity_precision_zone,
-                self.velocity_fast_threshold,
-                self.velocity_slow_factor,
-                self.velocity_fast_factor,
-            )
-
-        # 2. Sticky targeting (friccao ao desacelerar)
-        sticky_factor = self._compute_sticky_friction(velocity)
-        dx *= sticky_factor
-        dy *= sticky_factor
-
-        # 3. Aim assist (slowdown global)
-        if is_aim_assist:
-            dx *= self.aim_assist_slowdown_factor
-            dy *= self.aim_assist_slowdown_factor
-
-        new_pos = (
-            max(0.0, min(1.0, self._last_smoothed_pos[0] + dx)),
-            max(0.0, min(1.0, self._last_smoothed_pos[1] + dy)),
+        pos = self._motion.update(
+            anchor,
+            dt,
+            landmarks=hand.landmarks,
+            base_sensitivity=self.dpi_fixed,
+            aim_target=aim_target,
+            precision_hold=precision_hold,
         )
-        self._last_smoothed_pos = new_pos
-        return new_pos
+        # Espelhos pro HUD e pro follow-through (mantidos na mesma
+        # unidade de antes: deslocamento POR FRAME).
+        self._last_smoothed_pos = pos
+        self._last_velocity = self._motion.speed * dt
+        self._last_velocity_vec = self._motion.last_delta
+        self._velocity_history.append(self._last_velocity)
+        self._last_dpi = self._motion.total_gain
+        self._aim_assist_active = self._motion.precision_weight > 0.05
+        self._sticky_active = self._motion.sticky_weight > 0.05
+        return pos
 
     # -----------------------------------------------------------------
     # PINCA DUAL
@@ -737,6 +853,7 @@ class GestureDetector:
     def update(self, hand: Optional[HandLandmarks]) -> List[GestureEvent]:
         events: List[GestureEvent] = []
         now = time.perf_counter()
+        dt = self._frame_dt(now)
 
         # Position hold + follow-through:
         # - 0..position_hold_frames frames: hold (cursor parado, pode ser
@@ -751,6 +868,10 @@ class GestureDetector:
             self._hand_lost_frames += 1
             hold_limit = self.position_hold_frames
             ft_limit = hold_limit + self.followthrough_frames
+            # Blink curto: o hold nao mexe em nada. Perda prolongada faz
+            # o motion descartar a escala e pedir re-ancoragem — o
+            # retorno da mao alinha a entrada sem mover a saida.
+            self._motion.notify_hand_lost(dt)
 
             if self._hand_lost_frames <= hold_limit:
                 return events  # hold puro
@@ -764,8 +885,10 @@ class GestureDetector:
                 # desacelera suavemente em vez de teletransportar.
                 if self._last_smoothed_pos is not None:
                     fx, fy = self._followthrough_velocity
-                    nx = max(0.0, min(1.0, self._last_smoothed_pos[0] + fx))
-                    ny = max(0.0, min(1.0, self._last_smoothed_pos[1] + fy))
+                    # advance_output NAO passa por ganho nem pela
+                    # assistencia de borda: follow-through e' um
+                    # mecanismo separado, aplicado so com a mao AUSENTE.
+                    nx, ny = self._motion.advance_output(fx, fy)
                     self._last_smoothed_pos = (nx, ny)
                     self._followthrough_velocity = (
                         fx * self.followthrough_damping,
@@ -889,8 +1012,8 @@ class GestureDetector:
             else:
                 confirmed_now = self._confirmed_shape
 
-        # Aim assist (com pre-ativacao + holdover)
-        self._aim_assist_active = self._is_aim_assist_active(confirmed_now, hand, now)
+        # Precisao continua: alvo gradual + envelope attack/release.
+        aim_target = self._aim_target(confirmed_now, self._last_pinch_dist)
 
         # CURSOR MOVE
         cursor_moves_in_open_hand = (confirmed_now == HandShape.OPEN_HAND)
@@ -899,44 +1022,33 @@ class GestureDetector:
         )
 
         if cursor_moves_in_open_hand or cursor_moves_in_pinch_drag:
-            anchor = get_anchor_position(hand, self.anchor_landmark, robust_anchor=self._robust_anchor)
-            dpi_adaptive = compute_dpi_multiplier(
-                self._last_hand_size,
-                self.hand_size_reference,
-                self.dpi_min,
-                self.dpi_max,
-                self.dpi_adaptive_enabled,
+            # anchor_now ja foi calculado UMA vez neste frame — a ancora
+            # robusta e' stateful e recomputar corromperia velocidade e
+            # historico de estabilidade.
+            final_pos = self._run_motion(
+                anchor_now, hand, dt, aim_target,
+                precision_hold=cursor_moves_in_pinch_drag,
             )
-            total_dpi = dpi_adaptive * self.dpi_fixed
-            self._last_dpi = total_dpi
-            target_pos = apply_dpi_to_position(anchor, total_dpi)
-
-            is_aim = self._aim_assist_active or cursor_moves_in_pinch_drag
-            final_pos = self._apply_precision_pipeline(target_pos, is_aim)
-
             events.append(GestureEvent(Gesture.MOVE, final_pos, now))
         else:
-            # Em PEACE/FIST: mantem posicao para continuidade
-            if confirmed_now in (HandShape.PEACE, HandShape.FIST):
-                anchor = get_anchor_position(hand, self.anchor_landmark, robust_anchor=self._robust_anchor)
-                dpi_adaptive = compute_dpi_multiplier(
-                    self._last_hand_size,
-                    self.hand_size_reference,
-                    self.dpi_min,
-                    self.dpi_max,
-                    self.dpi_adaptive_enabled,
-                )
-                total_dpi = dpi_adaptive * self.dpi_fixed
-                self._last_smoothed_pos = apply_dpi_to_position(anchor, total_dpi)
-                self._last_velocity = 0.0
-                self._sticky_active = False
+            # Qualquer shape que NAO move o cursor (PEACE, FIST, PINCH
+            # antes do drag, OTHER/UNKNOWN em transicao) passa por hold():
+            # re-alinha a ENTRADA sem mover a SAIDA. Sem isso a ancora
+            # continuaria correndo enquanto o cursor esta congelado e o
+            # delta acumulado viraria um salto ao voltar pra OPEN_HAND.
+            self._last_smoothed_pos = self._motion.hold(
+                anchor_now, dt, aim_target=aim_target,
+            )
+            self._last_velocity = 0.0
+            self._sticky_active = False
+            self._aim_assist_active = aim_target > 0.05
 
         # ACOES
         previous_shape = self._confirmed_shape
         action_event = self._process_action(
             shape=confirmed_now,
             previous_shape=previous_shape,
-            hand=hand,
+            anchor=anchor_now,
             now=now,
         )
         if action_event is not None:
@@ -956,8 +1068,10 @@ class GestureDetector:
     # Logica de acoes
     # -----------------------------------------------------------------
 
-    def _process_action(self, shape, previous_shape, hand, now):
-        anchor = get_anchor_position(hand, self.anchor_landmark, robust_anchor=self._robust_anchor)
+    def _process_action(self, shape, previous_shape, anchor, now):
+        # `anchor` chega pronto do update(): a ancora robusta e' STATEFUL
+        # (historico por landmark + velocidade) e precisa ser computada
+        # exatamente UMA vez por mao/frame.
         event = None
 
         # 1. SAIU DE PEACE -> DOUBLE_CLICK

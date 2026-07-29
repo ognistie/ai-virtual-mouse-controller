@@ -134,16 +134,19 @@ class RobustHandAnchor:
     _EDGE_PROXIMITY: float = 0.30         # ancora a < 30% da borda = "perto"
     _EDGE_CRITICAL_PROXIMITY: float = 0.08  # < 8% = critico, sempre ativo
     _EDGE_CRITICAL_GAIN: float = 1.0      # gain quando em zona critica
-    # Gain reforcado DESCENDO na zona critica: a borda inferior e' a
-    # unica onde a geometria da camera (montada no topo, apontando pra
-    # baixo) trabalha contra o usuario. Simetrico causaria overshoot
-    # nas outras tres bordas, que ja funcionam bem.
+    # Gain de descida na zona critica.
     #
-    # 1.4 (era 2.6): 2.6 empurrava a ancora MUITO alem da mao ao descer;
-    # quando a mao desacelerava (homing) a extrapolacao sumia e a ancora
-    # voltava pra cima -> cursor "descia demais e voltava". 1.4 mantem o
-    # alcance mas sem o overshoot que quebrava a suavidade.
-    _EDGE_CRITICAL_GAIN_DOWN: float = 1.4
+    # 1.0 (era 1.4, antes 2.6): simetrico com as outras bordas. A
+    # assistencia ESPECIFICA da borda inferior passou a viver em um
+    # unico lugar — core/cursor_motion.py (BottomAssist), com teto de
+    # velocidade e aceleracao e dependencia de intencao.
+    #
+    # Somar um reforco aqui TAMBEM significava empilhar predicao (esta
+    # extrapolacao) com aceleracao (boost/creep do CursorController) em
+    # pontos diferentes do pipeline, sem teto conjunto: era impossivel
+    # raciocinar sobre a velocidade final do cursor perto do fundo.
+    # A extrapolacao generica de borda (todas as quatro) continua.
+    _EDGE_CRITICAL_GAIN_DOWN: float = 1.0
 
     def __init__(
         self,

@@ -141,10 +141,81 @@ VELOCITY_FAST_FACTOR: float = 1.15
 # ---------------------------------------------------------------------
 
 DPI_ADAPTIVE_ENABLED: bool = True
+"""Liga o ganho adaptativo por distancia (core/cursor_motion.py)."""
+
 HAND_SIZE_REFERENCE: float = 0.22
+"""Escala aparente da palma na distancia NEUTRA (ganho 1.0).
+
+Unidade: "comprimento de palma" normalizado no frame — a mesma escala
+que `compute_hand_size` (pulso -> MCP do medio) produz. Calibre olhando
+o HUD de debug com a mao na distancia que voce considera confortavel.
+"""
+
 DPI_MULTIPLIER_MIN: float = 0.7
 DPI_MULTIPLIER_MAX: float = 1.4
+"""LEGADO — usados apenas por `compute_dpi_multiplier()`, que esta
+deprecada. O ganho por distancia agora vem de DISTANCE_GAIN_* abaixo.
+Mantidos pra nao quebrar codigo/config de terceiros."""
+
 DPI_FIXED_MULTIPLIER: float = 1.00
+"""Sensibilidade BASE escolhida pelo usuario (slider "sensitivity").
+
+E' o unico ganho que o usuario controla diretamente. O ganho final e'
+composto explicitamente como:
+
+    base (este valor) x ganho_de_distancia x ganho_de_precisao
+"""
+
+# ---------------------------------------------------------------------
+# GANHO ADAPTATIVO POR DISTANCIA
+# ---------------------------------------------------------------------
+# Relacao MONOTONICA e INVERSA entre escala aparente da palma e ganho:
+# mao LONGE (palma pequena, landmarks ruidosos) ganha alcance; mao PERTO
+# (palma grande) ganha precisao. Interpolacao por smoothstep — derivada
+# zero na distancia neutra, entao atravessar a referencia nao muda a
+# velocidade aparente em degrau.
+#
+# ATENCAO: o comportamento anterior era o INVERSO disto (mao perto =
+# multiplicador alto). Ver core/cursor_motion.py para a causa raiz.
+
+DISTANCE_GAIN_FAR: float = 1.40
+"""Ganho com a mao LONGE da webcam. Deslocamentos amplos e rapidos,
+bordas e cantos acessiveis mesmo com landmarks pequenos."""
+
+DISTANCE_GAIN_NEAR: float = 0.75
+"""Ganho com a mao PERTO da webcam. Alta precisao, pouco tremor."""
+
+DISTANCE_SCALE_FAR_RATIO: float = 0.60
+"""escala/referencia a partir da qual a mao conta como LONGE (ganho
+maximo). 0.60 x 0.22 = 0.132."""
+
+DISTANCE_SCALE_NEAR_RATIO: float = 1.55
+"""escala/referencia a partir da qual a mao conta como PERTO (ganho
+minimo). 1.55 x 0.22 = 0.341."""
+
+DISTANCE_SCALE_FILTER_HZ: float = 1.2
+"""Cutoff do passa-baixa da escala da palma. Baixo de proposito: a
+distancia da mao muda em ~1s, tremor de landmark muda em ~10ms."""
+
+DISTANCE_GAIN_RATE_PER_SECOND: float = 1.5
+"""Teto de variacao do ganho por segundo. Mesmo que a escala pule (mao
+de perfil, oclusao), o ganho leva tempo pra acompanhar — nunca ha
+mudanca abrupta de sensibilidade."""
+
+# ---------------------------------------------------------------------
+# PRECISAO CONTINUA (aim assist + sticky)
+# ---------------------------------------------------------------------
+# Substituem o liga/desliga booleano + holdover por timer. O peso de
+# precisao vive em [0,1] e o fator aplicado e':
+#     precision_factor = lerp(1.0, AIM_ASSIST_SLOWDOWN_FACTOR, peso)
+
+PRECISION_ATTACK_SECONDS: float = 0.10
+"""Constante de tempo de ENTRADA da precisao (~63%); entrada praticamente
+completa em ~2.2x esse valor (~220ms)."""
+
+PRECISION_RELEASE_SECONDS: float = 0.22
+"""Constante de tempo de SAIDA. Faz o papel do antigo
+AIM_ASSIST_HOLDOVER_SECONDS, porem como liberacao PROGRESSIVA."""
 
 # ---------------------------------------------------------------------
 # SUAVIZACAO
@@ -319,13 +390,61 @@ de exigir a mao quase na mesa.
 # ---------------------------------------------------------------------
 # ALCANCE DA BORDA INFERIOR (taskbar)
 # ---------------------------------------------------------------------
-# Tres mecanismos complementares pra fechar a "zona morta" acima da
-# taskbar. Causa raiz: (a) edge-taper da ancora enviesa o cursor pra
-# cima quando landmarks inferiores saem do frame; (b) extrapolacao por
-# velocidade zera na fase de homing (aproximacao lenta do alvo, Fitts).
-# Cada mecanismo cobre um elo: mapeamento -> gap terminal -> homing.
+# UMA assistencia coerente, em core/cursor_motion.py (BottomAssist).
+#
+#     prox   = clamp((y - (borda - faixa)) / faixa, 0, 1)
+#     intent = envelope da velocidade DESCENDENTE recente
+#     v      = taxa_max * smoothstep(prox) * intent   [limitada em accel]
+#     y      = y + v * dt                             (nunca passa a borda)
+#
+# Por que substituiu a pilha anterior (boost + snap + creep + gain
+# reforcado de descida na ancora):
+#
+# - o boost era continuo em posicao mas NAO em derivada: no joelho a
+#   inclinacao saltava de 1.0 pra CURSOR_Y_BOTTOM_BOOST_POWER (1.5),
+#   mudando a velocidade aparente em degrau;
+# - o edge snap teleportava o cursor pro ultimo pixel — salto por
+#   definicao;
+# - o creep movia o cursor com a mao PARADA (o oposto do desejado: sem
+#   intencao recente o cursor nao pode fugir);
+# - os quatro somavam aceleracao e predicao em lugares diferentes do
+#   pipeline, sem teto conjunto.
+#
+# A assistencia atual e' C1 na entrada (smoothstep tem derivada zero em
+# prox=0), tem teto de velocidade E de aceleracao, depende de intencao
+# de descer, e cancela na hora quando a mao sobe.
 
-CURSOR_Y_BOTTOM_BOOST_ENABLED: bool = True
+BOTTOM_ASSIST_ENABLED: bool = True
+"""Liga a assistencia unica da borda inferior."""
+
+BOTTOM_ASSIST_BAND: float = 0.22
+"""Largura da faixa (espaco da ancora) acima da borda onde a assistencia
+atua. 0.22 ~= os 27% finais da tela util (a assistencia so
+fica relevante nos ultimos ~15%, por causa do smoothstep)."""
+
+BOTTOM_ASSIST_MAX_GAIN: float = 3.2
+"""Ganho MAXIMO do movimento descendente, atingido na borda.
+
+Com a mao perto da webcam (ganho de distancia 0.75) o produto chega a
+~1.95 no ultimo trecho — e' o que devolve o alcance da taskbar sem
+tocar na precisao do miolo da tela. Como e' GANHO e nao velocidade
+injetada, com a mao parada a assistencia vale exatamente zero."""
+
+BOTTOM_ASSIST_MAX_EXTRA_RATE: float = 0.60
+"""Teto da velocidade ADICIONADA pela assistencia (unidades/s), por cima
+da que o usuario ja imprime. ~790 px/s em 1920x1080."""
+
+BOTTOM_ASSIST_INTENT_SPEED: float = 0.12
+"""Velocidade descendente (unidades/s) que conta como intencao PLENA de
+descer. Abaixo disso a assistencia entra proporcionalmente; com a mao
+parada ela vai a zero e o cursor nao foge."""
+
+# --- LEGADO -----------------------------------------------------------
+# Os tres mecanismos antigos continuam implementados no CursorController
+# (nenhuma API removida), mas vem DESLIGADOS por padrao. Quem dependia
+# deles pode religar aqui, ciente dos efeitos descritos acima.
+
+CURSOR_Y_BOTTOM_BOOST_ENABLED: bool = False
 """Remapeamento nao-linear do eixo Y: abaixo do joelho (knee), o
 restante do frame cobre o restante da tela com aceleracao — pequenos
 movimentos de mao perto do fundo viram avancos maiores do cursor."""
@@ -344,13 +463,15 @@ efeito). 1.5 = curva mais suave que 1.9 — glide sobre os apps sem
 saltos. Aumente pra chegar mais rapido ao fundo; reduza se perder
 precisao / se o cursor 'escorregar' na regiao inferior."""
 
-CURSOR_EDGE_SNAP_PX: int = 48
-"""Magnetismo da borda inferior: movendo pra BAIXO a menos de N pixels
-do fundo, o cursor snap pra borda. Alvos da taskbar ficam colados na
-borda (Fitts: borda = alvo de largura infinita); o snap fecha o gap
-terminal que o vies da ancora deixa. 0 desabilita."""
+CURSOR_EDGE_SNAP_PX: int = 0
+"""LEGADO / DESLIGADO. Magnetismo que levava o cursor direto ao ultimo
+pixel quando descia a menos de N px do fundo.
 
-CURSOR_EDGE_CREEP_ENABLED: bool = True
+Fica em 0 por padrao: por definicao isso e' um teleporte, e a UX exige
+que nenhuma mudanca de assistencia mova o cursor em salto. Se voce
+religar (> 0), o salto volta."""
+
+CURSOR_EDGE_CREEP_ENABLED: bool = False
 """Border creep: mao parada na banda inferior por mais que o delay =
 cursor desliza suavemente ate a borda. Cobre a fase de homing (usuario
 desacelera ao mirar -> velocidade ~0 -> extrapolacao nao ajuda)."""
@@ -419,6 +540,20 @@ SETTINGS_PANEL_SIDE: str = "right"
 # ---------------------------------------------------------------------
 # DEBUG E PREVIEW
 # ---------------------------------------------------------------------
+
+MOTION_DEBUG_ENABLED: bool = False
+"""Loga o estado do pipeline de movimento (core/cursor_motion.py).
+
+Expoe, via `logger.debug`: escala bruta e filtrada da mao, ganho de
+distancia, ganho final, peso de precisao, peso do sticky, intensidade da
+assistencia inferior, velocidade normalizada e estado de re-ancoragem.
+
+NAO salva frames da webcam, nao escreve imagem em disco e nao envia
+nada pra fora da maquina. Requer LOG_LEVEL="DEBUG" pra aparecer.
+"""
+
+MOTION_DEBUG_EVERY_N_FRAMES: int = 30
+"""Throttle do log acima (30 = ~2x por segundo a 60 FPS)."""
 
 ENABLE_PREVIEW: bool = True
 SHOW_FPS: bool = True

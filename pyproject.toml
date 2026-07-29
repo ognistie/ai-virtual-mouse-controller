@@ -242,7 +242,7 @@ exclude = [
 ]
 
 [[tool.mypy.overrides]]
-module = ["core.hand_anchor"]
+module = ["core.hand_anchor", "core.cursor_motion"]
 # Type-check rigoroso so no modulo escrito do zero com tipagem completa.
 # Outros modulos puros (finger_posture, smoothing) podem subir pra strict
 # quando passarem por uma rodada de cleanup de tipagem (helpers internos
