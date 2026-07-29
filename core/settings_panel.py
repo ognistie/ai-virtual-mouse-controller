@@ -171,8 +171,11 @@ if _PYSIDE_OK:
             outer.addWidget(root)
 
             col = QVBoxLayout(root)
-            col.setContentsMargins(22, 22, 22, 22)
-            col.setSpacing(18)
+            col.setContentsMargins(22, 18, 22, 18)
+            # Espacamento um pouco menor que antes (18): a secao MODOS
+            # somou dois toggles; compactar mantem tudo dentro do card em
+            # telas menores sem mudar perceptivelmente o visual.
+            col.setSpacing(13)
 
             # Cabecalho
             header = QHBoxLayout()
@@ -322,7 +325,12 @@ if _PYSIDE_OK:
 
         # -------------------------------------------------- animacao
         def _target_rect(self, screen: QRect) -> QRect:
-            h = min(screen.height() - 80, 640)
+            # A altura acompanha o CONTEUDO (sizeHint). Antes era fixa em
+            # 640px; a secao "MODOS" empurrou o painel pra ~780px e os
+            # toggles caiam pra fora do card. Limita a area util da tela
+            # pra nunca estourar embaixo.
+            hint = self.sizeHint().height()
+            h = min(screen.height() - 40, max(480, hint))
             y = screen.y() + (screen.height() - h) // 2
             if self._side == "left":
                 x = screen.x() + 16
