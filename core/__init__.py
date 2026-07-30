@@ -10,5 +10,5 @@ Versao do pacote vive em `__version__` e e' a fonte unica de verdade
 
 from __future__ import annotations
 
-__version__ = "1.1.1"
+__version__ = "1.1.2"
 __all__ = ["__version__"]

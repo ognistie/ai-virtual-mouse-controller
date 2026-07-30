@@ -7,6 +7,8 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.1.2] — 2026-07-29
+
 ### Changed
 - **Acesso da barra de tarefas**: o gap terminal acima da taskbar passa a
   ser fechado por UMA assistencia suave em `CursorController`
