@@ -908,6 +908,74 @@ ol {
   line-height: 1.75;
 }
 
+.press-vote-card {
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr);
+  align-items: center;
+  gap: 20px;
+  margin-top: 8px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 8% 12%, rgba(50, 194, 202, 0.1), transparent 42%),
+    var(--surface);
+}
+
+.press-vote-qr {
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #ffffff;
+  transition: border-color 180ms ease, transform 180ms ease;
+}
+
+.press-vote-qr:hover {
+  border-color: var(--accent-strong);
+  transform: translateY(-2px);
+}
+
+.press-vote-qr img {
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+
+.press-vote-copy {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.press-vote-kicker {
+  color: var(--accent-strong);
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.press-vote-card h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.press-vote-card p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.75rem;
+  line-height: 1.55;
+}
+
+.press-vote-card .button {
+  min-height: 38px;
+  padding: 0 14px;
+  font-size: 0.7rem;
+}
+
 .text-link {
   display: inline-flex;
   align-items: center;
@@ -2000,6 +2068,12 @@ code {
     padding-left: 9px;
   }
 
+  .press-vote-card {
+    grid-template-columns: 104px minmax(0, 1fr);
+    gap: 16px;
+    padding: 16px;
+  }
+
   .terminal pre {
     padding: 22px 18px;
     font-size: 0.69rem;
@@ -2150,6 +2224,14 @@ code {
 
   .repository-qr {
     width: 150px;
+  }
+
+  .press-vote-card {
+    grid-template-columns: 1fr;
+  }
+
+  .press-vote-qr {
+    width: 132px;
   }
 
 }
