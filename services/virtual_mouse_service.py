@@ -281,6 +281,18 @@ class VirtualMouseService:
             edge_creep_rate_px_s=getattr(
                 config, "CURSOR_EDGE_CREEP_RATE_PX_S", 320.0,
             ),
+            bottom_reach_enabled=getattr(
+                config, "CURSOR_BOTTOM_REACH_ENABLED", False,
+            ),
+            bottom_reach_band_px=getattr(
+                config, "CURSOR_BOTTOM_REACH_BAND_PX", 120,
+            ),
+            bottom_reach_max_gain=getattr(
+                config, "CURSOR_BOTTOM_REACH_MAX_GAIN", 3.0,
+            ),
+            bottom_reach_max_extra_px=getattr(
+                config, "CURSOR_BOTTOM_REACH_MAX_EXTRA_PX", 60,
+            ),
         )
 
         # 6. Smoother (API real: kwargs alpha, freq, min_cutoff, beta, d_cutoff)
@@ -541,6 +553,8 @@ class VirtualMouseService:
                 if key_masked in (ord(hkey), ord(hkey.upper())):
                     if self.hologram is not None and self.hologram.available:
                         new_state = self.hologram.toggle()
+                        # Reflete no painel Qt (alternado pela tecla H).
+                        self._sync_settings_panel()
                         msg = (
                             f"HOLOGRAM = {new_state} | "
                             f"click_through={self.hologram.click_through_active} | "
@@ -760,7 +774,21 @@ class VirtualMouseService:
             self.gesture_detector.sticky_targeting_enabled = value
         elif key == "presentation":
             self._set_presentation_mode(value)
+        elif key == "hologram":
+            self._set_hologram_enabled(value)
         logger.info("TOGGLE %s = %s", key, value)
+
+    def _set_hologram_enabled(self, active: bool) -> None:
+        """Liga/desliga o holograma da mao e sincroniza o painel.
+
+        No-op seguro se o holograma nao estiver disponivel (plataforma
+        sem GPU/driver) — o resto do programa nao depende dele.
+        """
+        active = bool(active)
+        if self.hologram is not None and self.hologram.available:
+            self.hologram.set_enabled(active)
+            logger.info("HOLOGRAM = %s (painel)", active)
+        self._sync_settings_panel()
 
     def _set_presentation_mode(self, active: bool) -> None:
         """Liga/desliga modo apresentacao e sincroniza UI + estado interno."""
@@ -776,6 +804,9 @@ class VirtualMouseService:
         )
         print(f"[AVM] {msg}", flush=True)
         logger.info(msg)
+        # Reflete no painel Qt o estado atual (util quando alternado pela
+        # tecla Z, nao pelo proprio painel).
+        self._sync_settings_panel()
 
     def _on_reset(self) -> None:
         logger.info("RESET profile")
@@ -835,8 +866,13 @@ class VirtualMouseService:
         s = self.runtime_settings
         sliders = {k: s.get_slider_value(k) for k in self._SLIDER_KEYS}
         displays = {k: s.get_slider_display(k) for k in self._SLIDER_KEYS}
+        hologram_on = (
+            self.hologram is not None
+            and self.hologram.available
+            and self.hologram.enabled
+        )
         panel.sync(sliders, displays, s.aim_enabled, s.sticky_enabled,
-                   s.current_profile)
+                   s.current_profile, self._presentation_mode, hologram_on)
 
     # -----------------------------------------------------------------
     # Overlay rendering

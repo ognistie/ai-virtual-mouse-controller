@@ -7,6 +7,24 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Changed
+- **Acesso da barra de tarefas**: o gap terminal acima da taskbar passa a
+  ser fechado por UMA assistencia suave em `CursorController`
+  (`CURSOR_BOTTOM_REACH_*`). Perto da borda, o cursor ganha um empurrao
+  EXTRA proporcional ao quanto o usuario ja esta descendo e a proximidade
+  do fundo (smoothstep, C1). Nao teleporta, nao move cursor parado e
+  subir cancela na hora. Resto do movimento inalterado.
+- Secao **MODOS** no painel de ajustes (Qt): botoes para ativar o modo
+  apresentacao e o modo holograma da mao, sincronizados com as teclas Z/H.
+  Altura do painel passa a acompanhar o conteudo (nao corta os toggles).
+
+### Deprecated
+- `CURSOR_EDGE_SNAP_PX` agora e' `0` por padrao (era 48): saltava o cursor
+  direto pro ultimo pixel (teleporte).
+- `CURSOR_EDGE_CREEP_ENABLED` agora e' `False` por padrao: deslizava o
+  cursor com a mao parada. Ambos os mecanismos seguem implementados no
+  `CursorController` pra quem quiser religar.
+
 ## [1.1.1] — 2026-07-28
 
 ### Added

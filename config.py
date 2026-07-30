@@ -319,11 +319,21 @@ de exigir a mao quase na mesa.
 # ---------------------------------------------------------------------
 # ALCANCE DA BORDA INFERIOR (taskbar)
 # ---------------------------------------------------------------------
-# Tres mecanismos complementares pra fechar a "zona morta" acima da
-# taskbar. Causa raiz: (a) edge-taper da ancora enviesa o cursor pra
-# cima quando landmarks inferiores saem do frame; (b) extrapolacao por
-# velocidade zera na fase de homing (aproximacao lenta do alvo, Fitts).
-# Cada mecanismo cobre um elo: mapeamento -> gap terminal -> homing.
+# Fecha a "zona morta" acima da taskbar. Causa raiz: (a) edge-taper da
+# ancora enviesa o cursor pra cima quando landmarks inferiores saem do
+# frame; (b) a extrapolacao por velocidade zera na fase de homing
+# (aproximacao lenta do alvo, Fitts) — sobra um gap terminal.
+#
+# O gap terminal e' fechado por UMA assistencia suave (CURSOR_BOTTOM_
+# REACH_*, ver core/cursor_controller._apply_bottom_reach): perto do
+# fundo, o cursor ganha um empurrao EXTRA proporcional ao quanto o
+# usuario ja esta descendo. Propriedades:
+#   - sem teleporte (o antigo edge snap saltava direto pro ultimo pixel);
+#   - nao move o cursor parado (o antigo border creep deslizava sozinho);
+#   - subir cancela na hora;
+#   - C1 na entrada da faixa (smoothstep) — sem degrau de velocidade.
+# O edge snap e o border creep antigos continuam no CursorController como
+# legado, porem DESLIGADOS por padrao.
 
 CURSOR_Y_BOTTOM_BOOST_ENABLED: bool = True
 """Remapeamento nao-linear do eixo Y: abaixo do joelho (knee), o
@@ -344,27 +354,49 @@ efeito). 1.5 = curva mais suave que 1.9 — glide sobre os apps sem
 saltos. Aumente pra chegar mais rapido ao fundo; reduza se perder
 precisao / se o cursor 'escorregar' na regiao inferior."""
 
-CURSOR_EDGE_SNAP_PX: int = 48
-"""Magnetismo da borda inferior: movendo pra BAIXO a menos de N pixels
-do fundo, o cursor snap pra borda. Alvos da taskbar ficam colados na
-borda (Fitts: borda = alvo de largura infinita); o snap fecha o gap
-terminal que o vies da ancora deixa. 0 desabilita."""
+CURSOR_EDGE_SNAP_PX: int = 0
+"""LEGADO / DESLIGADO. Magnetismo que levava o cursor direto pro ultimo
+pixel quando descia a menos de N px do fundo.
 
-CURSOR_EDGE_CREEP_ENABLED: bool = True
-"""Border creep: mao parada na banda inferior por mais que o delay =
-cursor desliza suavemente ate a borda. Cobre a fase de homing (usuario
-desacelera ao mirar -> velocidade ~0 -> extrapolacao nao ajuda)."""
+Fica em 0 por padrao: por definicao isso e' um teleporte (salto visivel),
+substituido pela assistencia suave abaixo. Religar (> 0) traz o salto de
+volta."""
+
+CURSOR_EDGE_CREEP_ENABLED: bool = False
+"""LEGADO / DESLIGADO. Border creep: mao parada na banda inferior por
+mais que o delay -> cursor deslizava sozinho ate a borda.
+
+Fica em False por padrao: mover o cursor com a mao PARADA e' justamente o
+que a assistencia suava evita. Substituido por CURSOR_BOTTOM_REACH_*."""
 
 CURSOR_EDGE_CREEP_BAND_PX: int = 110
-"""Altura da banda inferior (em px de tela) onde o creep atua."""
+"""LEGADO. Altura da banda do creep antigo (px). Sem efeito com o creep
+desligado."""
 
 CURSOR_EDGE_CREEP_DELAY_S: float = 0.15
-"""Tempo parado dentro da banda antes do creep comecar. Evita disparo
-em travessias rapidas pela regiao."""
+"""LEGADO. Delay do creep antigo. Sem efeito com o creep desligado."""
 
 CURSOR_EDGE_CREEP_RATE_PX_S: float = 380.0
-"""Velocidade do deslize (px/s). ~350-400 le como 'assistencia suave',
-nao como cursor fugindo do controle."""
+"""LEGADO. Velocidade do creep antigo. Sem efeito com o creep
+desligado."""
+
+# --- Assistencia suave da borda inferior (padrao) --------------------
+CURSOR_BOTTOM_REACH_ENABLED: bool = True
+"""Liga a assistencia unica e suave do alcance da barra de tarefas."""
+
+CURSOR_BOTTOM_REACH_BAND_PX: int = 120
+"""Altura da faixa inferior (px de tela) onde a assistencia atua. Fora
+dela o mapeamento e' o normal da main — precisao intacta no miolo."""
+
+CURSOR_BOTTOM_REACH_MAX_GAIN: float = 3.0
+"""Ganho MAXIMO do movimento descendente, atingido colado na borda. O
+cursor anda ate 3x o passo do usuario nos ultimos pixels — o que fecha
+o gap terminal sem teleporte. Como e' ganho sobre o movimento do
+proprio usuario, com a mao parada a assistencia vale zero."""
+
+CURSOR_BOTTOM_REACH_MAX_EXTRA_PX: int = 60
+"""Teto absoluto do empurrao EXTRA por frame (px), por cima do passo que
+o usuario ja deu. Impede que um movimento rapido vire um salto grande."""
 
 # ---------------------------------------------------------------------
 # FEEL DE MOUSE FISICO

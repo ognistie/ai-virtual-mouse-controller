@@ -28,7 +28,8 @@ API publica:
 `callbacks` segue o contrato de core.ui_overlay.UICallbacks:
     on_slider_change(key, value)   value 0-1
     on_profile_change(profile)
-    on_toggle(key, value)          key in {"aim", "sticky"}
+    on_toggle(key, value)          key in {"aim", "sticky",
+                                            "presentation", "hologram"}
     on_reset()
     on_apply_recommended()
 """
@@ -170,8 +171,11 @@ if _PYSIDE_OK:
             outer.addWidget(root)
 
             col = QVBoxLayout(root)
-            col.setContentsMargins(22, 22, 22, 22)
-            col.setSpacing(18)
+            col.setContentsMargins(22, 18, 22, 18)
+            # Espacamento um pouco menor que antes (18): a secao MODOS
+            # somou dois toggles; compactar mantem tudo dentro do card em
+            # telas menores sem mudar perceptivelmente o visual.
+            col.setSpacing(13)
 
             # Cabecalho
             header = QHBoxLayout()
@@ -213,6 +217,17 @@ if _PYSIDE_OK:
             )
             self._sticky_switch = self._make_toggle(
                 col, "Aderência a alvos", "sticky",
+            )
+
+            col.addWidget(self._divider())
+
+            # Modos (apresentacao / holograma da mao)
+            col.addWidget(self._section_label("MODOS"))
+            self._presentation_switch = self._make_toggle(
+                col, "Modo apresentação", "presentation",
+            )
+            self._hologram_switch = self._make_toggle(
+                col, "Modo holograma", "hologram",
             )
 
             col.addWidget(self._divider())
@@ -289,6 +304,8 @@ if _PYSIDE_OK:
             aim: bool,
             sticky: bool,
             profile: str,
+            presentation: bool = False,
+            hologram: bool = False,
         ) -> None:
             for key, s in self._sliders.items():
                 s.blockSignals(True)
@@ -299,6 +316,8 @@ if _PYSIDE_OK:
                 btn.setChecked(k == profile)
             self._aim_switch.set_on(aim)
             self._sticky_switch.set_on(sticky)
+            self._presentation_switch.set_on(presentation)
+            self._hologram_switch.set_on(hologram)
 
         def set_slider_display(self, key: str, text: str) -> None:
             if key in self._slider_vals:
@@ -306,7 +325,12 @@ if _PYSIDE_OK:
 
         # -------------------------------------------------- animacao
         def _target_rect(self, screen: QRect) -> QRect:
-            h = min(screen.height() - 80, 640)
+            # A altura acompanha o CONTEUDO (sizeHint). Antes era fixa em
+            # 640px; a secao "MODOS" empurrou o painel pra ~780px e os
+            # toggles caiam pra fora do card. Limita a area util da tela
+            # pra nunca estourar embaixo.
+            hint = self.sizeHint().height()
+            h = min(screen.height() - 40, max(480, hint))
             y = screen.y() + (screen.height() - h) // 2
             if self._side == "left":
                 x = screen.x() + 16
@@ -563,10 +587,15 @@ class SettingsPanel:
         aim: bool,
         sticky: bool,
         profile: str,
+        presentation: bool = False,
+        hologram: bool = False,
     ) -> None:
         """Popula o painel com o estado atual do RuntimeSettings."""
         if self._panel is not None:
-            self._panel.apply_snapshot(sliders, displays, aim, sticky, profile)
+            self._panel.apply_snapshot(
+                sliders, displays, aim, sticky, profile,
+                presentation, hologram,
+            )
 
     def set_slider_display(self, key: str, text: str) -> None:
         """Atualiza so o rotulo de valor de um slider (feedback ao vivo
