@@ -103,7 +103,8 @@
       [0.64, 0.64]   // pinky curled
     ],
 
-    // Thumb tip meets middle tip; index extended; ring + pinky semi-curled
+    // Thumb tip meets middle tip; the other fingers remain extended so the
+    // right-click gesture is easy to distinguish from a closed hand.
     pinch_middle: [
       [0.50, 0.92],
       [0.42, 0.82],
@@ -115,17 +116,17 @@
       [0.39, 0.37],
       [0.38, 0.28],  // index extended
       [0.50, 0.60],
-      [0.50, 0.50],
-      [0.50, 0.55],
+      [0.53, 0.49],
+      [0.53, 0.56],
       [0.50, 0.54],  // middle tip meets thumb
       [0.58, 0.62],
-      [0.60, 0.52],
-      [0.59, 0.58],
-      [0.58, 0.60],
+      [0.60, 0.46],
+      [0.61, 0.34],
+      [0.62, 0.25],  // ring extended
       [0.66, 0.66],
-      [0.68, 0.58],
-      [0.67, 0.63],
-      [0.66, 0.65]
+      [0.69, 0.52],
+      [0.71, 0.42],
+      [0.73, 0.34]   // pinky extended
     ],
 
     // All fingers curled into palm; thumb wraps over
