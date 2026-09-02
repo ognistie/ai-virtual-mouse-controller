@@ -11,6 +11,11 @@
 
 Webcam → 21 landmarks → cursor do sistema. Sem hardware extra. Sem GPU.
 
+**AI-powered virtual mouse controller for Windows, macOS, and Linux.** Control the
+mouse cursor, left and right clicks, drag-and-drop, and presentations with real-time
+hand gestures captured by a standard webcam. Built with Python, OpenCV, MediaPipe
+Hands, and PyAutoGUI; runs locally without sending camera images to the cloud.
+
 <br/>
 
 <table>
@@ -33,7 +38,7 @@ Webcam → 21 landmarks → cursor do sistema. Sem hardware extra. Sem GPU.
 
 ## O que é
 
-Sistema gestual de controle de cursor com qualidade comparável a periféricos físicos. O MediaPipe identifica 21 pontos da mão em tempo real, uma state machine traduz gestos em eventos do sistema operacional (move, click, drag, scroll), e um holograma 3D opcional renderiza a mão virtual sobre o desktop.
+O **AI Virtual Mouse Controller** é um mouse virtual com reconhecimento de gestos pela webcam. O MediaPipe identifica 21 pontos da mão em tempo real, uma state machine traduz gestos em eventos do sistema operacional (move, click, drag, scroll), e um holograma 3D opcional renderiza a mão virtual sobre o desktop.
 
 100% local. Sem nuvem, sem telemetria, sem persistir nada da webcam.
 
