@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
+        xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
+  <url>
+    <loc>https://ognistie.github.io/ai-virtual-mouse-controller/</loc>
+    <lastmod>2026-07-30</lastmod>
+    <image:image>
+      <image:loc>https://ognistie.github.io/ai-virtual-mouse-controller/assets/img/avmc-demo-poster.jpg</image:loc>
+      <image:caption>AI Virtual Mouse Controller em uso com reconhecimento de gestos</image:caption>
+    </image:image>
+    <video:video>
+      <video:thumbnail_loc>https://ognistie.github.io/ai-virtual-mouse-controller/assets/img/avmc-demo-poster.jpg</video:thumbnail_loc>
+      <video:title>Demonstração do AI Virtual Mouse Controller</video:title>
+      <video:description>Controle de cursor, desenho, apresentações e navegação por gestos da mão em tempo real.</video:description>
+      <video:content_loc>https://ognistie.github.io/ai-virtual-mouse-controller/assets/video/avmc-demo.mp4</video:content_loc>
+    </video:video>
+  </url>
+  <url>
+    <loc>https://ognistie.github.io/ai-virtual-mouse-controller/usage.html</loc>
+    <lastmod>2026-07-30</lastmod>
+    <image:image>
+      <image:loc>https://ognistie.github.io/ai-virtual-mouse-controller/assets/img/instalacao-avmc-poster.jpg</image:loc>
+      <image:caption>Guia de instalação do AI Virtual Mouse Controller</image:caption>
+    </image:image>
+  </url>
+</urlset>

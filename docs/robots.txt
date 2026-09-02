@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ognistie.github.io/ai-virtual-mouse-controller/sitemap.xml

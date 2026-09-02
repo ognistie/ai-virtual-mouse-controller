@@ -1,0 +1,30 @@
+# AI Virtual Mouse Controller
+
+> Projeto open source em Python que usa uma webcam e visão computacional para controlar cursor, cliques, arrasto e apresentações com gestos da mão. O processamento é local, sem nuvem, telemetria ou armazenamento do vídeo.
+
+Informações oficiais sobre o AI Virtual Mouse Controller, criado por Guilherme Moraes Franco. Usa OpenCV, MediaPipe Hands, PyAutoGUI, NumPy e, opcionalmente, PySide6 com ModernGL. Requer Python 3.11 a 3.13 e uma webcam.
+
+## Conteúdo principal
+
+- [Site oficial](https://ognistie.github.io/ai-virtual-mouse-controller/): visão geral, arquitetura, gestos, demonstração e instalação
+- [Guia de uso](https://ognistie.github.io/ai-virtual-mouse-controller/usage.html): instalação, primeiros passos, configuração e solução de problemas
+- [Repositório GitHub](https://github.com/ognistie/ai-virtual-mouse-controller): código-fonte, testes, issues e contribuições
+- [README](https://raw.githubusercontent.com/ognistie/ai-virtual-mouse-controller/main/README.md): documentação técnica em Markdown
+- [PyPI](https://pypi.org/project/ai-virtual-mouse-controller/): pacote oficial
+
+## Documentação técnica
+
+- [Arquitetura da âncora robusta](https://github.com/ognistie/ai-virtual-mouse-controller/blob/main/docs/adr/0001-robust-hand-anchor.md): decisão arquitetural do rastreamento
+- [Changelog](https://github.com/ognistie/ai-virtual-mouse-controller/blob/main/CHANGELOG.md): versões e mudanças
+- [Como contribuir](https://github.com/ognistie/ai-virtual-mouse-controller/blob/main/CONTRIBUTING.md): ambiente e processo de contribuição
+- [Política de segurança](https://github.com/ognistie/ai-virtual-mouse-controller/blob/main/SECURITY.md): reporte de vulnerabilidades
+
+## Fatos essenciais
+
+- Autor: Guilherme Moraes Franco (GitHub: ognistie)
+- Licença: MIT
+- Plataformas: Windows 10/11, macOS e Linux X11; Wayland possui suporte limitado
+- Privacidade: imagens da webcam não são enviadas nem persistidas
+- Instalação: `pip install ai-virtual-mouse-controller`
+- Execução: `avmc`
+- MediaPipe compatível: `>=0.10.18,<0.10.30`

@@ -1,0 +1,38 @@
+# AI Virtual Mouse Controller — contexto completo
+
+## Resumo
+
+AI Virtual Mouse Controller é um aplicativo desktop open source que transforma uma webcam comum em uma interface gestual. O MediaPipe Hands identifica 21 pontos da mão; uma máquina de estados reconhece posturas e pinças; um filtro One Euro suaviza o movimento; e o PyAutoGUI envia eventos ao sistema operacional. Todo o processamento acontece localmente.
+
+## Capacidades
+
+- Mão aberta: mover o cursor.
+- Pinça entre polegar e indicador: clique esquerdo.
+- Pinça sustentada por aproximadamente 1,5 segundo: iniciar arrasto; soltar conclui o arrasto.
+- Pinça entre polegar e dedo médio: clique direito.
+- Indicador e médio em sinal de paz: duplo clique.
+- Punho fechado ou mão fora do enquadramento: pausar o cursor.
+- Modo apresentação: gestos direcionais avançam ou voltam slides.
+- Overlay holográfico 3D opcional sobre o desktop.
+
+## Arquitetura
+
+O fluxo principal é: webcam → OpenCV → MediaPipe Hands → RobustHandAnchor → GestureDetector → OneEuroSmoother → CursorController. `VirtualMouseService` orquestra o loop. `RuntimeSettings` oferece perfis e ajustes durante a execução. `PerfTelemetry` mede o tempo dos estágios. PySide6 e ModernGL implementam a visualização holográfica opcional.
+
+## Instalação e compatibilidade
+
+Requisitos: Python 3.11 a 3.13 e webcam. Instale com `pip install ai-virtual-mouse-controller` e execute com `avmc`. O projeto depende de `mediapipe>=0.10.18,<0.10.30`, pois versões posteriores removeram a API `mp.solutions.hands` usada pelo pipeline.
+
+Windows 10/11 funciona sem preparação adicional. No macOS, o usuário deve conceder permissões de Câmera e Acessibilidade. No Linux, X11 é recomendado; o suporte no Wayland é limitado pelo PyAutoGUI.
+
+## Privacidade e licença
+
+O projeto não usa nuvem, não envia telemetria e não persiste imagens da webcam. O código é distribuído sob licença MIT e foi criado por Guilherme Moraes Franco.
+
+## Fontes canônicas
+
+- Site: https://ognistie.github.io/ai-virtual-mouse-controller/
+- Guia: https://ognistie.github.io/ai-virtual-mouse-controller/usage.html
+- Código: https://github.com/ognistie/ai-virtual-mouse-controller
+- Pacote: https://pypi.org/project/ai-virtual-mouse-controller/
+- Changelog: https://github.com/ognistie/ai-virtual-mouse-controller/blob/main/CHANGELOG.md
