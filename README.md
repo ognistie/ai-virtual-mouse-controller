@@ -55,6 +55,17 @@ pip install ai-virtual-mouse-controller
 avmc
 ```
 
+> **Windows — "avmc não é reconhecido"?** O instalador novo do Python (padrão
+> no 3.14) não põe a pasta `Scripts` no PATH. Rode uma vez:
+>
+> ```powershell
+> py -m avmc
+> ```
+>
+> O AVMC abre e adiciona essa pasta ao PATH do seu usuário (sem admin). A partir
+> daí, num terminal **novo**, `avmc` funciona. Pra não mexer no PATH, defina
+> `AVMC_NO_PATH_SETUP=1`.
+
 Posicione a mão a ~50cm da câmera. Atalhos em runtime:
 
 | Tecla | Ação |

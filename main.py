@@ -5,10 +5,9 @@ main.py
 Entry point do AI Virtual Mouse Controller.
 
 Uso:
-    python main.py
-
-Ou como modulo:
-    python -m main
+    avmc            (comando instalado pelo pip)
+    py -m avmc      (Windows, funciona mesmo sem a pasta Scripts no PATH)
+    python main.py  (a partir do repositorio)
 
 Sai com codigo:
     0 = ok
@@ -53,6 +52,26 @@ def _check_environment() -> None:
         sys.exit(1)
 
 
+def _setup_windows_path() -> None:
+    """No Windows, poe a pasta do avmc.exe no PATH do usuario (1a execucao).
+
+    Nunca impede o programa de abrir: qualquer falha aqui e' ignorada.
+    """
+    try:
+        from core.windows_path import OPT_OUT_ENV, ensure_scripts_on_path
+
+        added = ensure_scripts_on_path()
+    except Exception:
+        return
+    if added:
+        print(
+            f"[AVM] Pasta '{added}' adicionada ao PATH do seu usuario.\n"
+            "[AVM] Nas proximas vezes, abra um terminal NOVO e digite: avmc\n"
+            f"[AVM] (pra nao mexer no PATH, defina {OPT_OUT_ENV}=1)",
+            flush=True,
+        )
+
+
 def _setup_logging() -> None:
     import config
     level = getattr(logging, config.LOG_LEVEL.upper(), logging.INFO)
@@ -64,6 +83,8 @@ def _setup_logging() -> None:
 
 
 def main() -> int:
+    _setup_windows_path()
+
     # Check ANTES de importar service (que ja tocaria em mediapipe)
     _check_environment()
 

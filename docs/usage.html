@@ -508,6 +508,20 @@ avmc</code></pre>
 
           <div class="troubleshooting">
             <details>
+              <summary>Windows: "avmc não é reconhecido"</summary>
+              <div>
+                <p>O instalador novo do Python (padrão no 3.14) não coloca a pasta <code>Scripts</code> no PATH. Rode uma vez:</p>
+                <div class="code-block">
+                  <div class="code-head">
+                    <span>powershell</span>
+                    <button type="button" data-copy-target="fix-avmc-path">Copiar</button>
+                  </div>
+                  <pre id="fix-avmc-path"><code>py -m avmc</code></pre>
+                </div>
+                <p>O AVMC abre e adiciona essa pasta ao PATH do seu usuário. Depois, num terminal novo, <code>avmc</code> funciona normalmente.</p>
+              </div>
+            </details>
+            <details>
               <summary>A câmera não abre</summary>
               <div>
                 <p>Feche aplicativos que estejam usando a webcam e confira as permissões de câmera do sistema.</p>

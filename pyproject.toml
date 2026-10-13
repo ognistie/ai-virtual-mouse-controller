@@ -90,7 +90,7 @@ avmc = "main:main"
 # ============================================================================
 
 [tool.setuptools]
-py-modules = ["main", "config"]
+py-modules = ["main", "config", "avmc"]
 
 [tool.setuptools.packages.find]
 include = ["core*", "services*"]

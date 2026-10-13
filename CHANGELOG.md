@@ -21,6 +21,14 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
   `pip uninstall -y opencv-python` (ver README → Atualizar).
 - Erro claro quando falta `libEGL` no Linux (exigido pelo mediapipe novo).
 - Testes do `HandTracker`, incluindo um quadro real do vídeo de demo.
+
+### Added
+- `py -m avmc` / `python -m avmc` roda o projeto mesmo sem a pasta
+  `Scripts` do Python no PATH.
+- Windows: na primeira execução, se a pasta do `avmc.exe` não estiver no
+  PATH (caso do instalador novo do Python 3.14), ela é adicionada ao PATH do
+  usuário — `avmc` passa a funcionar em terminais novos. Desliga com
+  `AVMC_NO_PATH_SETUP=1`.
 - CI roda os testes em Python 3.10–3.14 (Ubuntu) e 3.12/3.14 (Windows).
 
 ### Deprecated
