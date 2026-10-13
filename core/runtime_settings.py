@@ -26,10 +26,10 @@ RECOMMENDED_VALUES = {
     "dpi_fixed_multiplier": 1.00,
     "aim_assist_slowdown_factor": 0.40,
     "one_euro_min_cutoff": 1.2,
-    "one_euro_beta": 0.020,
+    "one_euro_beta": 5.7,
     "pinch_distance_threshold": 0.075,
     "sticky_friction_factor": 0.75,
-    "anchor_freeze_duration_ms": 50,
+    "anchor_freeze_duration_ms": 120,
     "aim_assist_enabled": True,
     "sticky_targeting_enabled": True,
 }
@@ -44,37 +44,37 @@ PROFILES = {
         "dpi_fixed_multiplier": 1.00,
         "aim_assist_slowdown_factor": 0.55,
         "one_euro_min_cutoff": 0.8,
-        "one_euro_beta": 0.040,
+        "one_euro_beta": 3.6,
         "pinch_distance_threshold": 0.075,
         "sticky_friction_factor": 0.75,
-        "anchor_freeze_duration_ms": 50,
+        "anchor_freeze_duration_ms": 120,
     },
     "precise": {
         "dpi_fixed_multiplier": 0.70,
         "aim_assist_slowdown_factor": 0.40,
         "one_euro_min_cutoff": 0.6,
-        "one_euro_beta": 0.025,
+        "one_euro_beta": 2.6,
         "pinch_distance_threshold": 0.065,
         "sticky_friction_factor": 0.65,
-        "anchor_freeze_duration_ms": 80,
+        "anchor_freeze_duration_ms": 150,
     },
     "responsive": {
         "dpi_fixed_multiplier": 1.0,
         "aim_assist_slowdown_factor": 0.75,
         "one_euro_min_cutoff": 1.5,
-        "one_euro_beta": 0.060,
+        "one_euro_beta": 7.3,
         "pinch_distance_threshold": 0.085,
         "sticky_friction_factor": 0.85,
-        "anchor_freeze_duration_ms": 30,
+        "anchor_freeze_duration_ms": 80,
     },
     "stable": {
         "dpi_fixed_multiplier": 0.80,
         "aim_assist_slowdown_factor": 0.50,
         "one_euro_min_cutoff": 0.4,
-        "one_euro_beta": 0.020,
+        "one_euro_beta": 1.5,
         "pinch_distance_threshold": 0.075,
         "sticky_friction_factor": 0.70,
-        "anchor_freeze_duration_ms": 60,
+        "anchor_freeze_duration_ms": 140,
     },
 }
 
@@ -138,12 +138,18 @@ SLIDER_MAPPINGS: Dict[str, SliderMapping] = {
         invert=[True],
     ),
     "smoothness": SliderMapping(
-        # combina min_cutoff e beta
-        # 0 = raw (high cutoff, low beta filtragem minima)
-        # 1 = smooth (low cutoff, high beta — mais filtragem)
+        # combina min_cutoff e beta (OneEuro). As coordenadas filtradas sao
+        # normalizadas (0-1), entao beta precisa estar nessa escala: beta
+        # multiplica a velocidade em "telas por segundo" (~0.5-3 num gesto
+        # normal). Com beta ~0.04 o corte adaptativo ficava inerte e o
+        # cursor arrastava atras da mao (~0.6s pra assentar). Medido com
+        # scripts/eval_motion.py.
+        # 0 = raw (corte alto, beta alto: quase sem filtro e sem atraso)
+        # 1 = smooth (corte baixo, beta baixo: mais filtro, mais atraso)
+        # Os perfis ficam sobre esta reta — mexer no slider nao da salto.
         setting_keys=["one_euro_min_cutoff", "one_euro_beta"],
-        min_real=[2.0, 0.005],   # raw
-        max_real=[0.4, 0.060],   # smooth
+        min_real=[2.0, 10.0],   # raw
+        max_real=[0.4, 1.5],    # smooth
         invert=[False, False],
     ),
     "pinch": SliderMapping(
@@ -161,6 +167,8 @@ SLIDER_MAPPINGS: Dict[str, SliderMapping] = {
         invert=[True],
     ),
     "anchor_freeze": SliderMapping(
+        # Trava do cursor no clique (CursorController.click_freeze_seconds):
+        # anula o deslocamento do curl dos dedos ao fechar a pinca.
         # 0 = off (0ms), 1 = long (200ms)
         setting_keys=["anchor_freeze_duration_ms"],
         min_real=[0.0],

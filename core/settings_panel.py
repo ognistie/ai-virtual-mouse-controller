@@ -69,7 +69,7 @@ _SLIDERS = [
     ("smoothness", "Suavização"),
     ("pinch", "Pinça"),
     ("sticky", "Aderência"),
-    ("anchor_freeze", "Congelar âncora"),
+    ("anchor_freeze", "Trava no clique"),
 ]
 
 # (chave do profile, rotulo)

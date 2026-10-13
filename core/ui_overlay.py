@@ -528,7 +528,7 @@ class UIOverlay:
             SliderSpec(key="sticky", label="Sticky strength",
                        value=0.4, color=COLOR_PINK,
                        min_label="off", max_label="strong"),
-            SliderSpec(key="anchor_freeze", label="Anchor freeze",
+            SliderSpec(key="anchor_freeze", label="Click freeze",
                        value=0.3, color=COLOR_ORANGE,
                        min_label="off", max_label="long"),
         ]

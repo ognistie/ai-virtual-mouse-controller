@@ -155,8 +155,9 @@ Toda a calibração vive em [`config.py`](config.py) — constantes nomeadas com
 | Seção | O que controla |
 |---|---|
 | `CAMERA` | índice da câmera, resolução, FPS alvo |
+| `PROFILE` | perfil inicial do painel: `smooth`, `precise`, `responsive`, `stable` |
 | `CURSOR_ANCHOR` | qual ponto da mão o cursor segue (`-2` = âncora robusta, default) |
-| `PINCH` | thresholds de detecção de clique (com escala adaptativa por tamanho da mão) |
+| `PINCH` | thresholds de detecção de clique (escala adaptativa por tamanho da mão + histerese pra soltar) |
 | `DPI` / `SMOOTHING` | sensibilidade do cursor + filtro OneEuro |
 | `SCREEN_MARGIN_*` | margens assimétricas (top/bottom < lateral) pra alcançar cantos |
 | `CURSOR_FOLLOWTHROUGH_*` | cinematic prediction quando a mão sai do FOV |
@@ -202,7 +203,8 @@ core/        # camera, hand_tracker, gesture_detector, hand_anchor, smoothing
 services/    # orquestração do loop principal
 config.py    # constantes de calibração documentadas
 main.py      # entry point
-tests/       # cobertura dos módulos puros (sem cv2/mediapipe)
+scripts/     # eval_motion.py: mede jitter/atraso/cliques com mãos sintéticas
+tests/       # unitários + gate de qualidade de movimento
 docs/        # site estático + assets
 ```
 

@@ -146,6 +146,17 @@ DPI_MULTIPLIER_MIN: float = 0.7
 DPI_MULTIPLIER_MAX: float = 1.4
 DPI_FIXED_MULTIPLIER: float = 1.00
 
+DPI_SIZE_SMOOTHING_S: float = 0.6
+"""Constante de tempo (s) do tamanho da mao usado no DPI adaptativo.
+
+O tamanho da mao no frame estima a DISTANCIA ate a camera — algo que muda
+devagar. Frame a frame ele oscila quando o pulso inclina/gira e com o
+ruido do tracker; como o DPI escala a posicao a partir do centro da tela,
+isso fazia o cursor andar sozinho com a mao parada (ate ~50 px longe do
+centro). 0.6 s filtra a inclinacao e ainda acompanha quem aproxima ou
+afasta a mao da camera. 0 = comportamento antigo (cru).
+"""
+
 # ---------------------------------------------------------------------
 # SUAVIZACAO
 # ---------------------------------------------------------------------
@@ -155,9 +166,18 @@ SMOOTHING_STRATEGY: SmoothingStrategy = "one_euro"
 
 SMOOTHING_FACTOR: float = 0.6
 
+PROFILE: str = "smooth"
+"""Perfil inicial do painel: 'smooth', 'precise', 'responsive' ou
+'stable'. Define suavizacao, sensibilidade, pinca, aim assist, sticky e a
+trava no clique (ver core/runtime_settings.PROFILES)."""
+
 ONE_EURO_FREQ: float = 60.0
+# min_cutoff e beta efetivos vem do PERFIL (painel, slider Suavizacao) —
+# os dois abaixo ficam como referencia do perfil 'recommended'.
+# beta esta na escala das coordenadas normalizadas (0-1): valores ~0.02
+# deixavam o filtro sem adaptacao e o cursor arrastando atras da mao.
 ONE_EURO_MIN_CUTOFF: float = 1.2
-ONE_EURO_BETA: float = 0.020
+ONE_EURO_BETA: float = 5.7
 ONE_EURO_D_CUTOFF: float = 1.0
 DEAD_ZONE_PIXELS: int = 1
 
@@ -192,9 +212,22 @@ vem do debounce de 2 frames + threshold.
 
 PINCH_VELOCITY_THRESHOLD: float = 0.008
 
+PINCH_RELEASE_RATIO: float = 1.25
+"""Histerese da pinca (Schmitt trigger): pra SOLTAR a pinca, polegar e
+indicador precisam abrir ate threshold * 1.25 (entrar continua em
+threshold). Vale tambem pro clique direito.
+
+Com limiar unico, o ruido do tracker com os dedos perto da borda fazia a
+pinca "piscar": clique extra no encostar seguinte ou drag caindo sozinho.
+Mesma tecnica dos detectores de pinca da Ultraleap (distancias separadas
+de ativar/desativar). 1.0 = comportamento antigo (limiar unico).
+Suba (1.35) se ainda notar clique duplo acidental; desca (1.15) se soltar
+o drag ficar dificil.
+"""
+
 PINCH_MIN_HOLD_SECONDS: float = 0.015
-"""Tempo minimo da pinca pra contar como click. 15ms permite cliques
-rapidos e fluidos sem disparar em encontros acidentais."""
+"""Sem efeito no modelo press-to-click (o clique sai no encostar).
+Mantido so pra nao quebrar configs existentes."""
 
 # ---------------------------------------------------------------------
 # CLIQUE DIREITO — pinca polegar+medio
@@ -416,6 +449,13 @@ alvos pequenos errarem.
 0.12s cobre o intervalo entre a deteccao do raw shape PINCH e a
 estabilizacao da pose. Aumente pra 0.15-0.20s se ainda notar deriva.
 Diminua pra 0.08s se sentir cursor "preso" apos clicks consecutivos.
+
+Em runtime o valor vem do PERFIL (slider "Trava no clique" do painel);
+este e' o valor de referencia do perfil 'smooth'/'recommended'.
+
+Ao destravar, o cursor NAO salta pra onde a mao foi durante a trava: a
+diferenca e' absorvida aos poucos conforme a mao se move (ver
+CursorController._reconcile_offset). Vale tambem pro fim do drag.
 """
 
 DRAG_PRECISION_FACTOR: float = 0.55

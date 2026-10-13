@@ -20,6 +20,9 @@ Solucao (este modulo):
   classico de oclusao).
 - Histerese: blende com a ultima ancora boa quando a confianca cai bruscamente
   -> sem saltos visiveis quando um landmark crítico falha.
+- Votacao por forma: cada landmark vota no centro usando o deslocamento
+  (landmark -> ancora) aprendido enquanto estava bem dentro do quadro.
+  Dedos saindo pela borda param de votar SEM puxar a ancora pra dentro.
 
 Design:
 - Modulo puro: sem I/O, sem dependencia de Qt/cv2. So math.
@@ -144,6 +147,20 @@ class RobustHandAnchor:
     # voltava pra cima -> cursor "descia demais e voltava". 1.4 mantem o
     # alcance mas sem o overshoot que quebrava a suavidade.
     _EDGE_CRITICAL_GAIN_DOWN: float = 1.4
+    # Escala aplicada aos tres gains acima. Os gains foram calibrados
+    # quando compute() rodava 2-3x por frame — o que achatava a
+    # velocidade estimada pra ~1/5 da real. Com 1 chamada por frame a
+    # velocidade e' a real; sem esta escala a ancora passava da mao nas
+    # bordas e voltava (overshoot de ~40 px). Medido com
+    # scripts/eval_motion.py.
+    _EDGE_GAIN_SCALE: float = 0.25
+
+    # Votacao por forma da mao: cada landmark vota no centro como
+    # (posicao - deslocamento aprendido ate o centro). Landmark que sai do
+    # quadro para de votar SEM arrastar a ancora pra dentro (a media
+    # ponderada simples puxava o centro pros pontos ainda visiveis).
+    _SHAPE_VOTING: bool = True
+    _OFFSET_ALPHA: float = 0.5  # EMA do deslocamento (mao muda de forma)
 
     def __init__(
         self,
@@ -171,6 +188,9 @@ class RobustHandAnchor:
         # Velocidade rolante (delta entre frames consecutivos) — usada
         # para extrapolar a ancora quando a confianca cai perto das bordas.
         self._last_velocity: Tuple[float, float] = (0.0, 0.0)
+        # Deslocamento (landmark - ancora) aprendido com o landmark bem
+        # dentro do quadro. None = ainda desconhecido.
+        self._offsets: Optional[List[Optional[Tuple[float, float]]]] = None
 
     # ------------------------------------------------------------- API
 
@@ -212,6 +232,14 @@ class RobustHandAnchor:
         sum_wy = 0.0
         sum_w = 0.0
         used = 0
+        # Votos por forma (so landmarks com deslocamento conhecido).
+        offsets = self._offsets if self._SHAPE_VOTING else None
+        if offsets is not None and len(offsets) != n:
+            offsets = self._offsets = None
+        vote_wx = 0.0
+        vote_wy = 0.0
+        vote_w = 0.0
+        inside: List[int] = []
 
         for i in range(n):
             lm = landmarks[i]
@@ -246,6 +274,14 @@ class RobustHandAnchor:
             sum_wy += w * y
             sum_w += w
             used += 1
+            if edge_factor >= 1.0:
+                inside.append(i)
+            if offsets is not None:
+                off = offsets[i]
+                if off is not None:
+                    vote_wx += w * (x - off[0])
+                    vote_wy += w * (y - off[1])
+                    vote_w += w
 
         if sum_w <= 1e-6:
             # Caso degenerado: nenhum landmark passou os filtros.
@@ -255,8 +291,16 @@ class RobustHandAnchor:
                 return AnchorResult(lx, ly, 0.0, 0)
             return AnchorResult(0.5, 0.5, 0.0, 0)
 
-        ax = sum_wx / sum_w
-        ay = sum_wy / sum_w
+        # Votacao por forma quando os votos cobrem boa parte do peso; senao
+        # (inicio, mao entrando) cai na media ponderada simples.
+        if vote_w >= 0.5 * sum_w:
+            ax = vote_wx / vote_w
+            ay = vote_wy / vote_w
+        else:
+            ax = sum_wx / sum_w
+            ay = sum_wy / sum_w
+        if self._SHAPE_VOTING:
+            self._learn_offsets(landmarks, inside, ax, ay)
 
         # Confianca normalizada: peso total / (40% do teto teorico de pesos).
         # 40% representa "mao razoavelmente visivel" — calibrado empiricamente.
@@ -300,17 +344,18 @@ class RobustHandAnchor:
                 vx, vy = self._last_velocity
                 going_to_edge_x = (vx < 0 and ax < 0.5) or (vx > 0 and ax > 0.5)
                 going_to_edge_y = (vy < 0 and ay < 0.5) or (vy > 0 and ay > 0.5)
+                k = self._EDGE_GAIN_SCALE
                 if in_critical:
-                    gain_x = self._EDGE_CRITICAL_GAIN
+                    gain_x = self._EDGE_CRITICAL_GAIN * k
                     # Descendo (vy > 0) o gain e' reforcado — unica
                     # borda onde a geometria da camera trava o alcance.
-                    gain_y = (
+                    gain_y = k * (
                         self._EDGE_CRITICAL_GAIN_DOWN if vy > 0
                         else self._EDGE_CRITICAL_GAIN
                     )
                 else:
                     gain_x = gain_y = (
-                        self._EDGE_VELOCITY_GAIN * (1.0 - confidence)
+                        self._EDGE_VELOCITY_GAIN * (1.0 - confidence) * k
                     )
                 if going_to_edge_x:
                     ax += vx * gain_x
@@ -341,6 +386,45 @@ class RobustHandAnchor:
         self._last_confidence = 0.0
         self._lost_frames = 0
         self._last_velocity = (0.0, 0.0)
+        self._offsets = None
+
+    def _learn_offsets(
+        self,
+        landmarks: Sequence[Tuple[float, float, float]],
+        inside: List[int],
+        ax: float,
+        ay: float,
+    ) -> None:
+        """Atualiza o deslocamento landmark->ancora dos pontos bem dentro
+        do quadro e recentra (media anatomica dos deslocamentos = 0), pra
+        ancora continuar sendo o centro anatomico da mao, sem deriva."""
+        n = len(landmarks)
+        if self._offsets is None:
+            self._offsets = [None] * n
+        offsets = self._offsets
+        a = self._OFFSET_ALPHA
+        for i in inside:
+            dx = float(landmarks[i][0]) - ax
+            dy = float(landmarks[i][1]) - ay
+            prev = offsets[i]
+            if prev is None:
+                offsets[i] = (dx, dy)
+            else:
+                offsets[i] = (prev[0] + a * (dx - prev[0]), prev[1] + a * (dy - prev[1]))
+        # Recentra pelos pesos anatomicos dos deslocamentos conhecidos.
+        sw = mx = my = 0.0
+        for i, off in enumerate(offsets):
+            if off is not None:
+                wa = _ANATOMY_WEIGHTS[i] if i < len(_ANATOMY_WEIGHTS) else 0.4
+                sw += wa
+                mx += wa * off[0]
+                my += wa * off[1]
+        if sw > 0.0 and len(inside) == n:
+            mx /= sw
+            my /= sw
+            for i, off in enumerate(offsets):
+                if off is not None:
+                    offsets[i] = (off[0] - mx, off[1] - my)
 
     # --------------------------------------------------------- introspeccao
 

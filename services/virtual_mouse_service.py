@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 import signal
 import sys
+import time
 from typing import Optional
 
 import cv2
@@ -100,6 +101,11 @@ class VirtualMouseService:
         self._fps = FPSCounter(window=30)
         self._should_stop = False
         self._hand_lost_frames = 0
+        # Controle de frames novos da webcam (ver _tick / _idle_tick).
+        self._frame_seq = 0
+        self._last_frame_t = time.perf_counter()
+        self._camera_lost = False
+        self._lost_frame: Optional[np.ndarray] = None
         self._always_on_top: bool = getattr(config, "DISPLAY_ALWAYS_ON_TOP", True)
 
         # UI Overlay
@@ -146,7 +152,7 @@ class VirtualMouseService:
             config, "PRESENTATION_PREV_KEY", "left"
         )
         self._presentation = PresentationController(
-            dead_zone=getattr(config, "PRESENTATION_DEAD_ZONE", 0.20),
+            dead_zone=getattr(config, "PRESENTATION_DEAD_ZONE", 0.75),
             cooldown_s=getattr(config, "PRESENTATION_COOLDOWN_S", 0.5),
             extension_threshold=getattr(
                 config, "PRESENTATION_EXTENSION_THRESHOLD", 0.80
@@ -163,16 +169,16 @@ class VirtualMouseService:
         try:
             self.hologram = HologramOverlay(
                 hand_size_px=getattr(config, "HOLOGRAM_HAND_SIZE_PX", 180),
-                opacity=getattr(config, "HOLOGRAM_OPACITY", 0.40),
+                opacity=getattr(config, "HOLOGRAM_OPACITY", 0.70),
                 target_fps=getattr(config, "HOLOGRAM_FPS", 30),
-                bone_color=getattr(config, "HOLOGRAM_COLOR_BONE", "#d92626"),
-                point_color=getattr(config, "HOLOGRAM_COLOR_POINT", "#f6efe2"),
+                bone_color=getattr(config, "HOLOGRAM_COLOR_BONE", "#00d4ff"),
+                point_color=getattr(config, "HOLOGRAM_COLOR_POINT", "#e0f7ff"),
                 transparent_color=getattr(
                     config, "HOLOGRAM_TRANSPARENT_COLOR", "#010203"
                 ),
-                view_dorsal=getattr(config, "HOLOGRAM_VIEW_DORSAL", True),
+                view_dorsal=getattr(config, "HOLOGRAM_VIEW_DORSAL", False),
                 particles_enabled=getattr(
-                    config, "HOLOGRAM_PARTICLES_ENABLED", True,
+                    config, "HOLOGRAM_PARTICLES_ENABLED", False,
                 ),
                 particle_count=getattr(
                     config, "HOLOGRAM_PARTICLE_COUNT", 180,
@@ -231,7 +237,6 @@ class VirtualMouseService:
             height=config.CAMERA_HEIGHT,
             fps=config.CAMERA_FPS_TARGET,
         )
-        camera.open()
 
         # 3. Hand tracker
         tracker = HandTracker(
@@ -253,36 +258,37 @@ class VirtualMouseService:
             dead_zone_pixels=config.DEAD_ZONE_PIXELS,
             failsafe=config.PYAUTOGUI_FAILSAFE,
             pyautogui_pause=config.PYAUTOGUI_PAUSE,
-            click_freeze_seconds=getattr(
-                config, "CLICK_FREEZE_SECONDS", 0.12,
+            # Trava no clique vem do perfil (slider do painel).
+            click_freeze_seconds=(
+                runtime.get("anchor_freeze_duration_ms") / 1000.0
             ),
             drag_precision_factor=getattr(
                 config, "DRAG_PRECISION_FACTOR", 0.55,
             ),
             y_bottom_boost_enabled=getattr(
-                config, "CURSOR_Y_BOTTOM_BOOST_ENABLED", False,
+                config, "CURSOR_Y_BOTTOM_BOOST_ENABLED", True,
             ),
             y_bottom_boost_knee=getattr(
-                config, "CURSOR_Y_BOTTOM_BOOST_KNEE", 0.72,
+                config, "CURSOR_Y_BOTTOM_BOOST_KNEE", 0.82,
             ),
             y_bottom_boost_power=getattr(
-                config, "CURSOR_Y_BOTTOM_BOOST_POWER", 1.6,
+                config, "CURSOR_Y_BOTTOM_BOOST_POWER", 1.5,
             ),
             edge_snap_px=getattr(config, "CURSOR_EDGE_SNAP_PX", 0),
             edge_creep_enabled=getattr(
                 config, "CURSOR_EDGE_CREEP_ENABLED", False,
             ),
             edge_creep_band_px=getattr(
-                config, "CURSOR_EDGE_CREEP_BAND_PX", 72,
+                config, "CURSOR_EDGE_CREEP_BAND_PX", 110,
             ),
             edge_creep_delay_s=getattr(
                 config, "CURSOR_EDGE_CREEP_DELAY_S", 0.15,
             ),
             edge_creep_rate_px_s=getattr(
-                config, "CURSOR_EDGE_CREEP_RATE_PX_S", 320.0,
+                config, "CURSOR_EDGE_CREEP_RATE_PX_S", 380.0,
             ),
             bottom_reach_enabled=getattr(
-                config, "CURSOR_BOTTOM_REACH_ENABLED", False,
+                config, "CURSOR_BOTTOM_REACH_ENABLED", True,
             ),
             bottom_reach_band_px=getattr(
                 config, "CURSOR_BOTTOM_REACH_BAND_PX", 120,
@@ -305,17 +311,25 @@ class VirtualMouseService:
             d_cutoff=config.ONE_EURO_D_CUTOFF,
         )
 
-        return cls(
-            camera=camera,
-            tracker=tracker,
-            gesture_detector=gesture_detector,
-            cursor=cursor,
-            smoother=smoother,
-            runtime_settings=runtime,
-            enable_preview=config.ENABLE_PREVIEW,
-            draw_landmarks=config.DRAW_LANDMARKS,
-            window_name=config.WINDOW_NAME,
-        )
+        # Camera abre por ultimo: se algo antes falhar, nao fica webcam
+        # presa (luz acesa) com o processo saindo por erro.
+        try:
+            camera.open()
+            return cls(
+                camera=camera,
+                tracker=tracker,
+                gesture_detector=gesture_detector,
+                cursor=cursor,
+                smoother=smoother,
+                runtime_settings=runtime,
+                enable_preview=config.ENABLE_PREVIEW,
+                draw_landmarks=config.DRAW_LANDMARKS,
+                window_name=config.WINDOW_NAME,
+            )
+        except BaseException:
+            camera.close()
+            tracker.close()
+            raise
 
     @staticmethod
     def _build_detector(runtime: RuntimeSettings) -> GestureDetector:
@@ -370,6 +384,8 @@ class VirtualMouseService:
             followthrough_damping=getattr(
                 config, "CURSOR_FOLLOWTHROUGH_DAMPING", 0.82,
             ),
+            pinch_release_ratio=getattr(config, "PINCH_RELEASE_RATIO", 1.25),
+            dpi_size_smoothing_s=getattr(config, "DPI_SIZE_SMOOTHING_S", 0.6),
         )
 
     # -----------------------------------------------------------------
@@ -392,6 +408,7 @@ class VirtualMouseService:
                 )
             self._apply_always_on_top()
 
+        self._last_frame_t = time.perf_counter()
         try:
             while not self._should_stop:
                 self._tick()
@@ -462,12 +479,31 @@ class VirtualMouseService:
     # Frame tick
     # -----------------------------------------------------------------
 
+    # Espera maxima por um frame novo antes de rodar um tick ocioso (so
+    # bombeia UI + teclado). ~60 Hz mantem painel/holograma fluidos sem
+    # reprocessar frames repetidos da webcam.
+    _FRAME_WAIT_S = 1.0 / 60.0
+    # Sem frame novo por mais que isso = camera perdida (mesmo se o
+    # driver nao reportar erro).
+    _CAMERA_LOST_AFTER_S = 2.0
+
     def _tick(self) -> None:
         prof = self._perf
         with prof.stage("camera"):
-            frame = self.camera.read(mirror=True)
+            # Inclui a espera pelo proximo frame da webcam.
+            frame, seq = self.camera.read_new(
+                self._frame_seq, timeout=self._FRAME_WAIT_S, mirror=True,
+            )
         if frame is None:
+            self._idle_tick()
             return
+
+        self._frame_seq = seq
+        self._last_frame_t = time.perf_counter()
+        if self._camera_lost:
+            self._camera_lost = False
+            print("[AVM] Webcam de volta", flush=True)
+            logger.info("Webcam de volta")
 
         self._fps.tick()
 
@@ -518,66 +554,133 @@ class VirtualMouseService:
                 self._draw_overlays(frame, hand, raw_results)
                 cv2.imshow(self.window_name, frame)
             with prof.stage("waitkey"):
-                key = cv2.pollKey() if self._use_pollkey else cv2.waitKeyEx(1)
-            if key == 27:  # ESC
-                self.stop()
+                key = self._read_key()
+            if self._handle_key(key, hand):
                 return
-            if key != -1:
-                key_masked = key & 0xFF if 0 <= key < 256 else key
-                # Tecla S: painel de ajustes Qt. O painel OpenCV legado
-                # so entra como fallback quando PySide6 nao esta
-                # disponivel — nunca os dois ao mesmo tempo.
-                if key_masked in (ord('s'), ord('S')):
-                    if (
-                        self.settings_panel is not None
-                        and self.settings_panel.available
-                    ):
-                        self.settings_panel.toggle()
-                    else:
-                        panel_was = self.ui.state.panel_visible
-                        self.ui.handle_key(key_masked)
-                        if panel_was != self.ui.state.panel_visible:
-                            self._apply_window_size(
-                                panel_visible=self.ui.state.panel_visible,
-                            )
-                    return
-                if key_masked in (ord('t'), ord('T')):
-                    self._apply_always_on_top(on=not self._always_on_top)
-                    logger.info("ALWAYS_ON_TOP = %s", self._always_on_top)
-                    return
-                pkey = self._presentation_toggle_key
-                if key_masked in (ord(pkey), ord(pkey.upper())):
-                    self._set_presentation_mode(not self._presentation_mode)
-                    return
-                hkey = self._hologram_toggle_key
-                if key_masked in (ord(hkey), ord(hkey.upper())):
-                    if self.hologram is not None and self.hologram.available:
-                        new_state = self.hologram.toggle()
-                        # Reflete no painel Qt (alternado pela tecla H).
-                        self._sync_settings_panel()
-                        msg = (
-                            f"HOLOGRAM = {new_state} | "
-                            f"click_through={self.hologram.click_through_active} | "
-                            f"tela={self.hologram.screen_size[0]}x{self.hologram.screen_size[1]} | "
-                            f"mao_visivel={hand is not None} | "
-                            f"cursor={self.cursor.last_position}"
-                        )
-                        print(f"[AVM] {msg}", flush=True)
-                        logger.info(msg)
-                    else:
-                        msg = (
-                            f"Hologram indisponivel: hologram_obj={self.hologram is not None}, "
-                            f"available={self.hologram.available if self.hologram else None}, "
-                            f"platform={sys.platform}"
-                        )
-                        print(f"[AVM] {msg}", flush=True)
-                        logger.warning(msg)
-                    return
-                # Demais teclas do overlay OpenCV (so agem com o painel
-                # legado visivel — inertes no fluxo normal com painel Qt)
-                self.ui.handle_key(key_masked)
 
         prof.tick()
+
+    def _read_key(self) -> int:
+        return cv2.pollKey() if self._use_pollkey else cv2.waitKeyEx(1)
+
+    def _handle_key(self, key: int, hand) -> bool:
+        """Trata uma tecla do preview. True = tecla consumida (o tick
+        termina sem registrar telemetria, como antes)."""
+        if key == 27:  # ESC
+            self.stop()
+            return True
+        if key != -1:
+            key_masked = key & 0xFF if 0 <= key < 256 else key
+            # Tecla S: painel de ajustes Qt. O painel OpenCV legado
+            # so entra como fallback quando PySide6 nao esta
+            # disponivel — nunca os dois ao mesmo tempo.
+            if key_masked in (ord('s'), ord('S')):
+                if (
+                    self.settings_panel is not None
+                    and self.settings_panel.available
+                ):
+                    self.settings_panel.toggle()
+                else:
+                    panel_was = self.ui.state.panel_visible
+                    self.ui.handle_key(key_masked)
+                    if panel_was != self.ui.state.panel_visible:
+                        self._apply_window_size(
+                            panel_visible=self.ui.state.panel_visible,
+                        )
+                return True
+            if key_masked in (ord('t'), ord('T')):
+                self._apply_always_on_top(on=not self._always_on_top)
+                logger.info("ALWAYS_ON_TOP = %s", self._always_on_top)
+                return True
+            pkey = self._presentation_toggle_key
+            if key_masked in (ord(pkey), ord(pkey.upper())):
+                self._set_presentation_mode(not self._presentation_mode)
+                return True
+            hkey = self._hologram_toggle_key
+            if key_masked in (ord(hkey), ord(hkey.upper())):
+                if self.hologram is not None and self.hologram.available:
+                    new_state = self.hologram.toggle()
+                    # Reflete no painel Qt (alternado pela tecla H).
+                    self._sync_settings_panel()
+                    msg = (
+                        f"HOLOGRAM = {new_state} | "
+                        f"click_through={self.hologram.click_through_active} | "
+                        f"tela={self.hologram.screen_size[0]}x{self.hologram.screen_size[1]} | "
+                        f"mao_visivel={hand is not None} | "
+                        f"cursor={self.cursor.last_position}"
+                    )
+                    print(f"[AVM] {msg}", flush=True)
+                    logger.info(msg)
+                else:
+                    msg = (
+                        f"Hologram indisponivel: hologram_obj={self.hologram is not None}, "
+                        f"available={self.hologram.available if self.hologram else None}, "
+                        f"platform={sys.platform}"
+                    )
+                    print(f"[AVM] {msg}", flush=True)
+                    logger.warning(msg)
+                return True
+            # Demais teclas do overlay OpenCV (so agem com o painel
+            # legado visivel — inertes no fluxo normal com painel Qt)
+            self.ui.handle_key(key_masked)
+        return False
+
+    def _idle_tick(self) -> None:
+        """Tick sem frame novo: mantem painel, holograma e teclado vivos.
+
+        Se a webcam sumiu (desconectada / tomada por outro app), solta
+        qualquer botao pressionado, zera o estado dos gestos e mostra o
+        aviso no preview enquanto o thread da camera tenta reconectar.
+        """
+        silent_for = time.perf_counter() - self._last_frame_t
+        if not self._camera_lost and (
+            self.camera.is_stalled or silent_for > self._CAMERA_LOST_AFTER_S
+        ):
+            self._on_camera_lost()
+
+        if self._camera_lost:
+            self._update_hologram(None)
+        elif self.hologram is not None and self.hologram.available:
+            self.hologram.pump()
+        if self.settings_panel is not None:
+            self.settings_panel.pump()
+
+        if self.enable_preview:
+            if self._camera_lost:
+                cv2.imshow(self.window_name, self._camera_lost_frame())
+            self._handle_key(self._read_key(), None)
+
+    def _on_camera_lost(self) -> None:
+        self._camera_lost = True
+        msg = "Webcam sem imagem — tentando reconectar..."
+        print(f"[AVM] {msg}", flush=True)
+        logger.warning(msg)
+        # Nunca deixar o botao do mouse preso num drag sem camera.
+        self.cursor.force_release()
+        self.gesture_detector.reset()
+        self.smoother.reset()
+        self._presentation.reset()
+
+    def _camera_lost_frame(self) -> np.ndarray:
+        if self._lost_frame is None:
+            h = int(getattr(config, "CAMERA_HEIGHT", 540))
+            w = int(getattr(config, "CAMERA_WIDTH", 960))
+            img = np.zeros((h, w, 3), dtype=np.uint8)
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            for i, line in enumerate((
+                "Webcam sem imagem",
+                "Reconectando automaticamente...",
+                "Verifique o cabo ou feche apps que usam a camera.",
+            )):
+                scale = 1.0 if i == 0 else 0.6
+                (tw, _), _ = cv2.getTextSize(line, font, scale, 2)
+                cv2.putText(
+                    img, line, ((w - tw) // 2, h // 2 - 30 + i * 36),
+                    font, scale, (200, 200, 200), 2 if i == 0 else 1,
+                    cv2.LINE_AA,
+                )
+            self._lost_frame = img
+        return self._lost_frame
 
     # -----------------------------------------------------------------
     # Hologram (mao virtual na tela)
@@ -656,39 +759,6 @@ class VirtualMouseService:
             elif ev.gesture == Gesture.PAUSE:
                 pass
 
-    def _compute_pinch_screen(self, hand, gesture):
-        """
-        Calcula o ponto de pinch em screen coords para o gesto especifico.
-
-        - CLICK / DRAG_START: midpoint(polegar=4, indicador=8)
-        - RIGHT_CLICK:        midpoint(polegar=4, medio=12)
-        - DOUBLE_CLICK:       midpoint(indicador=8, medio=12) [peace sign]
-
-        Returns None se nao foi possivel calcular (sem mao ou landmarks
-        faltando).
-        """
-        if hand is None:
-            return None
-        landmarks = getattr(hand, "landmarks", None)
-        if landmarks is None or len(landmarks) < 21:
-            return None
-
-        if gesture == Gesture.RIGHT_CLICK:
-            a, b = 4, 12
-        elif gesture == Gesture.DOUBLE_CLICK:
-            a, b = 8, 12
-        else:
-            a, b = 4, 8
-
-        try:
-            ax, ay = landmarks[a][0], landmarks[a][1]
-            bx, by = landmarks[b][0], landmarks[b][1]
-            nx = (ax + bx) / 2.0
-            ny = (ay + by) / 2.0
-            return self.cursor.map_to_screen(nx, ny)
-        except Exception:
-            return None
-
     def _fire_hologram_burst(self, kind: str) -> None:
         """Dispara burst visual no holograma se ele estiver ativo."""
         if self.hologram is not None and self.hologram.available and self.hologram.enabled:
@@ -722,10 +792,8 @@ class VirtualMouseService:
             self.settings_panel.set_slider_display(key, display)
 
     def _apply_setting_live(self, key: str, value: float) -> None:
-        """Aplica setting individual no detector/smoother sem restart.
-
-        Usa setattr seguro: se o detector nao tem o atributo (ex:
-        anchor_freeze), a operacao e ignorada silenciosamente.
+        """Aplica setting individual no detector/smoother/cursor sem
+        restart.
         """
         d = self.gesture_detector
 
@@ -742,9 +810,7 @@ class VirtualMouseService:
         elif key == "sticky_friction_factor":
             d.sticky_friction_factor = value
         elif key == "anchor_freeze_duration_ms":
-            # Detector pode nao ter essa feature — ignora silenciosamente
-            if hasattr(d, "anchor_freeze_duration_seconds"):
-                d.anchor_freeze_duration_seconds = value / 1000.0
+            self.cursor.click_freeze_seconds = max(0.0, value / 1000.0)
 
     def _apply_smoothing_change(self, attr: str, value: float) -> None:
         """Atualiza OneEuroSmoother2D ao vivo.
@@ -835,9 +901,9 @@ class VirtualMouseService:
         d.aim_assist_enabled = s.aim_enabled
         d.sticky_targeting_enabled = s.sticky_enabled
 
-        # Anchor freeze: so se detector suportar
-        if hasattr(d, "anchor_freeze_duration_seconds"):
-            d.anchor_freeze_duration_seconds = s.get("anchor_freeze_duration_ms") / 1000.0
+        self.cursor.click_freeze_seconds = max(
+            0.0, s.get("anchor_freeze_duration_ms") / 1000.0,
+        )
 
         self._apply_smoothing_change("min_cutoff", s.get("one_euro_min_cutoff"))
         self._apply_smoothing_change("beta", s.get("one_euro_beta"))

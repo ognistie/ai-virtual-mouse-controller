@@ -92,8 +92,22 @@ def main() -> int:
     logger = logging.getLogger("main")
     logger.info("AI Virtual Mouse Controller — iniciando...")
 
+    from core.camera import CameraOpenError
     from services.virtual_mouse_service import VirtualMouseService
-    service = VirtualMouseService.from_config()
+
+    try:
+        service = VirtualMouseService.from_config()
+    except CameraOpenError as e:
+        sys.stderr.write(
+            f"\nERRO: {e}\n"
+            "Dicas: feche Zoom/Teams/OBS ou o app de Camera; confira se a\n"
+            "webcam esta conectada; com mais de uma camera, ajuste\n"
+            "CAMERA_INDEX em config.py.\n\n"
+        )
+        return 1
+    except Exception:
+        logger.exception("Falha ao iniciar")
+        return 2
     return service.run()
 
 

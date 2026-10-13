@@ -35,6 +35,11 @@ logger = logging.getLogger(__name__)
 class CursorController:
     """Controlador do cursor do sistema."""
 
+    # Alcance pos-trava: fracao do gap percorrida por frame e o gap (px)
+    # abaixo do qual o cursor volta a seguir a mao 1:1.
+    _CATCH_UP_FACTOR: float = 0.5
+    _CATCH_UP_DONE_PX: int = 4
+
     def __init__(
         self,
         screen_margin_percentage: float = 0.10,
@@ -92,10 +97,11 @@ class CursorController:
         # midpoint e o cursor andava 5-15px na hora do click. Freeze
         # ANULA esse drift — clique cai exatamente onde voce mirou.
         self.click_freeze_seconds = max(0.0, float(click_freeze_seconds))
-        # drag_precision_factor: quanto escala o delta do cursor enquanto
-        # DRAG esta ativo. 0.55 = mao precisa andar quase 2x pra cobrir a
-        # mesma distancia em pixel — replica o feel de "mouse DPI baixo"
-        # que profissionais usam pra selecionar texto/icones sem tremedeira.
+        # drag_precision_factor: durante o DRAG o cursor anda so essa
+        # fracao da distancia ate o alvo a cada frame (aproximacao
+        # exponencial). Filtra a tremedeira da mao no ar na selecao de
+        # texto/icones sem criar offset permanente: parado, o cursor
+        # converge pro ponto da mao.
         self.drag_precision_factor = max(0.1, min(1.0, float(drag_precision_factor)))
 
         # Alcance da borda inferior (ver config.py, secao "ALCANCE DA
@@ -129,6 +135,9 @@ class CursorController:
 
         # Estado do freeze (timestamp futuro ate o qual ignoramos move).
         self._frozen_until: float = 0.0
+        # True depois que algum move foi ignorado pela trava: o proximo
+        # trecho alcanca a mao aos poucos em vez de saltar (ver move()).
+        self._catching_up: bool = False
 
         # Estado do border creep: offset acumulado (px) empurrando o
         # cursor pra borda + timestamps de permanencia na banda.
@@ -187,22 +196,29 @@ class CursorController:
         # posicao. O cursor permanece exatamente onde estava no instante
         # do click — feel de mouse fisico (apertar botao nao move).
         if self._frozen_until > 0.0 and time.perf_counter() < self._frozen_until:
+            self._catching_up = True
             return
 
         x, y = self.map_to_screen(nx, ny)
 
-        # Drag precision: enquanto DRAG ativo, escala o delta — replica o
-        # feel de DPI baixo pra selecao de texto / movimentos finos.
-        # Aplicado em PIXEL space pra ser independente de escala normalizada.
-        if (
-            self._dragging
-            and self._last_x is not None
-            and self._last_y is not None
-        ):
-            dx = (x - self._last_x) * self.drag_precision_factor
-            dy = (y - self._last_y) * self.drag_precision_factor
-            x = int(round(self._last_x + dx))
-            y = int(round(self._last_y + dy))
+        # Aproximacao exponencial (em PIXEL space) em dois casos:
+        # - DRAG ativo: filtra tremedeira na selecao fina;
+        # - logo apos uma trava de clique: a mao seguiu andando enquanto o
+        #   cursor estava travado; em vez de saltar a diferenca num frame,
+        #   o cursor a alcanca em poucos frames.
+        if self._last_x is not None and self._last_y is not None:
+            factor = None
+            if self._dragging:
+                factor = self.drag_precision_factor
+            elif self._catching_up:
+                gap = max(abs(x - self._last_x), abs(y - self._last_y))
+                if gap <= self._CATCH_UP_DONE_PX:
+                    self._catching_up = False
+                else:
+                    factor = self._CATCH_UP_FACTOR
+            if factor is not None:
+                x = int(round(self._last_x + (x - self._last_x) * factor))
+                y = int(round(self._last_y + (y - self._last_y) * factor))
 
         y = self._apply_bottom_reach(y)
 

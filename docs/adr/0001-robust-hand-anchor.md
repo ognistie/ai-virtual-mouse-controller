@@ -81,8 +81,30 @@ Componentes:
 4. **Filtragem temporal mais agressiva no landmark unico** — adicionaria
    lag perceptivel. Rejeitado.
 
+## Adendo (2026-10) — votacao por forma da mao
+
+Medido com `scripts/eval_motion.py` (pipeline real, maos sinteticas):
+a media ponderada simples tem um vies estrutural nas bordas — quando os
+dedos saem do quadro perdem peso e o centro e' puxado pros pontos ainda
+visiveis. A extrapolacao por velocidade compensava isso de forma fragil:
+com `compute()` rodando 2-3x por frame (bug corrigido na mesma versao) a
+velocidade estimada ficava achatada e o cursor parava ~42 px antes da
+borda lateral; com 1 chamada por frame a mesma extrapolacao passava da
+mao e voltava (~40 px de overshoot).
+
+Decisao: cada landmark vota no centro como `posicao - deslocamento`, onde
+o deslocamento (landmark -> ancora) e' aprendido por EMA enquanto o
+landmark esta bem dentro do quadro e recentrado pela media anatomica
+(com a mao inteira visivel a ancora continua sendo o centro anatomico).
+Landmark que sai do quadro para de votar sem enviesar o centro. A
+extrapolacao fica com 1/4 do gain original, so como reforco de homing.
+
+Resultado (media de seeds): borda lateral alcancada sem overshoot
+(antes 40 px), borda inferior sem gap (antes ~26 px), salto ao perder
+polegar+indicador no quadro 83 -> 0 px, deriva do clique 2.9 -> 0.8 px.
+
 ## Referencias
 
 - Implementacao: `core/hand_anchor.py`
-- Tests: `tests/test_hand_anchor.py` (TODO)
+- Tests: `tests/test_hand_anchor_bottom.py`, `tests/test_motion_quality.py`
 - Discussao original: conversa de iteracao do projeto (jun/2026)

@@ -137,8 +137,9 @@ class PresentationController:
         )
 
         if not open_hand:
-            # Fechar a mao rearma o gatilho — sem isto, reabrir num lado
-            # ja "presente" dispararia sem o usuario ter atravessado o meio.
+            # Fechar a mao rearma o gatilho: reabrir num lado dispara de
+            # novo. Permite avancar varios slides abrindo/fechando a mao
+            # na lateral, sem voltar ao meio a cada vez.
             self._last_zone = Zone.MIDDLE
             return None
 

@@ -63,3 +63,36 @@ class TestDownwardCriticalGain:
         # Pode extrapolar um pouco (gain padrao), mas nunca com o
         # reforco de descida: fica perto do valor cru.
         assert result.y < 0.90
+
+
+class TestShapeVoting:
+    """Landmarks saindo do quadro nao podem arrastar a ancora pra dentro."""
+
+    @staticmethod
+    def _spread_hand(cx: float, cy: float):
+        # mao "espalhada": dedos a +-0.12 do centro em x
+        pts = []
+        for i in range(21):
+            dx = (i % 5 - 2) * 0.06
+            dy = (i // 5 - 2) * 0.05
+            pts.append((cx + dx, cy + dy, 0.0))
+        return pts
+
+    def test_anchor_stays_when_side_landmarks_leave_frame(self):
+        anchor = RobustHandAnchor()
+        for _ in range(10):
+            ref = anchor.compute(self._spread_hand(0.5, 0.5))
+        # Mesmos pontos, mas a coluna da direita "sai" do quadro (x > 1).
+        cut = [
+            (x + 0.6, y, z) if (i % 5) == 4 else (x, y, z)
+            for i, (x, y, z) in enumerate(self._spread_hand(0.5, 0.5))
+        ]
+        res = anchor.compute(cut)
+        assert abs(res.x - ref.x) < 0.005
+
+    def test_reset_forgets_shape(self):
+        anchor = RobustHandAnchor()
+        for _ in range(5):
+            anchor.compute(self._spread_hand(0.5, 0.5))
+        anchor.reset()
+        assert anchor._offsets is None

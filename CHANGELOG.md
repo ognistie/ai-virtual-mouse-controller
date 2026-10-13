@@ -7,6 +7,73 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Changed
+- **Cursor bem mais responsivo, sem perder estabilidade.** O filtro
+  OneEuro recebe coordenadas normalizadas (0–1), mas o `beta` estava na
+  escala de pixels (~0.02–0.06) — a parte adaptativa do filtro ficava
+  inerte e o cursor "arrastava" atrás da mão. Com `beta` na escala certa
+  (perfis e slider *Suavização*), medido com `scripts/eval_motion.py`:
+  atraso num movimento rápido cai de ~133 px para ~41 px e o tempo para
+  o cursor assentar de ~670 ms para ~150 ms; jitter com a mão parada
+  inalterado (~0.7 px).
+- **Pinça com histerese** (`PINCH_RELEASE_RATIO = 1.25`): para soltar, os
+  dedos precisam abrir um pouco além do limiar de entrada. Acaba o
+  clique fantasma quando a pinça fica na borda do limiar (1,27 → 1,00
+  clique por pinça no cenário com ruído) e o drag não cai sozinho. Dois
+  cliques intencionais seguidos continuam funcionando.
+- **Cada frame da webcam é processado uma vez.** O loop rodava mais
+  rápido que a câmera e reprocessava o mesmo frame — inferência
+  desperdiçada e frames repetidos distorcendo histerese, sticky e
+  follow-through. Agora espera o frame novo e, enquanto isso, só mantém
+  painel/holograma/teclado vivos (sem CPU girando à toa no startup).
+- Slider **"Trava no clique"** (antes "Congelar âncora") agora funciona: controla quanto
+  tempo o cursor fica parado após o clique. Antes não tinha efeito. O
+  perfil padrão mantém os 120 ms de sempre.
+- Ao fim da trava do clique o cursor alcança a mão em poucos frames em
+  vez de saltar a distância percorrida durante a trava.
+- `config.PROFILE` escolhe o perfil inicial do painel.
+- **Cursor acompanha a mão sem "correr na frente".** Três causas medidas
+  e corrigidas:
+  - DPI adaptativo usava o tamanho da mão cru, frame a frame: só inclinar
+    o pulso (mão parada) andava o cursor ~200 px em 2 s. Agora o tamanho
+    (proxy da distância da câmera) é suavizado — `DPI_SIZE_SMOOTHING_S`.
+    Trajeto fantasma cai para ~42 px.
+  - Âncora da mão: votação por forma — dedos saindo pelo quadro não puxam
+    mais o centro pra dentro. Borda lateral e inferior alcançadas sem o
+    cursor passar da mão e voltar (overshoot lateral 40 → 0 px); salto ao
+    perder dedos no quadro 83 → 0 px; deriva do clique 2,9 → 0,8 px.
+  - Extrapolação por velocidade nas bordas recalibrada (¼ do ganho) após o
+    fix da âncora calculada uma vez por frame.
+  A amplificação com a mão perto da câmera foi mantida de propósito:
+  reduzi-la deixaria 70–230 px sem alcance nas bordas.
+
+### Fixed
+- Webcam desconectada ou tomada por outro app no meio do uso: o app
+  avisa no preview, solta qualquer botão do mouse que estivesse
+  pressionado (drag) e reconecta sozinho quando a câmera volta. Antes
+  seguia processando a última imagem congelada.
+- Webcam ocupada/inexistente ao abrir: mensagem clara com dicas e
+  código de saída 1, em vez de traceback. A câmera também não fica presa
+  se outra etapa da inicialização falhar.
+- Âncora robusta da mão calculada uma vez por frame (era 2–3 vezes; o
+  estado interno — histórico, velocidade, histerese — era corrompido).
+- Defaults internos do service alinhados com `config.py` (cores e
+  opacidade do holograma, zona morta da apresentação, assistência da
+  borda inferior).
+
+### Added
+- `scripts/eval_motion.py`: harness que roda o pipeline real com mãos
+  sintéticas, relógio simulado e mouse falso — mede jitter, atraso,
+  assentamento, cliques fantasma e alcance da taskbar.
+- Testes: máquina de estados do `GestureDetector`, câmera (frames novos,
+  queda e reconexão), sensação do cursor, perfis do painel, câmera
+  perdida no service e um gate de qualidade de movimento
+  (`tests/test_motion_quality.py`).
+
+### Removed
+- Fallback de "clique ao soltar" do detector — era código inalcançável
+  (nunca disparava). `PINCH_MIN_HOLD_SECONDS` fica sem efeito.
+
 ## [1.2.0] — 2026-10-13
 
 ### Changed

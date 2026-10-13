@@ -423,6 +423,12 @@ class GestureDetector:
         # Cinematic follow-through quando a mao sai do FOV
         followthrough_frames: int = 6,
         followthrough_damping: float = 0.82,
+        # Histerese da pinca (Schmitt trigger): pra SOLTAR, a distancia
+        # precisa passar de threshold * ratio. 1.0 = limiar unico (legado).
+        pinch_release_ratio: float = 1.0,
+        # Constante de tempo (s) do tamanho da mao usado no DPI adaptativo.
+        # 0 = cru frame a frame (legado).
+        dpi_size_smoothing_s: float = 0.0,
     ) -> None:
         self.anchor_landmark = anchor_landmark
         self.pinch_threshold = pinch_threshold
@@ -471,6 +477,15 @@ class GestureDetector:
         self.pinch_middle_middle_extension_max = float(
             pinch_middle_middle_extension_max
         )
+        self.pinch_release_ratio = max(1.0, float(pinch_release_ratio))
+        # Tamanho da mao pro DPI adaptativo = proxy da DISTANCIA ate a
+        # camera, que muda devagar. Cru, ele oscila quando o pulso inclina
+        # ou gira (pulso->MCP encurta no frame) e com o ruido do tracker —
+        # e como o DPI escala a posicao a partir do centro, o cursor andava
+        # sozinho (dezenas de px) com a mao parada. Suavizado por EMA.
+        self.dpi_size_smoothing_s = max(0.0, float(dpi_size_smoothing_s))
+        self._dpi_hand_size: Optional[float] = None
+        self._dpi_size_t: float = 0.0
 
         # Ancora robusta da mao — instanciada eagermente porem barata.
         # So consultada quando anchor_landmark == LM_ROBUST_HAND. Manter
@@ -545,9 +560,27 @@ class GestureDetector:
         self._previous_raw_shape = HandShape.UNKNOWN
         self._click_already_fired = False
         self._right_click_already_fired = False
+        # Drag tambem zera: sem isso, apos um reset no meio do drag a
+        # proxima pinca nao clicaria (edge bloqueada por _drag_active).
+        # Quem chama reset() durante um drag solta o botao do mouse
+        # (update() emite DRAG_END antes; o service usa force_release).
+        self._drag_active = False
+        # Mao pode voltar a outra distancia da camera: recomeca o DPI.
+        self._dpi_hand_size = None
         # Ancora robusta: limpa historico de landmarks (mao saiu por muito
         # tempo, comecaremos do zero ao re-detectar).
         self._robust_anchor.reset()
+
+    def _update_dpi_hand_size(self, now: float) -> None:
+        size = self._last_hand_size
+        tau = self.dpi_size_smoothing_s
+        if self._dpi_hand_size is None or tau <= 0.0:
+            self._dpi_hand_size = size
+        else:
+            dt = max(0.0, now - self._dpi_size_t)
+            alpha = 1.0 - math.exp(-dt / tau)
+            self._dpi_hand_size += alpha * (size - self._dpi_hand_size)
+        self._dpi_size_t = now
 
     # -----------------------------------------------------------------
     # AIM ASSIST com pre-ativacao + holdover
@@ -790,6 +823,7 @@ class GestureDetector:
         self._followthrough_consumed = 0
         self._followthrough_velocity = (0.0, 0.0)
         self._last_hand_size = compute_hand_size(hand)
+        self._update_dpi_hand_size(now)
 
         # Pinch threshold adaptativo (com FLOOR minimo)
         effective_pinch_threshold = self.pinch_threshold
@@ -817,6 +851,15 @@ class GestureDetector:
                 self.pinch_middle_index_guard * scale_clamped
             )
 
+        # Histerese (Schmitt trigger): ja pinçando, soltar exige abrir
+        # ALEM do limiar de entrada. Com limiar unico, o ruido do tracker
+        # perto da borda fazia a pinca "piscar" -> clique extra no
+        # proximo encostar ou drag caindo sozinho.
+        if self._previous_raw_shape == HandShape.PINCH:
+            effective_pinch_threshold *= self.pinch_release_ratio
+        elif self._previous_raw_shape == HandShape.PINCH_MIDDLE:
+            effective_pinch_middle_threshold *= self.pinch_release_ratio
+
         self._last_pinch_dist = _pinch_distance(
             hand.landmarks[LM_THUMB_TIP],
             hand.landmarks[LM_INDEX_TIP],
@@ -834,6 +877,11 @@ class GestureDetector:
         # RIGHT_CLICK imediatamente — em vez de esperar o usuario soltar.
         # Release-to-click tinha feedback atrasado e perdia cliques curtos
         # que soltavam antes da histerese confirmar PINCH.
+        #
+        # Ancora calculada UMA vez por frame: RobustHandAnchor e' stateful
+        # (historico, velocidade, histerese de confianca) — chamar compute()
+        # varias vezes no mesmo frame duplicava o historico e anulava a
+        # histerese justamente no valor usado pelo cursor.
         anchor_now = get_anchor_position(hand, self.anchor_landmark, robust_anchor=self._robust_anchor)
 
         edge_pinch = (
@@ -899,9 +947,9 @@ class GestureDetector:
         )
 
         if cursor_moves_in_open_hand or cursor_moves_in_pinch_drag:
-            anchor = get_anchor_position(hand, self.anchor_landmark, robust_anchor=self._robust_anchor)
+            anchor = anchor_now
             dpi_adaptive = compute_dpi_multiplier(
-                self._last_hand_size,
+                self._dpi_hand_size,
                 self.hand_size_reference,
                 self.dpi_min,
                 self.dpi_max,
@@ -918,9 +966,9 @@ class GestureDetector:
         else:
             # Em PEACE/FIST: mantem posicao para continuidade
             if confirmed_now in (HandShape.PEACE, HandShape.FIST):
-                anchor = get_anchor_position(hand, self.anchor_landmark, robust_anchor=self._robust_anchor)
+                anchor = anchor_now
                 dpi_adaptive = compute_dpi_multiplier(
-                    self._last_hand_size,
+                    self._dpi_hand_size,
                     self.hand_size_reference,
                     self.dpi_min,
                     self.dpi_max,
@@ -936,7 +984,7 @@ class GestureDetector:
         action_event = self._process_action(
             shape=confirmed_now,
             previous_shape=previous_shape,
-            hand=hand,
+            anchor=anchor_now,
             now=now,
         )
         if action_event is not None:
@@ -956,8 +1004,7 @@ class GestureDetector:
     # Logica de acoes
     # -----------------------------------------------------------------
 
-    def _process_action(self, shape, previous_shape, hand, now):
-        anchor = get_anchor_position(hand, self.anchor_landmark, robust_anchor=self._robust_anchor)
+    def _process_action(self, shape, previous_shape, anchor, now):
         event = None
 
         # 1. SAIU DE PEACE -> DOUBLE_CLICK
@@ -986,42 +1033,20 @@ class GestureDetector:
                 self._click_already_fired = False
                 return GestureEvent(Gesture.DRAG_END, anchor, now)
 
+            # O clique ja saiu no PRESS (edge detection no update). Soltar
+            # nao clica de novo — senao seriam 2 cliques (encostar + soltar).
+            # Se o press caiu no cooldown, tambem nao clicamos ao soltar:
+            # um clique atrasado, longe do momento do gesto, confunde mais
+            # do que ajuda.
             self._pinch_started_at = None
+            self._click_already_fired = False
+            return None
 
-            # Se ja disparou no PRESS (encostou), so reseta a flag — sem
-            # isso disparariamos 2 cliques (encostar + soltar).
-            if self._click_already_fired:
-                self._click_already_fired = False
-                return None
-
-            # FALLBACK release-to-click: roda apenas se a edge detection do press
-            # falhou (caso raro de MediaPipe perder 1-2 frames consecutivos).
-            held_for = 0.0
-            if self._pinch_started_at is not None:
-                held_for = now - self._pinch_started_at
-            if held_for < self.drag_hold_seconds and held_for > self.pinch_min_hold_seconds:
-                if (now - self._last_click_time) >= self.click_cooldown:
-                    self._last_click_time = now
-                    return GestureEvent(Gesture.CLICK, anchor, now)
-
-        # 2b. SAIU DE PINCH_MIDDLE
+        # 2b. SAIU DE PINCH_MIDDLE — idem: RIGHT_CLICK ja saiu no press.
         if previous_shape == HandShape.PINCH_MIDDLE and shape != HandShape.PINCH_MIDDLE:
             self._pinch_middle_started_at = None
-
-            # Idem ao bloco PINCH — se ja disparou no press, ignora.
-            if self._right_click_already_fired:
-                self._right_click_already_fired = False
-                return None
-
-            # FALLBACK release-to-click (caso edge detection tenha falhado)
-            held_for = 0.0
-            if self._pinch_middle_started_at is not None:
-                held_for = now - self._pinch_middle_started_at
-            if held_for > self.pinch_min_hold_seconds:
-                if (now - self._last_right_click_time) >= self.click_cooldown:
-                    self._last_right_click_time = now
-                    logger.info("RIGHT_CLICK 👉 (fallback release)")
-                    return GestureEvent(Gesture.RIGHT_CLICK, anchor, now)
+            self._right_click_already_fired = False
+            return None
 
         # 3. ENTRA em PEACE
         if shape == HandShape.PEACE:
