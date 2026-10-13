@@ -11,7 +11,21 @@ Uso:
 
 from __future__ import annotations
 
+import sys
+from unittest.mock import MagicMock
+
 import pytest
+
+# Sem tela (CI Linux headless): o pyautogui le $DISPLAY ja no import e
+# quebra a coleta (KeyError: 'DISPLAY'). Os testes nunca movem o mouse de
+# verdade — um stub basta.
+try:
+    import pyautogui  # noqa: F401
+except Exception:
+    _fake_pyautogui = MagicMock(name="pyautogui")
+    _fake_pyautogui.size.return_value = (1920, 1080)
+    _fake_pyautogui.position.return_value = (960, 540)
+    sys.modules.setdefault("pyautogui", _fake_pyautogui)
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
