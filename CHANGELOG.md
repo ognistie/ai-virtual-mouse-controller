@@ -7,6 +7,8 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-10-13
+
 ### Changed
 - **Cursor bem mais responsivo, sem perder estabilidade.** O filtro
   OneEuro recebe coordenadas normalizadas (0–1), mas o `beta` estava na
@@ -75,6 +77,8 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
   inicialização e, sem ele, o renderer 2D assume.
 - Testes `--gpu` do holograma voltaram a rodar (antes davam access
   violation).
+- CI no Linux: a coleta dos testes quebrava com `KeyError: 'DISPLAY'`
+  (o `pyautogui` exige tela no import); sem tela, os testes usam um stub.
 - Webcam desconectada ou tomada por outro app no meio do uso: o app
   avisa no preview, solta qualquer botão do mouse que estivesse
   pressionado (drag) e reconecta sozinho quando a câmera volta. Antes
