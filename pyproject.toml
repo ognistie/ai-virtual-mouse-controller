@@ -43,7 +43,10 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Image Recognition",
 ]
 dependencies = [
-    "opencv-python>=4.10.0,<5.0.0",
+    # contrib (e nao opencv-python): o mediapipe novo ja depende do
+    # opencv-contrib-python, e os dois pacotes gravam a mesma pasta cv2.
+    # Com os dois instalados em versoes diferentes o cv2 fica misturado.
+    "opencv-contrib-python>=4.10.0,<5.0.0",
     # Usamos a Tasks API (HandLandmarker), presente em todas as versoes
     # >=0.10.18. Sem teto: 0.10.30+ tem wheels py3-none (qualquer Python 3),
     # o que destrava 3.13/3.14; Mac Intel segue no 0.10.21 (Python <=3.12).

@@ -15,6 +15,12 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
   `hand_landmarker.task` vai empacotado em `core/models/`. Pontos da mão,
   lateralidade e dedos levantados conferidos contra a API antiga.
 - Dependências sem teto artificial: `mediapipe>=0.10.18`, `numpy>=1.26.0`.
+- `opencv-python` trocado por `opencv-contrib-python` (mesmo `cv2`): o
+  mediapipe novo já depende dele, e os dois pacotes juntos em versões
+  diferentes misturavam a pasta `cv2`. Quem atualiza da 1.1.2 pode rodar
+  `pip uninstall -y opencv-python` (ver README → Atualizar).
+- Erro claro quando falta `libEGL` no Linux (exigido pelo mediapipe novo).
+- Testes do `HandTracker`, incluindo um quadro real do vídeo de demo.
 - CI roda os testes em Python 3.10–3.14 (Ubuntu) e 3.12/3.14 (Windows).
 
 ### Deprecated

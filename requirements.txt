@@ -4,7 +4,7 @@
 #
 # Mediapipe sem teto: o projeto usa a Tasks API (HandLandmarker).
 
-opencv-python>=4.10.0,<5.0.0
+opencv-contrib-python>=4.10.0,<5.0.0
 mediapipe>=0.10.18
 pyautogui>=0.9.54,<1.0.0
 numpy>=1.26.0

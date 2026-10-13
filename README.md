@@ -6,7 +6,7 @@
 
 [![CI](https://github.com/ognistie/ai-virtual-mouse-controller/actions/workflows/ci.yml/badge.svg)](https://github.com/ognistie/ai-virtual-mouse-controller/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/ai-virtual-mouse-controller?style=flat-square&color=22d3ee&label=pypi)](https://pypi.org/project/ai-virtual-mouse-controller/)
-[![Python](https://img.shields.io/badge/python-3.10_–_3.14-22d3ee?style=flat-square)](https://pypi.org/project/ai-virtual-mouse-controller/)
+[![Python](https://img.shields.io/badge/python-3.10--3.14-22d3ee?style=flat-square)](https://pypi.org/project/ai-virtual-mouse-controller/)
 [![License](https://img.shields.io/badge/license-MIT-22d3ee?style=flat-square)](LICENSE)
 
 Webcam → 21 landmarks → cursor do sistema. Sem hardware extra. Sem GPU.
@@ -92,6 +92,15 @@ Conferir a versão instalada:
 
 ```bash
 pip show ai-virtual-mouse-controller
+```
+
+Vindo da 1.1.2 ou anterior? O projeto trocou `opencv-python` por
+`opencv-contrib-python` (mesmo `cv2`, usado pelo MediaPipe). Remova o antigo
+pra os dois não disputarem a mesma pasta:
+
+```bash
+pip uninstall -y opencv-python
+pip install --force-reinstall --no-deps "opencv-contrib-python>=4.10,<5"
 ```
 
 Se quiser pular o cache do pip e baixar do PyPI direto:

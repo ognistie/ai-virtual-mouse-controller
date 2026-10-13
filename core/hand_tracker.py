@@ -182,7 +182,17 @@ class HandTracker:
             min_hand_presence_confidence=min_tracking_confidence,
             min_tracking_confidence=min_tracking_confidence,
         )
-        self._landmarker = mp_vision.HandLandmarker.create_from_options(options)
+        try:
+            self._landmarker = mp_vision.HandLandmarker.create_from_options(options)
+        except OSError as e:
+            # mediapipe 0.10.30+ carrega a lib nativa via ctypes; no Linux ela
+            # depende do libEGL, ausente em instalacoes minimas.
+            if "libEGL" in str(e) or "libGLES" in str(e):
+                raise RuntimeError(
+                    f"{e}\nO MediaPipe precisa do libEGL. No Ubuntu/Debian: "
+                    "sudo apt install libegl1 libgles2"
+                ) from e
+            raise
         # VIDEO mode exige timestamps estritamente crescentes (ms).
         self._t0 = time.monotonic()
         self._last_ts_ms = -1
