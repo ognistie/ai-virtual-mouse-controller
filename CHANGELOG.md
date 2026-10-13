@@ -7,6 +7,8 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-10-13
+
 ### Changed
 - **Suporte a Python 3.10 até 3.14** (antes: 3.11–3.13, e na prática só até
   3.12). `requires-python` passa a ser `>=3.10`, sem teto.
