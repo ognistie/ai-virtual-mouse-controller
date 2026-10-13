@@ -42,7 +42,7 @@ O **AI Virtual Mouse Controller** é um mouse virtual com reconhecimento de gest
 
 100% local. Sem nuvem, sem telemetria, sem persistir nada da webcam.
 
-**Stack:** Python 3.10+ · OpenCV · MediaPipe · PyAutoGUI · NumPy · ModernGL/PySide6 (opcional)
+**Stack:** Python 3.10+ · OpenCV · MediaPipe · PyAutoGUI · NumPy · PySide6 (holograma 3D via OpenGL do Qt)
 
 ---
 
@@ -161,7 +161,7 @@ Toda a calibração vive em [`config.py`](config.py) — constantes nomeadas com
 | `DPI` / `SMOOTHING` | sensibilidade do cursor + filtro OneEuro |
 | `SCREEN_MARGIN_*` | margens assimétricas (top/bottom < lateral) pra alcançar cantos |
 | `CURSOR_FOLLOWTHROUGH_*` | cinematic prediction quando a mão sai do FOV |
-| `HOLOGRAM` | backend (GL/QPainter), cor, opacidade, FPS |
+| `HOLOGRAM` | estilo (`quest`, `graphite`, `neon`), backend (OpenGL/QPainter), tamanho, opacidade, FPS |
 
 Ajustes em tempo de execução também ficam disponíveis no painel (tecla `S`) — perfis prontos: *smooth*, *precise*, *responsive*, *stable*.
 
@@ -194,7 +194,7 @@ webcam → MediaPipe Hands (21 landmarks)
      CursorController  ← PyAutoGUI move o cursor real
 ```
 
-Componentes auxiliares: `HologramOverlay` (renderização 3D opcional via ModernGL), `RuntimeSettings` (perfis e sliders), `PerfTelemetry` (timing p50/p99 por estágio).
+Componentes auxiliares: `HologramOverlay` (mão 3D estilo headset VR: `hand_pose` → `hand_mesh` → shader OpenGL do Qt, com fallback 2D QPainter), `RuntimeSettings` (perfis e sliders), `PerfTelemetry` (timing p50/p99 por estágio).
 
 Estrutura de pastas:
 
@@ -224,7 +224,7 @@ make test-gpu   # só testes que precisam de display/GPU real
 make test-cov   # com coverage HTML
 ```
 
-Testes marcados com `gpu` (overlay PySide6/ModernGL) ficam fora do `pytest` default — eles requerem display real e podem crashar em ambientes headless. Rode-os explicitamente com `make test-gpu` quando estiver mexendo no holograma.
+Testes marcados com `gpu` (overlay PySide6/OpenGL) ficam fora do `pytest` default — eles requerem display real e podem crashar em ambientes headless. Rode-os explicitamente com `make test-gpu` quando estiver mexendo no holograma.
 
 ---
 

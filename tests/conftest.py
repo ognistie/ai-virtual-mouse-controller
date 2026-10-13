@@ -1,7 +1,7 @@
 """Pytest config global da suite.
 
 Adiciona flag `--gpu` pra controlar testes marcados com `@pytest.mark.gpu`
-(overlay PySide6/ModernGL). Sem a flag, esses testes sao pulados — eles
+(overlay PySide6/OpenGL). Sem a flag, esses testes sao pulados — eles
 podem crashar com access violation em ambientes sem display/driver real.
 
 Uso:

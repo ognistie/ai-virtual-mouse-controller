@@ -42,7 +42,10 @@ import time
 from typing import List, Optional, Sequence, Tuple
 
 from .click_burst import BurstManager
+from .hand_gl_renderer import STYLE_PRESETS
+from .hand_pose import HandPoseSolver, PosedHand
 from .hand_renderer import compute_hand_primitives, get_particle_cloud
+from .hand_soft_renderer import SoftHandRenderer
 from .smoothing import OneEuroSmoother2D
 
 logger = logging.getLogger(__name__)
@@ -157,6 +160,8 @@ class HologramOverlay:
         view_dorsal: bool = True,
         particles_enabled: bool = True,
         particle_count: int = 180,
+        style: str = "quest",
+        frame_aspect: float = 16.0 / 9.0,
     ) -> None:
         self.available: bool = False
         self.click_through_active: bool = False
@@ -171,6 +176,18 @@ class HologramOverlay:
         # True = mirror X dos landmarks ao redor do anchor (landmark 9).
         # Vira palm view em dorsal view (costas da mao).
         self._view_dorsal = bool(view_dorsal)
+
+        # Estilo da mao. "neon" = visual antigo (silhueta + particulas, so
+        # QPainter). Os demais ("quest", "graphite") usam a pose 3D
+        # (HandPoseSolver) e a mesma paleta no GL e no fallback QPainter.
+        self._style_name = (style or "quest").lower()
+        self._legacy = self._style_name == "neon"
+        hand_style = STYLE_PRESETS.get(self._style_name, STYLE_PRESETS["quest"])
+        self._solver = HandPoseSolver(
+            hand_size_px=hand_size_px, frame_aspect=frame_aspect,
+        )
+        self._soft = SoftHandRenderer(style=hand_style, opacity=opacity)
+        self._posed: Optional[PosedHand] = None
 
         # Nuvem densa de particles — cached, gerada 1x.
         self._particles_enabled = bool(particles_enabled)
@@ -224,7 +241,7 @@ class HologramOverlay:
         self._widget: Optional["_HologramWidget"] = None
 
         # Backend dispatch: se HOLOGRAM_BACKEND for "gl" ou "auto", tenta
-        # ModernGL primeiro. Quando GL bem-sucedido, _gl_backend != None
+        # OpenGL 3D primeiro. Quando GL bem-sucedido, _gl_backend != None
         # e toda a API publica delega pra ele; pipeline QPainter abaixo
         # nao inicializa.
         self._gl_backend = None
@@ -234,20 +251,22 @@ class HologramOverlay:
         except Exception:
             _backend_pref = "qpainter"
 
-        if _backend_pref in ("gl", "auto"):
+        if _backend_pref in ("gl", "auto") and not self._legacy:
             try:
                 from .hologram_gl_backend import HologramGLBackend
                 gl = HologramGLBackend(
                     hand_size_px=hand_size_px,
                     opacity=opacity,
                     target_fps=target_fps,
+                    style=hand_style,
+                    frame_aspect=frame_aspect,
                 )
                 if gl.available:
                     self._gl_backend = gl
                     self.available = True
                     self.click_through_active = True
                     logger.info(
-                        "HologramOverlay: backend GL ativo (ModernGL 3D)",
+                        "HologramOverlay: backend GL ativo (OpenGL 3D)",
                     )
                     return
                 else:
@@ -301,6 +320,10 @@ class HologramOverlay:
         self._app = QApplication.instance()
         if self._app is None:
             self._app = QApplication(sys.argv if hasattr(sys, "argv") else [])
+        if not isinstance(self._app, QApplication):
+            # Ja existe um QGuiApplication (sem suporte a widgets): criar o
+            # QWidget aqui derrubaria o processo.
+            raise RuntimeError("QApplication de widgets indisponivel")
 
         # Tamanho real da tela primaria
         screen = self._app.primaryScreen()
@@ -352,6 +375,8 @@ class HologramOverlay:
     def screen_size(self) -> Tuple[int, int]:
         """Dimensoes da tela primaria (default 1920x1080 ate o backend
         resolver a geometria real)."""
+        if self._gl_backend is not None:
+            return self._gl_backend.screen_size
         return self._screen_w, self._screen_h
 
     def update_pose(
@@ -363,6 +388,12 @@ class HologramOverlay:
         # Delega pra GL backend se ativo
         if self._gl_backend is not None:
             self._gl_backend.update_pose(landmarks, screen_x, screen_y)
+            return
+        if not self._legacy:
+            self._posed = self._solver.solve(landmarks, screen_x, screen_y)
+            self._pose_visible = self._posed is not None
+            self._pose_x = screen_x
+            self._pose_y = screen_y
             return
         if landmarks is None or len(landmarks) < 21:
             self._pose_visible = False
@@ -414,6 +445,13 @@ class HologramOverlay:
             out.append((sx, sy, p[2]))
         return out
 
+    def set_frame_aspect(self, aspect: float) -> None:
+        """Largura/altura do frame da camera (corrige o aspecto da mao)."""
+        if self._gl_backend is not None:
+            self._gl_backend.set_frame_aspect(aspect)
+            return
+        self._solver.set_frame_aspect(aspect)
+
     def update_cursor(self, screen_x: float, screen_y: float) -> None:
         # Delega pra GL backend se ativo
         if self._gl_backend is not None:
@@ -430,6 +468,10 @@ class HologramOverlay:
             self._gl_backend.fire_burst(kind)
             return
         if not self._enabled:
+            return
+        if not self._legacy:
+            # Estilo VR: sem aneis de clique — o feedback e' o brilho das
+            # pontas do polegar/indicador conforme a pinca fecha.
             return
         if self._pose_visible:
             if kind == "right":
@@ -501,7 +543,14 @@ class HologramOverlay:
             self._anim_breath = 0.85 + 0.15 * math.sin(two_pi_t * 1.2)
             self._anim_t = t
 
-            if self._pose_visible and self._pose_landmarks is not None:
+            if not self._legacy:
+                if self._posed is not None:
+                    self._soft.paint(painter, self._posed)
+                    pinch = self._posed.pinch_point
+                    self._latest_pinch_left = pinch
+                    self._latest_pinch_right = pinch
+                    self._latest_pinch_double = pinch
+            elif self._pose_visible and self._pose_landmarks is not None:
                 prims = compute_hand_primitives(
                     self._pose_landmarks,
                     self._pose_x, self._pose_y,

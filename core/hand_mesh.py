@@ -2,45 +2,46 @@
 core/hand_mesh.py
 =================
 
-Geometria 3D PROCEDURAL da mao a partir de 21 landmarks MediaPipe.
+Geometria 3D PROCEDURAL da mao (estilo maos de headset VR: superficie
+lisa, dedos com volume, antebraco que some em fade).
 
-Funcao PURA — sem Qt, sem GL, sem OpenCV. Recebe landmarks normalizados +
-tamanho alvo e retorna 3 numpy arrays prontos pra upload em VBO/EBO:
-    - vertices: (N, 3) float32 — posicoes em screen pixel space
-    - normals:  (N, 3) float32 — normais de superficie (pra shader fresnel)
-    - indices:  (M,)   uint32  — triangle indices
+Funcao PURA — sem Qt, sem GL, sem OpenCV. Recebe a pose ja interpretada
+(`core.hand_pose.PosedHand`: pontos em pixels de tela + profundidade) e
+devolve arrays prontos pra VBO/EBO:
+    - vertices: (N, 3) float32 — x, y em px; z = profundidade (px, + = perto)
+    - normals:  (N, 3) float32 — normais unitarias pra iluminacao
+    - fade:     (N,)   float32 — 1 = opaco, 0 = some (fim do antebraco)
+    - indices:  (M,)   uint32  — triangulos
 
-Modelagem anatomica:
-- PALMA (`_build_anatomical_palm`): lofted surface via 7 rings eliticos
-  ao longo do eixo wrist→MCPs. Largura variavel (estreito wrist, cheio
-  MCPs), thenar bulge sutil offset lateral, depth convexa no centro.
-  Caps fan no top + bottom.
-- DEDOS (`_build_swept_finger`): Catmull-Rom subdivision (4→10 rings)
-  + cross-section eliptica (ratio depth/lateral = 0.80) + hemisphere
-  tip cap (3 rings + apex). Knuckle bulge no PIP via SEGMENT_TAPER.
-- POLEGAR: mesma logica de dedo mas com THUMB_TAPER (base musculosa)
-  + THUMB_MCP_INSET_FRAC = 0.50 pra CMC enterrar no thenar do palm,
-  evitando look "polegar colado de fora".
+Modelagem:
+- PALMA + ANTEBRACO: cada secao vai da borda do lado do polegar ate a
+  borda do minimo, interpolando entre a linha do pulso e a LINHA DOS NOS
+  (indicador..minimo, inclinada como na mao real) — os MCPs ficam dentro
+  da borda. Bulge da tenar pro lado do polegar, borda dos nos
+  arredondada, antebraco reto que some em fade.
+- DEDOS: tubo continuo raiz->MCP->PIP->DIP->ponta (Catmull-Rom), secao
+  eliptica achatada dorso-palma, raio proporcional a PALMA (fechar a mao
+  nao muda a espessura). A raiz nasce DENTRO da palma; as duas pontas tem
+  tampa hemisferica (o apice da ponta cai no landmark).
+- POLEGAR: nasce na "teia" da tenar (entre pulso e indicador).
+- Quadros por TRANSPORTE PARALELO: dedo apontando pra camera nao torce.
+- Indices por TEMPLATE cacheado: nada de loop Python por triangulo.
 
-Principio de design: geometria SOZINHA (sem shader) ja le como uma
-mao humana simplificada. Shader holografico complementa, nao mascara
-problemas de modelagem.
-
-Reuso do scaling/anchor de hand_renderer.py pra que o holograma 3D
-fique alinhado com o cursor IDENTICAMENTE.
-
-Mesh final: ~770 verts / ~1500 tris. ~1.5ms gen em Python+numpy.
+O renderer desenha com depth pre-pass: so a superficie mais proxima
+aparece, o que da a translucidez "de camada unica" das maos de VR.
 """
 
 from __future__ import annotations
 
-import math
-from typing import List, Sequence, Tuple
+from dataclasses import dataclass
+from functools import lru_cache
+from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 
+from .hand_pose import HandPoseSolver, PosedHand
 
-# Cadeias de landmarks por dedo (matches hand_renderer.py)
+# Cadeias de landmarks por dedo (MediaPipe Hands)
 THUMB_CHAIN = (1, 2, 3, 4)
 INDEX_CHAIN = (5, 6, 7, 8)
 MIDDLE_CHAIN = (9, 10, 11, 12)
@@ -48,632 +49,438 @@ RING_CHAIN = (13, 14, 15, 16)
 PINKY_CHAIN = (17, 18, 19, 20)
 FINGER_CHAINS = (THUMB_CHAIN, INDEX_CHAIN, MIDDLE_CHAIN, RING_CHAIN, PINKY_CHAIN)
 
-# Largura base por dedo (fracao de size_px) — mesmo do hand_renderer.py
-FINGER_WIDTH_FACTOR = (0.095, 0.075, 0.082, 0.072, 0.060)
-
-# Fator de afilamento por joint (MCP→PIP→DIP→TIP). Anatomia humana:
-# dedo nao e' cone — tem leve bump (knuckle bulge) na junta intermediaria.
-# Index 0=MCP (base), 1=PIP (knuckle), 2=DIP (afina), 3=TIP (redondo).
-SEGMENT_TAPER = (0.90, 1.00, 0.85, 0.65)
-
-# Polegar tem proporcoes distintas — base musculosa, sem knuckle no IP.
-THUMB_TAPER = (1.05, 0.95, 0.82, 0.68)
-
-# Encolhe ligeiramente o MCP pra ele ficar DENTRO do palm,
-# criando fusao visual sem precisar de boolean mesh union.
-MCP_INSET_FRAC = 0.12
-
-# Polegar nasce do CENTRO da thenar (nao de fora) — sem isso parece
-# "tubo grudado lateralmente".
-THUMB_MCP_INSET_FRAC = 0.50
-
-# Ancora visual = midpoint pinch_left (mesmo de hand_renderer)
-_PINCH_ANCHOR = (4, 8)
-
-# Resolution da malha (compromisso visual / performance)
-FINGER_RING_SEGMENTS = 10  # verts por anel dos dedos
-PALM_RING_COUNT = 7        # cross-sections ao longo do eixo wrist→top
-PALM_RING_SEGMENTS = 16    # verts por ring eliptico da palma
-
-# Angle tables pre-computadas globalmente — usadas em vectorized ring
-# vertex generation pra evitar math.cos/sin per-vert nos hot loops.
-_FINGER_ANGLES = np.linspace(
-    0, 2 * np.pi, FINGER_RING_SEGMENTS, endpoint=False, dtype=np.float32,
+# Raio (raiz, MCP, PIP, DIP, ponta) em fracao do comprimento da palma.
+# Dedo humano ~1.8-2 cm de largura pra palma de ~9.5 cm.
+# Polegar: raiz = teia da tenar, depois CMC..ponta.
+FINGER_RADII: Tuple[Tuple[float, ...], ...] = (
+    (0.150, 0.170, 0.150, 0.128, 0.112),  # polegar
+    (0.100, 0.126, 0.116, 0.103, 0.090),  # indicador
+    (0.105, 0.131, 0.121, 0.106, 0.092),  # medio
+    (0.098, 0.122, 0.112, 0.100, 0.087),  # anelar
+    (0.085, 0.107, 0.098, 0.088, 0.077),  # minimo
 )
-_FINGER_COS = np.cos(_FINGER_ANGLES).astype(np.float32)
-_FINGER_SIN = np.sin(_FINGER_ANGLES).astype(np.float32)
-_PALM_ANGLES = np.linspace(
-    0, 2 * np.pi, PALM_RING_SEGMENTS, endpoint=False, dtype=np.float32,
+FINGER_ELLIPSE_RATIO = 0.86  # secao achatada: profundidade/largura
+# Raiz do dedo: quanto entra na palma, em direcao ao CENTRO dela (fracao
+# da palma). Raiz mais fina que o MCP: fica escondida dentro da palma.
+FINGER_ROOT_DEPTH = 0.26
+# Raiz do polegar = ponto da teia (fracao do segmento pulso->MCP indicador).
+THUMB_ROOT_ALONG = 0.32
+
+FINGER_RING_SEGMENTS = 16
+FINGER_SAMPLES_PER_SEGMENT = 3
+CAP_RINGS = 4
+
+PALM_RING_SEGMENTS = 24
+# Perfil da palma (t: 0 = pulso, 1 = linha dos nos; negativo = antebraco):
+# (t, espessura relativa a palma, fade).
+_PALM_PROFILE: Tuple[Tuple[float, float, float], ...] = (
+    (-0.75, 0.42, 0.00),
+    (-0.50, 0.40, 0.25),
+    (-0.25, 0.37, 0.70),
+    (0.00, 0.35, 1.00),
+    (0.20, 0.34, 1.00),
+    (0.40, 0.33, 1.00),
+    (0.60, 0.32, 1.00),
+    (0.80, 0.31, 1.00),
+    (0.95, 0.30, 1.00),
+    (1.00, 0.29, 1.00),
 )
-_PALM_COS = np.cos(_PALM_ANGLES).astype(np.float32)
-_PALM_SIN = np.sin(_PALM_ANGLES).astype(np.float32)
-
-# Ratio depth/lateral pra cross-section dos dedos (1.0 = circular).
-# Dedos humanos sao levemente flatter palmar-dorsal vs lateral.
-FINGER_ELLIPSE_RATIO = 0.80
-
-# Profundidade maxima da palma (no centro) como fracao de size_px.
-# Palm e' essencialmente um slab fino — depth alta cria "ridge" vertical
-# visivel no meio quando combinada com fresnel rim do shader.
-PALM_DEPTH_MAX_FRAC = 0.05
-
-# Thenar bulge — desloca o ring center na direcao do polegar pra
-# absorver visualmente a base do polegar (puxada via
-# THUMB_MCP_INSET_FRAC=0.50).
-PALM_THENAR_BULGE_FRAC = 0.08
-
-# Extensao do palm abaixo do landmark wrist. Zero evita "stub" de
-# antebraco — palm para limpa no wrist.
-PALM_WRIST_EXTEND_FRAC = 0.0
+# Arredondamento da borda dos nos: (avanco em palmas, escala da largura,
+# escala da espessura) relativos ao ultimo anel do perfil.
+_PALM_TOP_ROUND: Tuple[Tuple[float, float, float], ...] = (
+    (0.05, 0.96, 0.90),
+    (0.10, 0.86, 0.72),
+    (0.145, 0.66, 0.48),
+    (0.17, 0.36, 0.22),
+)
+PALM_WRIST_WIDTH = 0.62   # largura do pulso (fracao da palma)
+PALM_THENAR_BULGE = 0.16  # bulge lateral max da tenar (fracao da palma)
 
 
-def _empty_mesh() -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    return (
-        np.zeros((0, 3), dtype=np.float32),
-        np.zeros((0, 3), dtype=np.float32),
-        np.zeros((0,), dtype=np.uint32),
+@dataclass(frozen=True)
+class HandMesh:
+    vertices: np.ndarray
+    normals: np.ndarray
+    fade: np.ndarray
+    indices: np.ndarray
+
+    @property
+    def empty(self) -> bool:
+        return self.indices.size == 0
+
+
+def _empty_mesh() -> HandMesh:
+    return HandMesh(
+        np.zeros((0, 3), np.float32),
+        np.zeros((0, 3), np.float32),
+        np.zeros((0,), np.float32),
+        np.zeros((0,), np.uint32),
     )
 
 
-def _catmull_rom_pos(
-    p0: np.ndarray, p1: np.ndarray, p2: np.ndarray, p3: np.ndarray,
-    t: float,
-) -> np.ndarray:
-    """
-    Catmull-Rom spline interpolation entre p1 e p2 (passa pelos 2).
-    p0 e p3 sao controles de tangente (vizinhos). t em [0, 1].
-    Tension 0.5 (default classico).
-    """
+# ---------------------------------------------------------------- tables
+
+@lru_cache(maxsize=8)
+def _circle(segments: int) -> Tuple[np.ndarray, np.ndarray]:
+    ang = np.linspace(0.0, 2.0 * np.pi, segments, endpoint=False)
+    return np.cos(ang), np.sin(ang)
+
+
+@lru_cache(maxsize=32)
+def _grid_indices(rings: int, segments: int) -> np.ndarray:
+    """Triangulos ligando aneis consecutivos (rings x segments), base 0."""
+    r = np.arange(rings - 1)[:, None]
+    s = np.arange(segments)[None, :]
+    s2 = (s + 1) % segments
+    i0 = r * segments + s
+    i1 = r * segments + s2
+    i2 = (r + 1) * segments + s
+    i3 = (r + 1) * segments + s2
+    tris = np.stack([i0, i1, i2, i1, i3, i2], axis=-1)
+    return tris.reshape(-1).astype(np.uint32)
+
+
+@lru_cache(maxsize=8)
+def _fan_indices(segments: int, apex_first: bool = False) -> np.ndarray:
+    """Leque anel<->apice. apex_first=False: anel em 0..seg-1 e apice em
+    `segments`. True: apice em 0 e anel em 1..seg."""
+    s = np.arange(segments)
+    s2 = (s + 1) % segments
+    if apex_first:
+        apex = np.zeros(segments, dtype=np.int64)
+        tri = np.stack([apex, s2 + 1, s + 1], axis=-1)
+    else:
+        apex = np.full(segments, segments)
+        tri = np.stack([apex, s, s2], axis=-1)
+    return tri.reshape(-1).astype(np.uint32)
+
+
+# ------------------------------------------------------------- geometry
+
+def _catmull_rom(points: np.ndarray, samples: int) -> np.ndarray:
+    """Subdivide (N,3) inserindo `samples` pontos por segmento."""
+    n = len(points)
+    if n < 2 or samples < 1:
+        return points
+    padded = np.vstack([points[:1], points, points[-1:]])
+    t = (np.arange(1, samples + 1, dtype=np.float64) / (samples + 1))[:, None]
     t2 = t * t
     t3 = t2 * t
-    return 0.5 * (
-        (2.0 * p1)
-        + (-p0 + p2) * t
-        + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2
-        + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3
-    )
-
-
-def _subdivide_chain_catmull_rom(
-    joints: List[np.ndarray],
-    samples_per_segment: int,
-) -> List[np.ndarray]:
-    """
-    Subdivide a cadeia de joints inserindo pontos intermediarios via
-    Catmull-Rom. Preserva os joints originais nas posicoes corretas.
-
-    Args:
-        joints: lista de N pontos de controle (>= 2)
-        samples_per_segment: quantos pontos NOVOS entre cada par adjacente
-
-    Returns:
-        Lista de M pontos onde M = N + (N-1) * samples_per_segment.
-        Joints originais permanecem nos seus indices.
-    """
-    n = len(joints)
-    if n < 2 or samples_per_segment < 1:
-        return list(joints)
-
-    out: List[np.ndarray] = [joints[0]]
+    out = [points[0]]
     for i in range(n - 1):
-        # Pontos de controle pra Catmull-Rom: vizinhos extendidos
-        p0 = joints[max(0, i - 1)]
-        p1 = joints[i]
-        p2 = joints[i + 1]
-        p3 = joints[min(n - 1, i + 2)]
-
-        for s in range(1, samples_per_segment + 1):
-            t = s / (samples_per_segment + 1)
-            pos = _catmull_rom_pos(p0, p1, p2, p3, t)
-            out.append(pos)
+        p0, p1, p2, p3 = padded[i], padded[i + 1], padded[i + 2], padded[i + 3]
+        seg = 0.5 * (
+            2.0 * p1
+            + (-p0 + p2) * t
+            + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2
+            + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3
+        )
+        out.extend(seg)
         out.append(p2)
-    return out
+    return np.asarray(out, dtype=np.float64)
 
 
-def _interpolate_widths_smoothstep(
-    widths: List[float],
-    target_n: int,
-) -> List[float]:
-    """
-    Interpola lista de widths pra target_n elementos via smoothstep.
-    Mantém os valores originais nos joints "principais" (knuckle bulge
-    no PIP preservado) com transicoes naturais entre eles.
-    """
-    n_orig = len(widths)
-    if n_orig == 0 or target_n <= 0:
-        return list(widths)
-    if n_orig == 1:
-        return [widths[0]] * target_n
-
-    out: List[float] = []
-    for i in range(target_n):
-        pos = i * (n_orig - 1) / max(1, target_n - 1)
-        idx = int(pos)
-        if idx >= n_orig - 1:
-            out.append(widths[-1])
-            continue
-        frac = pos - idx
-        s = 3.0 * frac * frac - 2.0 * frac * frac * frac
-        out.append(widths[idx] + (widths[idx + 1] - widths[idx]) * s)
-    return out
+def _tangents(centers: np.ndarray) -> np.ndarray:
+    tan = np.empty_like(centers)
+    tan[1:-1] = centers[2:] - centers[:-2]
+    tan[0] = centers[1] - centers[0]
+    tan[-1] = centers[-1] - centers[-2]
+    lens = np.linalg.norm(tan, axis=1, keepdims=True)
+    fallback = np.array([0.0, -1.0, 0.0])
+    return np.where(lens > 1e-9, tan / np.maximum(lens, 1e-9), fallback)
 
 
-def _perpendicular_basis(tangent: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Constroi base perpendicular (u, v) ortogonal a `tangent`.
-    Tangent deve ser unit. Resultado u, v tambem unit.
-    """
-    ref = np.array([0.0, 0.0, 1.0], dtype=np.float32)
-    if abs(float(np.dot(ref, tangent))) > 0.9:
-        ref = np.array([1.0, 0.0, 0.0], dtype=np.float32)
-    u = np.cross(tangent, ref)
-    u = u / (float(np.linalg.norm(u)) + 1e-9)
-    v = np.cross(tangent, u)
-    return u, v
+def _transport_frames(
+    tangents: np.ndarray, first_u: Optional[np.ndarray] = None,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Quadros (u, v) por transporte paralelo — sem torcao entre aneis."""
+    n = len(tangents)
+    us = np.empty((n, 3))
+    vs = np.empty((n, 3))
+    t0 = tangents[0]
+    if first_u is None or float(np.linalg.norm(first_u)) < 1e-9:
+        ref = np.array([0.0, 0.0, 1.0])
+        if abs(float(np.dot(ref, t0))) > 0.9:
+            ref = np.array([1.0, 0.0, 0.0])
+        u = np.cross(t0, ref)
+    else:
+        u = np.asarray(first_u, dtype=np.float64)
+    for i in range(n):
+        t = tangents[i]
+        u = u - t * float(np.dot(u, t))
+        norm = float(np.linalg.norm(u))
+        if norm < 1e-9:
+            ref = np.array([1.0, 0.0, 0.0]) if abs(t[0]) < 0.9 else np.array([0.0, 1.0, 0.0])
+            u = np.cross(t, ref)
+            norm = float(np.linalg.norm(u))
+        u = u / norm
+        us[i] = u
+        vs[i] = np.cross(t, u)
+    return us, vs
 
 
-def _build_swept_finger(
-    joints: List[np.ndarray],
-    radii: List[float],
+def _ring_block(
+    centers: np.ndarray,
+    us: np.ndarray,
+    vs: np.ndarray,
+    r_u: np.ndarray,
+    r_v: np.ndarray,
     segments: int,
-    base_idx: int,
-    palm_center: np.ndarray,
-    add_tip_cap: bool = True,
-    mcp_inset_frac: float = MCP_INSET_FRAC,
-) -> Tuple[List, List, List]:
-    """
-    Constroi superficie continua ao longo da cadeia de joints.
-
-    Para cada joint:
-      - Computa tangent (direcao do dedo nesse ponto, smoothing entre vizinhos)
-      - Constroi base perpendicular (u, v)
-      - Gera ring de `segments` vertices em torno do joint com radii[i]
-      - Conecta ao ring anterior com 2 triangles por segment
-
-    O MCP (joint[0]) e' deslocado LIGEIRAMENTE em direcao ao palm_center
-    pra criar overlap visual com o palm — fusao sem mesh boolean.
-    `mcp_inset_frac` configurável: dedos normais 0.12, polegar 0.30
-    (anatomia thenar precisa do polegar mais "enterrado" no palm).
-
-    Returns: verts, normals, indices (relative to base_idx).
-    """
-    n_joints_orig = len(joints)
-    if n_joints_orig < 2:
-        return [], [], []
-
-    # Ajusta MCP em direcao ao palm pra fusao visual
-    mcp_to_palm = palm_center - joints[0]
-    mcp_dist = float(np.linalg.norm(mcp_to_palm))
-    joints_adjusted: List[np.ndarray] = list(joints)
-    if mcp_dist > 1e-6:
-        mcp_dir = mcp_to_palm / mcp_dist
-        joints_adjusted[0] = joints[0] + mcp_dir * mcp_dist * mcp_inset_frac
-
-    # Subdivide a chain via Catmull-Rom + interpola widths smoothstep.
-    # 4 rings lineares geram "elbows" visiveis nos joints; ~10 rings
-    # com curvatura natural = silhueta organica de dedo.
-    SAMPLES_PER_SEGMENT = 2  # 4 joints + 3*2 = 10 rings
-    joints_dense = _subdivide_chain_catmull_rom(
-        joints_adjusted, samples_per_segment=SAMPLES_PER_SEGMENT,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Aneis elipticos: posicoes e normais (rings*segments, 3)."""
+    cos, sin = _circle(segments)
+    cu = cos[None, :, None]
+    sv = sin[None, :, None]
+    pos = (
+        centers[:, None, :]
+        + us[:, None, :] * (r_u[:, None, None] * cu)
+        + vs[:, None, :] * (r_v[:, None, None] * sv)
     )
-    radii_dense = _interpolate_widths_smoothstep(
-        list(radii), len(joints_dense),
+    nrm = (
+        us[:, None, :] * (cu / np.maximum(r_u, 1e-6)[:, None, None])
+        + vs[:, None, :] * (sv / np.maximum(r_v, 1e-6)[:, None, None])
     )
-    n_rings = len(joints_dense)
+    nrm /= np.maximum(np.linalg.norm(nrm, axis=2, keepdims=True), 1e-9)
+    return pos.reshape(-1, 3), nrm.reshape(-1, 3)
 
-    # Vectorized ring generation. Precomputa angle tables e gera ring
-    # inteiro com broadcasting (1 numpy op em vez de N Python ops).
-    # Usa tables globais se segments == FINGER_RING_SEGMENTS, senao
-    # gera dinamico (fallback defensivo).
-    if segments == FINGER_RING_SEGMENTS:
-        cos_table = _FINGER_COS
-        sin_table = _FINGER_SIN
-    else:
-        cos_table = np.cos(np.linspace(
-            0, 2 * np.pi, segments, endpoint=False, dtype=np.float32,
-        ))
-        sin_table = np.sin(np.linspace(
-            0, 2 * np.pi, segments, endpoint=False, dtype=np.float32,
-        ))
 
-    # Buffer pre-alocado pra ring positions/normals (segments × 3)
-    all_ring_pos: List[np.ndarray] = []
-    all_ring_norm: List[np.ndarray] = []
+def _cap_rings(
+    center: np.ndarray,
+    direction: np.ndarray,
+    u: np.ndarray,
+    v: np.ndarray,
+    radius: float,
+    toward_apex: bool,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Hemisferio sobre o anel (center, radius) apontando pra `direction`.
 
-    for j_idx in range(n_rings):
-        # Tangent smoothed (mesmo logic, mais conciso)
-        if j_idx == 0:
-            tangent = joints_dense[1] - joints_dense[0]
-        elif j_idx == n_rings - 1:
-            tangent = joints_dense[-1] - joints_dense[-2]
+    Aneis ordenados do tubo pro apice (toward_apex) ou do apice pro tubo.
+    Retorna posicoes, normais e o apice.
+    """
+    seg = FINGER_RING_SEGMENTS
+    thetas = (np.arange(1, CAP_RINGS + 1) / (CAP_RINGS + 1)) * (np.pi / 2.0)
+    if not toward_apex:
+        thetas = thetas[::-1]
+    centers = center[None, :] + direction[None, :] * (radius * np.sin(thetas))[:, None]
+    r = radius * np.cos(thetas)
+    pos, side = _ring_block(
+        centers,
+        np.repeat(u[None, :], CAP_RINGS, axis=0),
+        np.repeat(v[None, :], CAP_RINGS, axis=0),
+        r,
+        r * FINGER_ELLIPSE_RATIO,
+        seg,
+    )
+    blend = np.repeat(np.sin(thetas), seg)[:, None]
+    nrm = side * (1.0 - blend) + direction[None, :] * blend
+    nrm /= np.maximum(np.linalg.norm(nrm, axis=1, keepdims=True), 1e-9)
+    return pos, nrm, center + direction * radius
+
+
+def _finger(
+    chain_pts: np.ndarray, radii: np.ndarray, dorsal_hint: np.ndarray,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Tubo continuo raiz->ponta com tampas arredondadas nas duas pontas.
+
+    chain_pts: (K, 3) raiz (dentro da palma), MCP, PIP, DIP, ponta.
+    radii: (K,) raio em px por ponto.
+    """
+    seg = FINGER_RING_SEGMENTS
+    pts = chain_pts.astype(np.float64).copy()
+    rad = radii.astype(np.float64)
+    # Apice da tampa cai no landmark da ponta: recua o centro do ultimo anel.
+    tip_dir = pts[-1] - pts[-2]
+    tip_len = float(np.linalg.norm(tip_dir))
+    if tip_len > 1e-6:
+        pts[-1] = pts[-1] - tip_dir / tip_len * min(rad[-1] * 0.9, tip_len * 0.6)
+
+    centers = _catmull_rom(pts, FINGER_SAMPLES_PER_SEGMENT)
+    n_dense = len(centers)
+    pos_param = np.linspace(0.0, len(rad) - 1, n_dense)
+    idx = np.minimum(pos_param.astype(int), len(rad) - 2)
+    f = pos_param - idx
+    f = f * f * (3.0 - 2.0 * f)
+    r = rad[idx] + (rad[idx + 1] - rad[idx]) * f
+
+    tans = _tangents(centers)
+    us, vs = _transport_frames(tans, first_u=dorsal_hint)
+    tube_pos, tube_nrm = _ring_block(centers, us, vs, r, r * FINGER_ELLIPSE_RATIO, seg)
+    s_pos, s_nrm, s_apex = _cap_rings(centers[0], -tans[0], us[0], vs[0], float(r[0]), False)
+    e_pos, e_nrm, e_apex = _cap_rings(centers[-1], tans[-1], us[-1], vs[-1], float(r[-1]), True)
+
+    # Ordem: apice inicial, tampa inicial, tubo, tampa final, apice final.
+    verts = np.vstack([s_apex[None, :], s_pos, tube_pos, e_pos, e_apex[None, :]])
+    norms = np.vstack([-tans[0][None, :], s_nrm, tube_nrm, e_nrm, tans[-1][None, :]])
+    n_rings = CAP_RINGS + n_dense + CAP_RINGS
+    last_ring = 1 + (n_rings - 1) * seg
+    indices = np.concatenate([
+        _fan_indices(seg, True),
+        _grid_indices(n_rings, seg) + np.uint32(1),
+        _fan_indices(seg) + np.uint32(last_ring),
+    ])
+    return verts, norms, indices
+
+
+def _palm(
+    points: np.ndarray, palm_px: float,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Palma + antebraco seguindo a linha real dos nos (ver docstring)."""
+    wrist = points[0]
+    index_mcp = points[5]
+    pinky_mcp = points[17]
+    thumb_cmc = points[1]
+
+    knuckle_mid = (index_mcp + pinky_mcp) * 0.5
+    main = knuckle_mid - wrist
+    length = float(np.linalg.norm(main))
+    across = index_mcp - pinky_mcp
+    if length < 1e-6 or float(np.linalg.norm(across)) < 1e-6:
+        empty = np.zeros((0, 3))
+        return empty, empty, np.zeros(0), np.zeros(0, np.uint32)
+    main_u = main / length
+    lateral = across - main_u * float(np.dot(across, main_u))
+    lateral /= max(float(np.linalg.norm(lateral)), 1e-9)
+    normal = np.cross(main_u, lateral)
+    normal /= max(float(np.linalg.norm(normal)), 1e-9)
+    thumb_sign = 1.0 if float(np.dot(thumb_cmc - wrist, lateral)) > 0 else -1.0
+
+    # Bordas: linha dos nos + folga do raio dos dedos das pontas.
+    idx_edge = index_mcp + lateral * (FINGER_RADII[1][1] * palm_px * 1.05)
+    pky_edge = pinky_mcp - lateral * (FINGER_RADII[4][1] * palm_px * 1.10)
+    half_w = 0.5 * PALM_WRIST_WIDTH * palm_px
+    wrist_a = wrist + lateral * half_w  # lado do indicador
+    wrist_b = wrist - lateral * half_w  # lado do minimo
+
+    # Arco dos nos: o MCP do medio fica acima da reta indicador-minimo.
+    arch = max(0.0, float(np.dot(points[9] - knuckle_mid, main_u)))
+
+    rows_l: List[np.ndarray] = []
+    rows_r: List[np.ndarray] = []
+    rows_th: List[float] = []
+    rows_fade: List[float] = []
+    for t, thick, fade_t in _PALM_PROFILE:
+        if t <= 0.0:
+            left = wrist_a + main_u * (t * length)
+            right = wrist_b + main_u * (t * length)
         else:
-            tangent = (joints_dense[j_idx + 1] - joints_dense[j_idx - 1]) * 0.5
-        t_len = float(np.linalg.norm(tangent))
-        tangent_unit = (
-            tangent / t_len if t_len > 1e-6
-            else np.array([0.0, 1.0, 0.0], dtype=np.float32)
-        )
+            s = t * t * (3.0 - 2.0 * t) * 0.35 + t * 0.65  # alarga cedo
+            left = wrist_a + (idx_edge - wrist_a) * s
+            right = wrist_b + (pky_edge - wrist_b) * s
+            if t > 0.55:
+                lift = main_u * (arch * ((t - 0.55) / 0.45) ** 2)
+                left = left + lift * 0.4
+                right = right + lift * 0.4
+            if 0.05 < t < 0.75:  # tenar
+                bulge = float(np.sin((t - 0.05) / 0.70 * np.pi)) * PALM_THENAR_BULGE * palm_px
+                if thumb_sign > 0:
+                    left = left + lateral * bulge
+                else:
+                    right = right - lateral * bulge
+        rows_l.append(left)
+        rows_r.append(right)
+        rows_th.append(thick)
+        rows_fade.append(fade_t)
+    # Borda dos nos arredondada.
+    l_last, r_last = rows_l[-1], rows_r[-1]
+    mid_last = (l_last + r_last) * 0.5 + main_u * (arch * 0.6)
+    th_last = _PALM_PROFILE[-1][1]
+    for adv, ws, ts in _PALM_TOP_ROUND:
+        c = mid_last + main_u * (adv * length)
+        rows_l.append(c + (l_last - mid_last) * ws)
+        rows_r.append(c + (r_last - mid_last) * ws)
+        rows_th.append(th_last * ts)
+        rows_fade.append(1.0)
 
-        u, v = _perpendicular_basis(tangent_unit)
-        r = float(radii_dense[j_idx])
-        r_u = r
-        r_v = r * FINGER_ELLIPSE_RATIO
+    left_pts = np.asarray(rows_l)
+    right_pts = np.asarray(rows_r)
+    centers = (left_pts + right_pts) * 0.5
+    span = left_pts - right_pts
+    r_lat = 0.5 * np.linalg.norm(span, axis=1)
+    us = span / np.maximum(r_lat[:, None] * 2.0, 1e-9)
+    vs = np.cross(us, np.repeat(main_u[None, :], len(us), axis=0))
+    vs *= np.sign(np.sum(vs * normal[None, :], axis=1, keepdims=True) + 1e-12)
+    vs /= np.maximum(np.linalg.norm(vs, axis=1, keepdims=True), 1e-9)
+    r_dep = 0.5 * palm_px * np.asarray(rows_th)
+    pos, nrm = _ring_block(centers, us, vs, r_lat, r_dep, PALM_RING_SEGMENTS)
 
-        # VECTORIZED: offset (segments, 3) = u[None,:] * (cos*r_u)[:,None]
-        #                                  + v[None,:] * (sin*r_v)[:,None]
-        # Cada linha do offset e' um vertex offset relativo ao centro
-        offsets = (
-            np.outer(cos_table * r_u, u)
-            + np.outer(sin_table * r_v, v)
-        )  # shape (segments, 3)
-        positions = joints_dense[j_idx][None, :] + offsets  # (segments, 3)
+    # Inclina as normais no eixo onde a secao encolhe (topo arredondado).
+    axis_pos = np.concatenate(
+        [[0.0], np.cumsum(np.linalg.norm(np.diff(centers, axis=0), axis=1))],
+    )
+    size = np.sqrt(r_lat * r_dep)
+    dr = np.gradient(size) / np.maximum(np.gradient(axis_pos), 1e-6)
+    nrm = nrm - np.repeat(dr, PALM_RING_SEGMENTS)[:, None] * main_u[None, :] * 0.8
+    nrm /= np.maximum(np.linalg.norm(nrm, axis=1, keepdims=True), 1e-9)
+    fade = np.repeat(np.asarray(rows_fade), PALM_RING_SEGMENTS)
 
-        # Normais: gradiente da elipse, vectorized
-        n_u_arr = cos_table / max(r_u, 1e-6)
-        n_v_arr = sin_table / max(r_v, 1e-6)
-        normals_arr = np.outer(n_u_arr, u) + np.outer(n_v_arr, v)  # (seg, 3)
-        # Normalize por linha
-        norm_lens = np.linalg.norm(normals_arr, axis=1, keepdims=True)
-        norm_lens = np.maximum(norm_lens, 1e-6)
-        normals_arr = normals_arr / norm_lens
-
-        all_ring_pos.append(positions)
-        all_ring_norm.append(normals_arr)
-
-    # Mantem numpy arrays e converte em batch com .tolist() — evita
-    # conversao tuple por vert no hot loop.
-    ring_verts_array = np.concatenate(all_ring_pos, axis=0)
-    ring_norms_array = np.concatenate(all_ring_norm, axis=0)
-    verts: List[Tuple[float, float, float]] = ring_verts_array.tolist()
-    normals: List[Tuple[float, float, float]] = ring_norms_array.tolist()
-
-    indices: List[int] = []
-
-    # Triangles entre rings consecutivos
-    for ring_idx in range(n_rings - 1):
-        for s in range(segments):
-            s2 = (s + 1) % segments
-            i0 = base_idx + ring_idx * segments + s
-            i1 = base_idx + ring_idx * segments + s2
-            i2 = base_idx + (ring_idx + 1) * segments + s
-            i3 = base_idx + (ring_idx + 1) * segments + s2
-            indices.extend([i0, i1, i2, i1, i3, i2])
-
-    # Hemisphere cap vectorizado via numpy broadcasting.
-    if add_tip_cap and n_rings >= 2:
-        tip_tangent = joints_dense[-1] - joints_dense[-2]
-        tip_len = float(np.linalg.norm(tip_tangent))
-        if tip_len > 1e-6:
-            tip_tangent_unit = tip_tangent / tip_len
-            r_tip = float(radii_dense[-1])
-            tip_origin = joints_dense[-1]
-            u_tip, v_tip = _perpendicular_basis(tip_tangent_unit)
-
-            CAP_RINGS = 3
-            # theta de 1/4 a 3/4 do quarter circle (excludes endpoints)
-            thetas = np.array([
-                (k / (CAP_RINGS + 1)) * (np.pi / 2.0)
-                for k in range(1, CAP_RINGS + 1)
-            ], dtype=np.float32)
-            sin_ths = np.sin(thetas)  # (CAP_RINGS,)
-            cos_ths = np.cos(thetas)  # (CAP_RINGS,)
-            r_rings = r_tip * cos_ths  # (CAP_RINGS,)
-            z_offsets = r_tip * sin_ths  # (CAP_RINGS,)
-
-            # Build all cap vertices in one go
-            for k in range(CAP_RINGS):
-                cos_th = float(cos_ths[k])
-                sin_th = float(sin_ths[k])
-                r_ring = float(r_rings[k])
-                ring_center = tip_origin + tip_tangent_unit * float(z_offsets[k])
-
-                r_u_cap = r_ring
-                r_v_cap = r_ring * FINGER_ELLIPSE_RATIO
-
-                # Vectorized positions
-                offsets = (
-                    np.outer(cos_table * r_u_cap, u_tip)
-                    + np.outer(sin_table * r_v_cap, v_tip)
-                )
-                positions = ring_center[None, :] + offsets  # (segments, 3)
-
-                # Vectorized normals (side blended with tip direction)
-                n_u_cap = cos_table / max(r_u_cap, 1e-6)
-                n_v_cap = sin_table / max(r_v_cap, 1e-6)
-                side = np.outer(n_u_cap, u_tip) + np.outer(n_v_cap, v_tip)
-                side_lens = np.linalg.norm(side, axis=1, keepdims=True)
-                side = side / np.maximum(side_lens, 1e-6)
-                # Blend side * cos_th + tip * sin_th
-                normal_blend = side * cos_th + tip_tangent_unit[None, :] * sin_th
-                nb_lens = np.linalg.norm(normal_blend, axis=1, keepdims=True)
-                normal_blend = normal_blend / np.maximum(nb_lens, 1e-6)
-
-                verts.extend(positions.tolist())
-                normals.extend(normal_blend.tolist())
-
-            # Apex vertex
-            apex_pos = tip_origin + tip_tangent_unit * r_tip
-            verts.append([float(apex_pos[0]), float(apex_pos[1]), float(apex_pos[2])])
-            normals.append([float(tip_tangent_unit[0]),
-                            float(tip_tangent_unit[1]),
-                            float(tip_tangent_unit[2])])
-
-            # Indices: conecta finger ultimo ring -> 1st cap ring -> ... -> apex
-            finger_last_ring = base_idx + (n_rings - 1) * segments
-            cap_ring0 = base_idx + n_rings * segments
-            # Quad strip: finger ring -> cap ring 0
-            for s in range(segments):
-                s2 = (s + 1) % segments
-                i0 = finger_last_ring + s
-                i1 = finger_last_ring + s2
-                i2 = cap_ring0 + s
-                i3 = cap_ring0 + s2
-                indices.extend([i0, i1, i2, i1, i3, i2])
-            # Strips entre cap rings consecutivos
-            for k in range(CAP_RINGS - 1):
-                ra = base_idx + n_rings * segments + k * segments
-                rb = base_idx + n_rings * segments + (k + 1) * segments
-                for s in range(segments):
-                    s2 = (s + 1) % segments
-                    indices.extend([
-                        ra + s, ra + s2, rb + s,
-                        ra + s2, rb + s2, rb + s,
-                    ])
-            # Fan do ultimo cap ring pro apex
-            apex_idx = base_idx + n_rings * segments + CAP_RINGS * segments
-            last_cap_ring = base_idx + n_rings * segments + (CAP_RINGS - 1) * segments
-            for s in range(segments):
-                s2 = (s + 1) % segments
-                indices.extend([apex_idx, last_cap_ring + s, last_cap_ring + s2])
-
-    return verts, normals, indices
+    n = len(centers)
+    apex = centers[-1] + main_u * (0.012 * length)
+    verts = np.vstack([pos, apex[None, :]])
+    norms = np.vstack([nrm, main_u[None, :]])
+    fade = np.concatenate([fade, [1.0]])
+    idx = np.concatenate([
+        _grid_indices(n, PALM_RING_SEGMENTS),
+        _fan_indices(PALM_RING_SEGMENTS) + np.uint32((n - 1) * PALM_RING_SEGMENTS),
+    ])
+    return verts, norms, fade, idx
 
 
-def _build_anatomical_palm(
-    pts_3d: List[np.ndarray],
-    size_px: float,
-    base_idx: int,
-    ring_count: int = PALM_RING_COUNT,
-    ring_segments: int = PALM_RING_SEGMENTS,
-) -> Tuple[List, List, List]:
-    """
-    Palma anatomica via LOFTED SURFACE.
+def build_hand_mesh(hand: PosedHand) -> HandMesh:
+    """Mesh completa (palma+antebraco+5 dedos) a partir da pose."""
+    points = np.asarray(hand.points, dtype=np.float64)
+    if points.shape[0] < 21:
+        return _empty_mesh()
+    palm_px = max(float(hand.palm_px), 1.0)
 
-    Em vez de uma UV sphere (egg-shape), constroi swept surface ao
-    longo do eixo wrist → middle_MCP, com rings ELITICOS que mudam de
-    tamanho e posicao por altura:
+    parts_v: List[np.ndarray] = []
+    parts_n: List[np.ndarray] = []
+    parts_f: List[np.ndarray] = []
+    parts_i: List[np.ndarray] = []
+    base = 0
 
-    - Bottom (t≈0): ring estreito + curto na profundidade = wrist taper
-    - Body (t≈0.2-0.7): largura crescente + thenar bulge offset lateral
-                       pro lado do polegar + max profundidade no meio
-    - Top (t≈1): largura cheia nos MCPs + leve rollover
+    pv, pn, pf, pi = _palm(points, palm_px)
+    if len(pv):
+        parts_v.append(pv)
+        parts_n.append(pn)
+        parts_f.append(pf)
+        parts_i.append(pi)
+        base += len(pv)
 
-    O resultado tem silhueta orgânica de palma humana, não um ovo.
+    n_palm = np.cross(points[5] - points[0], points[17] - points[0])
+    n_len = float(np.linalg.norm(n_palm))
+    dorsal = n_palm / n_len if n_len > 1e-9 else np.array([0.0, 0.0, 1.0])
+    palm_axis = (points[5] + points[17]) * 0.5 - points[0]
+    pa_len = float(np.linalg.norm(palm_axis))
+    palm_axis = palm_axis / pa_len if pa_len > 1e-9 else np.array([0.0, -1.0, 0.0])
+    palm_center = points[0] + palm_axis * (0.45 * pa_len)
 
-    Eixos:
-    - main_axis = wrist → middle_MCP (longitudinal)
-    - lateral_axis = pinky_MCP → index_MCP (transversal, orto a main)
-    - depth_axis = perpendicular a ambos (out-of-screen)
-    """
-    wrist = pts_3d[0]
-    thumb_cmc = pts_3d[1]
-    index_mcp = pts_3d[5]
-    middle_mcp = pts_3d[9]
-    pinky_mcp = pts_3d[17]
-
-    # Eixo principal
-    main_axis = middle_mcp - wrist
-    main_axis_len = float(np.linalg.norm(main_axis))
-    if main_axis_len < 1e-6:
-        return [], [], []
-    main_unit = main_axis / main_axis_len
-
-    # Eixo lateral: ortogonalizar (pinky → index) contra main
-    lateral_raw = index_mcp - pinky_mcp
-    lateral_raw = lateral_raw - main_unit * float(np.dot(lateral_raw, main_unit))
-    lateral_len = float(np.linalg.norm(lateral_raw))
-    if lateral_len < 1e-6:
-        lateral_unit = np.array([1.0, 0.0, 0.0], dtype=np.float32)
-        lateral_len = size_px * 0.30
-    else:
-        lateral_unit = lateral_raw / lateral_len
-
-    # Depth axis (perpendicular)
-    depth_unit = np.cross(main_unit, lateral_unit)
-    if float(np.linalg.norm(depth_unit)) < 1e-6:
-        depth_unit = np.array([0.0, 0.0, 1.0], dtype=np.float32)
-    else:
-        depth_unit = depth_unit / float(np.linalg.norm(depth_unit))
-
-    # Determina lado do polegar (sinal projetado no eixo lateral)
-    palm_mid = (wrist + middle_mcp) * 0.5
-    thumb_proj = float(np.dot(thumb_cmc - palm_mid, lateral_unit))
-    thumb_sign = 1.0 if thumb_proj > 0 else -1.0
-
-    palm_length = main_axis_len * (1.0 + PALM_WRIST_EXTEND_FRAC)
-    palm_width = lateral_len
-    palm_depth_max = size_px * PALM_DEPTH_MAX_FRAC
-
-    # Origem deslocada pra dar extensao abaixo do wrist
-    palm_origin = wrist - main_unit * (main_axis_len * PALM_WRIST_EXTEND_FRAC)
-
-    verts: List[Tuple[float, float, float]] = []
-    normals: List[Tuple[float, float, float]] = []
-
-    for ring_idx in range(ring_count):
-        t = ring_idx / (ring_count - 1)  # 0 = base extendida, 1 = top MCPs
-
-        # Posicao ao longo do eixo principal
-        center_axis = palm_origin + main_unit * (t * palm_length)
-
-        # Width curve cheia: top expande 10% alem dos MCPs pra envolver
-        # bases dos dedos visualmente.
-        if t < 0.20:
-            # Zona do pulso — taper moderado (0.65 → 0.88)
-            width_factor = 0.65 + (t / 0.20) * 0.23
-        elif t < 0.85:
-            # Body — cheio
-            width_factor = 0.88 + (t - 0.20) / 0.65 * 0.17  # 0.88 → 1.05
+    for chain_idx, chain in enumerate(FINGER_CHAINS):
+        joints = points[list(chain)]
+        if chain_idx == 0:
+            # Teia do polegar: nasce dentro da palma, entre pulso e indicador.
+            root = points[0] + (points[5] - points[0]) * THUMB_ROOT_ALONG
         else:
-            # Top — leve overshoot pra envelopar finger MCPs
-            width_factor = 1.05 - (t - 0.85) * 0.05
+            # Raiz afundada na palma, em direcao ao centro dela.
+            to_center = palm_center - joints[0]
+            tc_len = float(np.linalg.norm(to_center))
+            to_center = to_center / tc_len if tc_len > 1e-9 else -palm_axis
+            root = joints[0] + to_center * (FINGER_ROOT_DEPTH * palm_px)
+        chain_pts = np.vstack([root[None, :], joints])
+        radii = np.asarray(FINGER_RADII[chain_idx]) * palm_px
+        hint = np.cross(dorsal, joints[1] - joints[0])
+        fv, fn, fi = _finger(chain_pts, radii, hint)
+        parts_v.append(fv)
+        parts_n.append(fn)
+        parts_f.append(np.ones(len(fv)))
+        parts_i.append(fi + np.uint32(base))
+        base += len(fv)
 
-        r_lateral = palm_width * 0.5 * width_factor
-
-        # Depth — convexo no meio, fino nos extremos
-        depth_t = math.sin(t * math.pi)  # 0 → 1 → 0
-        r_depth = palm_depth_max * (0.35 + 0.65 * depth_t)
-
-        # Thenar bulge — desloca ring center lateralmente pro lado do polegar
-        thenar_offset = 0.0
-        if 0.10 < t < 0.55:
-            # Bell curve com pico em t ≈ 0.32
-            bulge_t = math.sin((t - 0.10) / 0.45 * math.pi)
-            thenar_offset = thumb_sign * bulge_t * palm_width * PALM_THENAR_BULGE_FRAC
-
-        ring_center = center_axis + lateral_unit * thenar_offset
-
-        # VECTORIZED ring generation
-        if ring_segments == PALM_RING_SEGMENTS:
-            cos_t = _PALM_COS
-            sin_t = _PALM_SIN
-        else:
-            cos_t = np.cos(np.linspace(
-                0, 2 * np.pi, ring_segments, endpoint=False, dtype=np.float32,
-            ))
-            sin_t = np.sin(np.linspace(
-                0, 2 * np.pi, ring_segments, endpoint=False, dtype=np.float32,
-            ))
-
-        offsets = (
-            np.outer(cos_t * r_lateral, lateral_unit)
-            + np.outer(sin_t * r_depth, depth_unit)
-        )
-        ring_positions = ring_center[None, :] + offsets  # (seg, 3)
-
-        # Normals = gradient eliptico
-        nx_arr = cos_t / max(r_lateral, 1e-6)
-        nz_arr = sin_t / max(r_depth, 1e-6)
-        ring_normals = (
-            np.outer(nx_arr, lateral_unit) + np.outer(nz_arr, depth_unit)
-        )
-        nlens = np.linalg.norm(ring_normals, axis=1, keepdims=True)
-        nlens = np.maximum(nlens, 1e-6)
-        ring_normals = ring_normals / nlens
-
-        # .tolist() converte ring (segments, 3) numpy → lista de listas
-        # muito mais rapido que loop com float() casts.
-        verts.extend(ring_positions.tolist())
-        normals.extend(ring_normals.tolist())
-
-    # Triangles entre rings consecutivos
-    indices: List[int] = []
-    for ri in range(ring_count - 1):
-        for s in range(ring_segments):
-            s2 = (s + 1) % ring_segments
-            i0 = base_idx + ri * ring_segments + s
-            i1 = base_idx + ri * ring_segments + s2
-            i2 = base_idx + (ri + 1) * ring_segments + s
-            i3 = base_idx + (ri + 1) * ring_segments + s2
-            indices.extend([i0, i1, i2, i1, i3, i2])
-
-    # Bottom cap (wrist end)
-    bot_center_idx = base_idx + ring_count * ring_segments
-    bot_center_pos = palm_origin
-    verts.append((float(bot_center_pos[0]), float(bot_center_pos[1]), float(bot_center_pos[2])))
-    normals.append((float(-main_unit[0]), float(-main_unit[1]), float(-main_unit[2])))
-    bot_ring_start = base_idx
-    for s in range(ring_segments):
-        s2 = (s + 1) % ring_segments
-        indices.extend([bot_center_idx, bot_ring_start + s2, bot_ring_start + s])
-
-    # Top cap (MCP end)
-    top_center_idx = bot_center_idx + 1
-    top_center_pos = palm_origin + main_unit * palm_length
-    verts.append((float(top_center_pos[0]), float(top_center_pos[1]), float(top_center_pos[2])))
-    normals.append((float(main_unit[0]), float(main_unit[1]), float(main_unit[2])))
-    top_ring_start = base_idx + (ring_count - 1) * ring_segments
-    for s in range(ring_segments):
-        s2 = (s + 1) % ring_segments
-        indices.extend([top_center_idx, top_ring_start + s, top_ring_start + s2])
-
-    return verts, normals, indices
-
-
-def _build_finger_palm_bridges(
-    all_verts: List,
-    finger_mcp_starts: List[int],
-    palm_top_ring_start: int,
-    finger_segments: int,
-    palm_segments: int,
-) -> List[int]:
-    """
-    MANO-inspired continuity geometry.
-
-    Cria triangulos conectando cada MCP ring dos dedos com a arc
-    correspondente da palm top ring. Resultado: mesh CONTINUA palm↔
-    fingers (sem seam visivel).
-
-    Algoritmo:
-    1. Para cada vert do MCP ring do dedo, encontra o palm top vert
-       MAIS PROXIMO (3D euclidean distance).
-    2. Triangle strip:
-       - mcp[s], palm_near[s], mcp[(s+1)%N]
-       - palm_near[s], palm_near[(s+1)%N], mcp[(s+1)%N]
-
-    Sem alocar verts novos — apenas indices conectando existentes.
-    Custo: ~10 triangles por dedo × 4 dedos = 40 tris extras.
-
-    Args:
-        all_verts: lista mutavel sendo construida (precisa pra np.array)
-        finger_mcp_starts: indices base de cada finger (skipping thumb)
-        palm_top_ring_start: indice base do palm top ring
-        finger_segments: 10
-        palm_segments: 16
-
-    Returns:
-        Lista de indices triangles pra extend em all_indices.
-    """
-    if not finger_mcp_starts:
-        return []
-
-    # Converte verts pra numpy pra busca eficiente
-    verts_arr = np.array(all_verts, dtype=np.float32)
-    palm_top_verts = verts_arr[
-        palm_top_ring_start:palm_top_ring_start + palm_segments
-    ]
-
-    indices: List[int] = []
-
-    for finger_start in finger_mcp_starts:
-        mcp_verts = verts_arr[finger_start:finger_start + finger_segments]
-
-        # Para cada MCP vert, indice do palm top mais proximo
-        # Distancias 2D (X, Y) suficientes pra anatomia — z aproximado
-        dists = np.linalg.norm(
-            palm_top_verts[None, :, :2] - mcp_verts[:, None, :2],
-            axis=2,
-        )  # shape (finger_segs, palm_segs)
-        nearest_palm = np.argmin(dists, axis=1)  # shape (finger_segs,)
-
-        # Triangle strip MCP → palm_top
-        for s in range(finger_segments):
-            s_next = (s + 1) % finger_segments
-            mcp_a = finger_start + s
-            mcp_b = finger_start + s_next
-            palm_a = palm_top_ring_start + int(nearest_palm[s])
-            palm_b = palm_top_ring_start + int(nearest_palm[s_next])
-
-            # Skip degenerate (se ambos MCP verts mapeiam pro mesmo palm)
-            if palm_a == palm_b:
-                # Single tri: mcp_a, mcp_b, palm_a
-                indices.extend([mcp_a, palm_a, mcp_b])
-            else:
-                # Quad → 2 triangles
-                indices.extend([mcp_a, palm_a, mcp_b])
-                indices.extend([mcp_b, palm_a, palm_b])
-
-    return indices
+    return HandMesh(
+        vertices=np.vstack(parts_v).astype(np.float32),
+        normals=np.vstack(parts_n).astype(np.float32),
+        fade=np.concatenate(parts_f).astype(np.float32),
+        indices=np.concatenate(parts_i).astype(np.uint32),
+    )
 
 
 def generate_hand_mesh(
@@ -681,114 +488,14 @@ def generate_hand_mesh(
     center_x: float,
     center_y: float,
     size_px: float,
+    frame_aspect: float = 16.0 / 9.0,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Constroi mesh 3D da mao.
-
-    Args:
-        landmarks: 21 tuplas (x, y, z) normalizadas (MediaPipe)
-        center_x, center_y: posicao na tela do anchor (pinch midpoint)
-        size_px: tamanho alvo do bbox em pixels
-
-    Returns:
-        vertices (N,3) float32, normals (N,3) float32, indices (M,) uint32
-    """
-    if len(landmarks) < 21:
-        return _empty_mesh()
-
-    # Vetoriza tudo num unico ndarray (21,3) — 1 alloc + broadcast +
-    # scaling vetorizado em vez de 21 calls Python.
-    lm_arr = np.asarray(landmarks, dtype=np.float32)  # (N, 3) normalizado
-    xs = lm_arr[:, 0]
-    ys = lm_arr[:, 1]
-    bbox_w = max(float(xs.max() - xs.min()), 1e-6)
-    bbox_h = max(float(ys.max() - ys.min()), 1e-6)
-    scale = size_px / max(bbox_w, bbox_h)
-
-    pa, pb = _PINCH_ANCHOR
-    anchor_x = float((lm_arr[pa, 0] + lm_arr[pb, 0]) * 0.5)
-    anchor_y = float((lm_arr[pa, 1] + lm_arr[pb, 1]) * 0.5)
-
-    # Converte pra screen pixels (3D — z escalado pra dar profundidade)
-    z_scale = scale * 0.4  # fator de profundidade
-    pts_arr = np.empty((len(landmarks), 3), dtype=np.float32)
-    pts_arr[:, 0] = center_x + (xs - anchor_x) * scale
-    pts_arr[:, 1] = center_y + (ys - anchor_y) * scale
-    pts_arr[:, 2] = lm_arr[:, 2] * z_scale
-    # Mantem API existente: pts_3d e' lista indexavel de arrays (1,3).
-    # Slicing de ndarray e' barato (views, sem copia).
-    pts_3d: List[np.ndarray] = [pts_arr[i] for i in range(pts_arr.shape[0])]
-
-    all_verts: List[Tuple[float, float, float]] = []
-    all_norms: List[Tuple[float, float, float]] = []
-    all_indices: List[int] = []
-    base_idx = 0
-
-    # ----------- PALM CENTER (precisamos antes pra fusao dos dedos) -----------
-    _PALM_IDX = (0, 1, 5, 9, 13, 17)
-    palm_xs = [pts_3d[i][0] for i in _PALM_IDX]
-    palm_ys = [pts_3d[i][1] for i in _PALM_IDX]
-    palm_zs = [pts_3d[i][2] for i in _PALM_IDX]
-    palm_center = np.array([
-        (max(palm_xs) + min(palm_xs)) * 0.5,
-        (max(palm_ys) + min(palm_ys)) * 0.5,
-        (max(palm_zs) + min(palm_zs)) * 0.5,
-    ], dtype=np.float32)
-
-    # Track ring boundaries pra bridge geometry: start index dos MCP
-    # rings de cada dedo + start index do top ring da palma. Depois
-    # conectados com triangles pra mesh continua palm↔fingers.
-    finger_mcp_starts: List[int] = []
-
-    # ----------- DEDOS: swept cylinder unico por dedo, com tip cap -----------
-    for chain_idx, (chain, w_factor) in enumerate(
-        zip(FINGER_CHAINS, FINGER_WIDTH_FACTOR),
-    ):
-        is_thumb = (chain_idx == 0)
-        taper = THUMB_TAPER if is_thumb else SEGMENT_TAPER
-        inset_frac = THUMB_MCP_INSET_FRAC if is_thumb else MCP_INSET_FRAC
-        base_radius = size_px * w_factor * 0.85
-        joints = [pts_3d[i] for i in chain]
-        radii = [base_radius * t for t in taper]
-        verts, norms, idx = _build_swept_finger(
-            joints, radii, FINGER_RING_SEGMENTS, base_idx,
-            palm_center=palm_center, add_tip_cap=True,
-            mcp_inset_frac=inset_frac,
+    """Compat: pose de um unico frame (sem suavizacao) -> (verts, normais,
+    indices). No render continuo use HandPoseSolver + build_hand_mesh."""
+    posed = None
+    if len(landmarks) >= 21:
+        posed = HandPoseSolver(hand_size_px=size_px, frame_aspect=frame_aspect).solve(
+            landmarks, center_x, center_y,
         )
-        # MCP ring (primeiro ring deste dedo) = primeiros FINGER_RING_SEGMENTS verts
-        finger_mcp_starts.append(base_idx)
-        all_verts.extend(verts)
-        all_norms.extend(norms)
-        all_indices.extend(idx)
-        base_idx += len(verts)
-
-    # ----------- PALMA: lofted surface ANATOMICA -----------
-    palm_base_idx = base_idx
-    verts, norms, idx = _build_anatomical_palm(
-        pts_3d, size_px, base_idx,
-    )
-    all_verts.extend(verts)
-    all_norms.extend(norms)
-    all_indices.extend(idx)
-    base_idx += len(verts)
-
-    # Palm top ring (ultimo ring antes dos caps) começa em:
-    palm_top_ring_start = palm_base_idx + (PALM_RING_COUNT - 1) * PALM_RING_SEGMENTS
-
-    # Bridges palm↔fingers: triangulos conectando cada MCP ring (10 verts)
-    # com a arc correspondente da palm top ring (16 verts). Skip thumb
-    # — seu CMC ja e' absorvido pela thenar.
-    bridge_indices = _build_finger_palm_bridges(
-        all_verts,
-        finger_mcp_starts=finger_mcp_starts[1:],  # skip thumb
-        palm_top_ring_start=palm_top_ring_start,
-        finger_segments=FINGER_RING_SEGMENTS,
-        palm_segments=PALM_RING_SEGMENTS,
-    )
-    all_indices.extend(bridge_indices)
-
-    # Conversao final
-    vertices = np.array(all_verts, dtype=np.float32)
-    normals = np.array(all_norms, dtype=np.float32)
-    indices = np.array(all_indices, dtype=np.uint32)
-    return vertices, normals, indices
+    m = _empty_mesh() if posed is None else build_hand_mesh(posed)
+    return m.vertices, m.normals, m.indices

@@ -198,6 +198,43 @@ class OneEuroSmoother2D:
         self._fy.reset()
 
 
+class OneEuroSmoother3D:
+    """OneEuro em 3 eixos independentes (ex: landmark x, y, z).
+
+    `z_min_cutoff` permite filtrar a profundidade mais forte — o z do
+    MediaPipe e' bem mais ruidoso que x/y.
+    """
+
+    def __init__(
+        self,
+        freq: float = 60.0,
+        min_cutoff: float = 1.0,
+        beta: float = 0.007,
+        d_cutoff: float = 1.0,
+        z_min_cutoff: float | None = None,
+    ) -> None:
+        self._fx = _OneEuroAxis(freq, min_cutoff, beta, d_cutoff)
+        self._fy = _OneEuroAxis(freq, min_cutoff, beta, d_cutoff)
+        self._fz = _OneEuroAxis(
+            freq,
+            min_cutoff if z_min_cutoff is None else z_min_cutoff,
+            beta,
+            d_cutoff,
+        )
+
+    def __call__(
+        self, x: float, y: float, z: float, t: float | None = None,
+    ) -> Tuple[float, float, float]:
+        if t is None:
+            t = time.perf_counter()
+        return self._fx(x, t), self._fy(y, t), self._fz(z, t)
+
+    def reset(self) -> None:
+        self._fx.reset()
+        self._fy.reset()
+        self._fz.reset()
+
+
 # ---------------------------------------------------------------------
 # Factory
 # ---------------------------------------------------------------------

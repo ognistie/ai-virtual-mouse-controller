@@ -47,7 +47,34 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
   A amplificação com a mão perto da câmera foi mantida de propósito:
   reduzi-la deixaria 70–230 px sem alcance nas bordas.
 
+- **Holograma da mão no estilo das mãos de headset VR (Quest).** Mão 3D
+  lisa, azul-acinzentada, com luz suave, borda luminosa, antebraço que
+  some em fade e pontas do polegar/indicador que brilham conforme a pinça
+  fecha. Translucidez de camada única (depth pre-pass): dedo na frente da
+  palma não "soma" transparência. Estilos em `HOLOGRAM_STYLE`: `quest`
+  (padrão), `graphite`, `neon` (visual antigo).
+- **Mão 3D segue a pose real** (`core/hand_pose.py`): aspecto correto da
+  câmera (antes a mão saía achatada ~0,56× na horizontal num frame 16:9),
+  escala pela palma (fechar a mão não "infla" mais a mão virtual), a mão
+  translada 1:1 com o cursor e mexer os dedos não arrasta a mão inteira,
+  profundidade real de cada articulação (dedos curvados ficam atrás do
+  dorso, como na vista em primeira pessoa).
+- Mesh nova (`core/hand_mesh.py`): palma segue a linha real dos nós,
+  dedos nascem de dentro da palma, polegar sai da tenar, pontas
+  arredondadas terminando no landmark; ~2000 vértices em ~3 ms.
+- Holograma usa o OpenGL do próprio Qt (`core/hand_gl_renderer.py`) — a
+  dependência `moderngl` saiu. O fallback 2D (`core/hand_soft_renderer.py`)
+  desenha a mesma mão/paleta quando não há OpenGL 3.3.
+- `scripts/render_hand_preview.py`: renderiza a mão offscreen (PNG) com
+  poses sintéticas ou reais lado a lado com o frame da câmera.
+
 ### Fixed
+- Holograma **invisível** no Windows com Smart App Control: a política
+  bloqueava a DLL do `glcontext` (moderngl); a janela abria mas o contexto
+  OpenGL falhava e não havia fallback. Agora o OpenGL 3.3 é testado na
+  inicialização e, sem ele, o renderer 2D assume.
+- Testes `--gpu` do holograma voltaram a rodar (antes davam access
+  violation).
 - Webcam desconectada ou tomada por outro app no meio do uso: o app
   avisa no preview, solta qualquer botão do mouse que estivesse
   pressionado (drag) e reconecta sozinho quando a câmera volta. Antes

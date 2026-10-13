@@ -53,17 +53,15 @@ dependencies = [
     "mediapipe>=0.10.18",
     "pyautogui>=0.9.54,<1.0.0",
     "numpy>=1.26.0",
-    # v1.0.2: holograma vira default — usuario que roda
-    # `pip install ai-virtual-mouse-controller` ja consegue ativar via tecla H
-    # sem precisar do extra. Trade-off: +500MB no download.
-    "moderngl>=5.10.0",
+    # Holograma (tecla H) e painel de ajustes. O OpenGL do holograma e' o
+    # do proprio Qt — moderngl/glcontext sairam (a DLL do glcontext podia
+    # ser bloqueada pelo Smart App Control do Windows).
     "PySide6>=6.6.0",
 ]
 
 [project.optional-dependencies]
 # Mantido pra back-compat: quem ja usava `[hologram]` continua funcionando.
 hologram = [
-    "moderngl>=5.10.0",
     "PySide6>=6.6.0",
 ]
 # Tooling de desenvolvimento.
@@ -115,7 +113,7 @@ addopts = [
     "--strict-markers",
     "--strict-config",
 ]
-# Testes 'gpu' (overlay PySide6/ModernGL) precisam de display/driver real
+# Testes 'gpu' (overlay PySide6/OpenGL) precisam de display/driver real
 # e podem crashar em ambientes headless. Sao pulados por default; rodar
 # com `pytest --gpu` (flag definida em tests/conftest.py).
 markers = [
@@ -242,7 +240,7 @@ no_implicit_optional = true
 disallow_untyped_defs = false  # gradual: nao quebramos legacy
 disallow_incomplete_defs = false
 check_untyped_defs = true
-ignore_missing_imports = true  # mediapipe/pyautogui/moderngl sem stubs
+ignore_missing_imports = true  # mediapipe/pyautogui sem stubs
 exclude = [
     "docs/",
     "build/",

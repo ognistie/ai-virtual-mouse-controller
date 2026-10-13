@@ -551,25 +551,42 @@ parece magica; em uso prolongado pode distrair.
 HOLOGRAM_BACKEND: str = "auto"
 """Backend de renderizacao do holograma.
 
-- "auto"     : tenta GL primeiro; cai pra QPainter se driver falhar
-- "gl"       : forca ModernGL (mesh 3D + GLSL shader)
-- "qpainter" : forca pipeline 2D vetorial (compatibilidade/debug)
+- "auto"     : OpenGL 3D se houver OpenGL 3.3 (testado na inicializacao);
+               senao cai pro renderer 2D QPainter no mesmo estilo
+- "gl"       : forca OpenGL (mesh 3D + shader)
+- "qpainter" : forca o renderer 2D (compatibilidade/debug)
 
-ModernGL renderiza a mao como mesh 3D real (palm ellipsoide + finger
-capsules) com shader holografico (fresnel rim, depth fade, cyan
-volumetric). Requer driver OpenGL 3.3+. Em ambientes sem GPU/driver
-(RDP, VM sem aceleracao), usar "qpainter".
+O OpenGL e' o do proprio Qt (PySide6) — nao depende de moderngl/
+glcontext, cuja DLL o Smart App Control do Windows pode bloquear.
+Em ambientes sem GPU/driver (RDP, VM sem aceleracao) o "auto" ja cai
+pro QPainter sozinho.
+"""
+
+HOLOGRAM_STYLE: str = "quest"
+"""Aparencia da mao.
+
+- "quest"    : mao 3D estilo headset VR — azul-acinzentado claro, luz
+               suave, borda luminosa, antebraco em fade, pontas brilham
+               na pinca (default)
+- "graphite" : mesma mao, grafite translucido com contorno claro (fundos
+               claros)
+- "neon"     : visual antigo (silhueta neon + particulas, so 2D)
+
+Nos estilos 3D a mao segue a pose real: aspecto correto da camera,
+profundidade de cada articulacao e escala estavel pela palma (fechar a
+mao nao a "infla"). Ver core/hand_pose.py.
 """
 
 HOLOGRAM_TOGGLE_KEY: str = "h"
 """Tecla pra alternar o holograma em runtime."""
 
-HOLOGRAM_OPACITY: float = 0.70
-"""Opacidade base. Camadas (palm/finger outline, particles, tips) usam
-fracoes desse valor."""
+HOLOGRAM_OPACITY: float = 0.90
+"""Opacidade da mao. No estilo "quest" o corpo fica ~72% opaco (borda
+mais forte); no "neon" as camadas usam fracoes deste valor."""
 
 HOLOGRAM_HAND_SIZE_PX: int = 180
-"""Tamanho do bounding box da mao em pixels."""
+"""Tamanho da mao na tela (px): comprimento da mao aberta, do pulso a
+ponta do dedo medio. Nao muda com o gesto."""
 
 HOLOGRAM_FPS: int = 30
 """Taxa de redesenho. 30 Hz e' suave + economico em CPU."""

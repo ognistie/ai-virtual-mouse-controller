@@ -106,6 +106,7 @@ class VirtualMouseService:
         self._last_frame_t = time.perf_counter()
         self._camera_lost = False
         self._lost_frame: Optional[np.ndarray] = None
+        self._frame_shape: Optional[tuple] = None
         self._always_on_top: bool = getattr(config, "DISPLAY_ALWAYS_ON_TOP", True)
 
         # UI Overlay
@@ -169,7 +170,7 @@ class VirtualMouseService:
         try:
             self.hologram = HologramOverlay(
                 hand_size_px=getattr(config, "HOLOGRAM_HAND_SIZE_PX", 180),
-                opacity=getattr(config, "HOLOGRAM_OPACITY", 0.70),
+                opacity=getattr(config, "HOLOGRAM_OPACITY", 0.90),
                 target_fps=getattr(config, "HOLOGRAM_FPS", 30),
                 bone_color=getattr(config, "HOLOGRAM_COLOR_BONE", "#00d4ff"),
                 point_color=getattr(config, "HOLOGRAM_COLOR_POINT", "#e0f7ff"),
@@ -182,6 +183,10 @@ class VirtualMouseService:
                 ),
                 particle_count=getattr(
                     config, "HOLOGRAM_PARTICLE_COUNT", 180,
+                ),
+                style=getattr(config, "HOLOGRAM_STYLE", "quest"),
+                frame_aspect=(
+                    float(config.CAMERA_WIDTH) / float(config.CAMERA_HEIGHT)
                 ),
             )
             print(
@@ -500,6 +505,7 @@ class VirtualMouseService:
 
         self._frame_seq = seq
         self._last_frame_t = time.perf_counter()
+        self._sync_frame_aspect(frame)
         if self._camera_lost:
             self._camera_lost = False
             print("[AVM] Webcam de volta", flush=True)
@@ -624,6 +630,19 @@ class VirtualMouseService:
             # legado visivel — inertes no fluxo normal com painel Qt)
             self.ui.handle_key(key_masked)
         return False
+
+    def _sync_frame_aspect(self, frame: np.ndarray) -> None:
+        """A webcam pode entregar resolucao diferente da pedida: o
+        holograma precisa do aspecto REAL pra mao nao sair achatada."""
+        shape = frame.shape[:2]
+        if shape == self._frame_shape:
+            return
+        self._frame_shape = shape
+        if self.hologram is not None and shape[0] > 0:
+            try:
+                self.hologram.set_frame_aspect(shape[1] / shape[0])
+            except Exception as e:
+                logger.debug("set_frame_aspect falhou: %s", e)
 
     def _idle_tick(self) -> None:
         """Tick sem frame novo: mantem painel, holograma e teclado vivos.

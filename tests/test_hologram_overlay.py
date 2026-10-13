@@ -108,7 +108,7 @@ class TestDorsalView:
 
     def test_anchor_x_preserved(self):
         from core.hologram_overlay import HologramOverlay
-        h = HologramOverlay(view_dorsal=True)
+        h = HologramOverlay(view_dorsal=True, style="neon")
         try:
             if not h.available:
                 pytest.skip()
@@ -124,7 +124,7 @@ class TestDorsalView:
 
     def test_palm_mode_no_mirror(self):
         from core.hologram_overlay import HologramOverlay
-        h = HologramOverlay(view_dorsal=False)
+        h = HologramOverlay(view_dorsal=False, style="neon")
         try:
             if not h.available:
                 pytest.skip()
@@ -155,7 +155,7 @@ class TestBurstFiring:
     @pytest.mark.gpu
     def test_fire_burst_without_pose_uses_cursor(self):
         from core.hologram_overlay import HologramOverlay
-        h = HologramOverlay()
+        h = HologramOverlay(style="neon")
         try:
             if not h.available:
                 pytest.skip()

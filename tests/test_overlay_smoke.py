@@ -105,7 +105,8 @@ def test_paint_cycle_with_pose_runs():
     """Pump dispara repaints — verifica que rodam sem crashar."""
     from core.hologram_overlay import HologramOverlay
 
-    h = HologramOverlay(target_fps=120)
+    # Aneis de clique existem so no estilo legado "neon".
+    h = HologramOverlay(target_fps=120, style="neon")
     try:
         if not h.available:
             pytest.skip()
@@ -123,7 +124,8 @@ def test_burst_lifecycle_through_paint():
     """Bursts devem ser criados, animados e removidos via cleanup."""
     from core.hologram_overlay import HologramOverlay
 
-    h = HologramOverlay(target_fps=120)
+    # Aneis de clique existem so no estilo legado "neon".
+    h = HologramOverlay(target_fps=120, style="neon")
     try:
         if not h.available:
             pytest.skip()
