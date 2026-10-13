@@ -14,7 +14,7 @@ name = "ai-virtual-mouse-controller"
 version = "1.1.2"
 description = "Controle de cursor por gestos da mao via webcam, com holograma 3D opcional."
 readme = "README.md"
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Guilherme Moraes Franco" }]
 keywords = [
@@ -34,20 +34,22 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS :: MacOS X",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Multimedia :: Video :: Capture",
     "Topic :: Scientific/Engineering :: Image Recognition",
 ]
 dependencies = [
     "opencv-python>=4.10.0,<5.0.0",
-    # CRITICAL: mediapipe 0.10.30+ removeu mp.solutions.hands que esse
-    # projeto usa. Range 0.10.18..0.10.29 garante o modulo solutions
-    # presente. Quando migrarmos pro novo Task API podemos abrir esse range.
-    "mediapipe>=0.10.18,<0.10.30",
+    # Usamos a Tasks API (HandLandmarker), presente em todas as versoes
+    # >=0.10.18. Sem teto: 0.10.30+ tem wheels py3-none (qualquer Python 3),
+    # o que destrava 3.13/3.14; Mac Intel segue no 0.10.21 (Python <=3.12).
+    "mediapipe>=0.10.18",
     "pyautogui>=0.9.54,<1.0.0",
-    "numpy>=1.26.0,<2.2.0",
+    "numpy>=1.26.0",
     # v1.0.2: holograma vira default — usuario que roda
     # `pip install ai-virtual-mouse-controller` ja consegue ativar via tecla H
     # sem precisar do extra. Trade-off: +500MB no download.
@@ -90,6 +92,10 @@ py-modules = ["main", "config"]
 [tool.setuptools.packages.find]
 include = ["core*", "services*"]
 exclude = ["tests*", "scripts*", "docs*"]
+
+# Modelo do MediaPipe Hand Landmarker (core/hand_tracker.py) vai no pacote.
+[tool.setuptools.package-data]
+core = ["models/*.task"]
 
 # ============================================================================
 # Pytest
@@ -154,7 +160,7 @@ fail_under = 20
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py310"
 # IMPORTANTE: lint atual aplica regras estritas SO nos modulos puros
 # escritos como senior code (hand_anchor, finger_posture). Arquivos
 # legacy (god classes em refactor pendente) sao excluidos do lint pra
@@ -223,7 +229,7 @@ docstring-code-format = true
 # ============================================================================
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.10"
 warn_return_any = false
 warn_unused_configs = true
 warn_redundant_casts = true

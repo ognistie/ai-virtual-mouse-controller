@@ -7,6 +7,20 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Changed
+- **Suporte a Python 3.10 até 3.14** (antes: 3.11–3.13, e na prática só até
+  3.12). `requires-python` passa a ser `>=3.10`, sem teto.
+- Rastreamento da mão migrado de `mp.solutions.hands` (removido no
+  mediapipe 0.10.30) para a Tasks API (`HandLandmarker`). O modelo
+  `hand_landmarker.task` vai empacotado em `core/models/`. Pontos da mão,
+  lateralidade e dedos levantados conferidos contra a API antiga.
+- Dependências sem teto artificial: `mediapipe>=0.10.18`, `numpy>=1.26.0`.
+- CI roda os testes em Python 3.10–3.14 (Ubuntu) e 3.12/3.14 (Windows).
+
+### Deprecated
+- `MODEL_COMPLEXITY` em `config.py` não tem mais efeito: a Tasks API tem
+  um único modelo (equivalente ao antigo `1`).
+
 ## [1.1.2] — 2026-07-29
 
 ### Changed

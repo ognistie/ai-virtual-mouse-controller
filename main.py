@@ -23,11 +23,10 @@ import sys
 
 
 def _check_environment() -> None:
-    """Verifica versoes criticas ANTES de qualquer import do projeto.
+    """Verifica o mediapipe ANTES de qualquer import do projeto.
 
-    Mediapipe 0.11+ removeu mp.solutions.hands que esse projeto usa.
-    Se o usuario tem 0.11+ instalado globalmente, mostramos mensagem
-    clara com comando de fix em vez de AttributeError obscuro.
+    O projeto usa a Tasks API (HandLandmarker). Se o import falhar,
+    mostramos mensagem clara com comando de fix em vez de erro obscuro.
     """
     try:
         import mediapipe as mp
@@ -38,15 +37,16 @@ def _check_environment() -> None:
         )
         sys.exit(1)
 
-    if not hasattr(mp, "solutions") or not hasattr(mp.solutions, "hands"):
+    try:
+        from mediapipe.tasks.python.vision import HandLandmarker  # noqa: F401
+    except ImportError as e:
         version = getattr(mp, "__version__", "desconhecida")
         sys.stderr.write(
             "\n" + "=" * 70 + "\n"
-            f"ERRO: mediapipe {version} nao tem mp.solutions.hands.\n"
-            "Esse projeto requer mediapipe 0.10.18 a 0.10.21 — o modulo\n"
-            "'solutions' foi removido a partir da 0.10.30.\n\n"
+            f"ERRO: mediapipe {version} sem HandLandmarker ({e}).\n"
+            "Esse projeto requer mediapipe 0.10.18 ou mais novo.\n\n"
             "Solucao rapida (copia e cola no terminal):\n\n"
-            '  pip install "mediapipe>=0.10.18,<0.10.30" --force-reinstall\n\n'
+            '  pip install --upgrade "mediapipe>=0.10.18"\n\n'
             "Depois roda 'avmc' de novo.\n"
             + "=" * 70 + "\n\n"
         )

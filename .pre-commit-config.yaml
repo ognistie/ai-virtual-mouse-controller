@@ -24,6 +24,8 @@ repos:
       - id: check-merge-conflict
       - id: check-added-large-files
         args: [--maxkb=500]
+        # Modelo do MediaPipe (~7.8MB) e' empacotado de proposito.
+        exclude: ^core/models/.*\.task$
       - id: detect-private-key
       - id: mixed-line-ending
         args: [--fix=lf]

@@ -33,10 +33,10 @@ MAX_NUM_HANDS: int = 1
 MIN_DETECTION_CONFIDENCE: float = 0.6
 MIN_TRACKING_CONFIDENCE: float = 0.4
 MODEL_COMPLEXITY: int = 0
-"""0=lite, 1=full.
+"""Sem efeito desde a migracao pra Tasks API do MediaPipe.
 
-Lite reduz inference em ~40-50% vs full sem perda perceptivel no pinch.
-Volta pra 1 se notar drop na deteccao em iluminacao ruim ou mao longe.
+O HandLandmarker tem um unico modelo (equivalente ao antigo 1=full).
+Mantido so pra nao quebrar configs existentes.
 """
 
 INFERENCE_PRE_RESIZE_ENABLED: bool = False

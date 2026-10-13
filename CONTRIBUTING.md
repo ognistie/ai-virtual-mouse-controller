@@ -4,7 +4,7 @@ Valeu por querer ajudar — esse projeto fica melhor quando mais gente bota a m�
 
 ## Setup rápido
 
-Precisa de Python 3.11 ou 3.12 (mediapipe ainda não brincou bem com 3.13+).
+Precisa de Python 3.10 ou mais novo (a CI testa de 3.10 a 3.14).
 
 ```bash
 git clone https://github.com/ognistie/ai-virtual-mouse-controller.git

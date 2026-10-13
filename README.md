@@ -6,7 +6,7 @@
 
 [![CI](https://github.com/ognistie/ai-virtual-mouse-controller/actions/workflows/ci.yml/badge.svg)](https://github.com/ognistie/ai-virtual-mouse-controller/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/ai-virtual-mouse-controller?style=flat-square&color=22d3ee&label=pypi)](https://pypi.org/project/ai-virtual-mouse-controller/)
-[![Python](https://img.shields.io/badge/python-3.11_|_3.12-22d3ee?style=flat-square)](https://pypi.org/project/ai-virtual-mouse-controller/)
+[![Python](https://img.shields.io/badge/python-3.10_–_3.14-22d3ee?style=flat-square)](https://pypi.org/project/ai-virtual-mouse-controller/)
 [![License](https://img.shields.io/badge/license-MIT-22d3ee?style=flat-square)](LICENSE)
 
 Webcam → 21 landmarks → cursor do sistema. Sem hardware extra. Sem GPU.
@@ -42,13 +42,13 @@ O **AI Virtual Mouse Controller** é um mouse virtual com reconhecimento de gest
 
 100% local. Sem nuvem, sem telemetria, sem persistir nada da webcam.
 
-**Stack:** Python 3.11+ · OpenCV · MediaPipe · PyAutoGUI · NumPy · ModernGL/PySide6 (opcional)
+**Stack:** Python 3.10+ · OpenCV · MediaPipe · PyAutoGUI · NumPy · ModernGL/PySide6 (opcional)
 
 ---
 
 ## Instalar
 
-Requer **Python 3.11 ou 3.12** + webcam.
+Requer **Python 3.10 ou mais novo** (testado de 3.10 a 3.14) + webcam.
 
 ```bash
 pip install ai-virtual-mouse-controller
@@ -151,11 +151,11 @@ Ajustes em tempo de execução também ficam disponíveis no painel (tecla `S`) 
 | OS | Setup adicional |
 |---|---|
 | 🪟 **Windows 10/11** | Nada. Funciona out-of-the-box após `pip install`. |
-| 🍎 **macOS** | Após primeiro run, liberar **System Settings → Privacy & Security → Accessibility** (cursor) e **Camera** (webcam). Em Apple Silicon, se PyAutoGUI reclamar: `pip install pyobjc-core pyobjc`. |
-| 🐧 **Linux (X11)** | `sudo apt install scrot python3-tk python3-dev` (Ubuntu/Debian). PyAutoGUI precisa desses pra capturar a tela. |
+| 🍎 **macOS** | Mac Intel: use Python ≤ 3.12 (o MediaPipe novo só publica wheel pra Apple Silicon). Após primeiro run, liberar **System Settings → Privacy & Security → Accessibility** (cursor) e **Camera** (webcam). Em Apple Silicon, se PyAutoGUI reclamar: `pip install pyobjc-core pyobjc`. |
+| 🐧 **Linux (X11)** | `sudo apt install scrot python3-tk python3-dev libegl1` (Ubuntu/Debian). PyAutoGUI precisa dos três primeiros pra capturar a tela; o MediaPipe precisa do `libegl1`. |
 | 🐧 **Linux (Wayland)** | Suporte limitado de PyAutoGUI. Recomendado mudar pra sessão X11. |
 
-> **Mediapipe pin:** o projeto usa `mediapipe < 0.10.30`. Versões 0.10.30+ removeram o módulo `mp.solutions.hands` que sustenta o pipeline. O `pyproject.toml` já fixa o limite — não há nada manual pra fazer.
+> **MediaPipe:** o rastreamento usa a Tasks API (`HandLandmarker`), disponível em `mediapipe >= 0.10.18`. O modelo (`core/models/hand_landmarker.task`) vem dentro do pacote — roda offline, sem download extra.
 
 ---
 

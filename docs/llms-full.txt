@@ -21,7 +21,7 @@ O fluxo principal é: webcam → OpenCV → MediaPipe Hands → RobustHandAnchor
 
 ## Instalação e compatibilidade
 
-Requisitos: Python 3.11 a 3.13 e webcam. Instale com `pip install ai-virtual-mouse-controller` e execute com `avmc`. O projeto depende de `mediapipe>=0.10.18,<0.10.30`, pois versões posteriores removeram a API `mp.solutions.hands` usada pelo pipeline.
+Requisitos: Python 3.10 ou mais novo (testado até 3.14) e webcam. Instale com `pip install ai-virtual-mouse-controller` e execute com `avmc`. O projeto depende de `mediapipe>=0.10.18` e usa a Tasks API (`HandLandmarker`), com o modelo de mão incluído no pacote.
 
 Windows 10/11 funciona sem preparação adicional. No macOS, o usuário deve conceder permissões de Câmera e Acessibilidade. No Linux, X11 é recomendado; o suporte no Wayland é limitado pelo PyAutoGUI.
 

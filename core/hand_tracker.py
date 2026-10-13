@@ -2,7 +2,7 @@
 core.hand_tracker
 =================
 
-Wrapper sobre MediaPipe Hands.
+Wrapper sobre MediaPipe Hand Landmarker (Tasks API).
 
 Responsabilidades:
 - Encapsular configuracao do MediaPipe.
@@ -11,20 +11,37 @@ Responsabilidades:
   12=medio, 0=pulso) e para detectar dedos levantados.
 
 NAO acopla com OpenCV de captura — recebe apenas um array RGB.
+
+Por que Tasks API (e nao mp.solutions.hands)?
+- mp.solutions foi removido no mediapipe 0.10.30. As versoes antigas
+  (<=0.10.21) so tem wheels pra Python 3.9-3.12 e exigem numpy<2.
+- A partir da 0.10.30 os wheels sao `py3-none` (qualquer Python 3), entao
+  a Tasks API destrava Python 3.13, 3.14 e futuras.
+- A Tasks API existe desde a 0.10.0, entao o mesmo codigo roda tanto no
+  mediapipe antigo (ex: Mac Intel, que nao tem wheel novo) quanto no novo.
+
+O modelo (`models/hand_landmarker.task`, ~7.8MB) vai junto do pacote:
+roda offline, sem download no primeiro uso.
 """
 
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import List, Optional, Tuple
 
 import mediapipe as mp
 import numpy as np
+from mediapipe.tasks.python import BaseOptions
+from mediapipe.tasks.python import vision as mp_vision
 
 
 logger = logging.getLogger(__name__)
 
+
+MODEL_PATH = Path(__file__).resolve().parent / "models" / "hand_landmarker.task"
 
 # Indices uteis dos 21 landmarks do MediaPipe Hands
 LM_WRIST = 0
@@ -37,6 +54,31 @@ LM_PINKY_TIP = 20
 # Pontas e juntas para deteccao de "dedo levantado"
 FINGER_TIPS = (LM_INDEX_TIP, LM_MIDDLE_TIP, LM_RING_TIP, LM_PINKY_TIP)
 FINGER_PIPS = (6, 10, 14, 18)  # juntas intermediarias correspondentes
+
+# Conexoes do esqueleto (mesmas de mp.solutions.hands.HAND_CONNECTIONS),
+# agrupadas por dedo pra colorir o preview.
+_FINGER_CHAINS: Tuple[Tuple[int, ...], ...] = (
+    (0, 1, 2, 3, 4),      # polegar
+    (5, 6, 7, 8),         # indicador
+    (9, 10, 11, 12),      # medio
+    (13, 14, 15, 16),     # anelar
+    (17, 18, 19, 20),     # minimo
+)
+_PALM_CONNECTIONS: Tuple[Tuple[int, int], ...] = (
+    (0, 5), (5, 9), (9, 13), (13, 17), (0, 17),
+)
+# Cores BGR por dedo (proximas do estilo default do mediapipe).
+_FINGER_COLORS_BGR: Tuple[Tuple[int, int, int], ...] = (
+    (180, 229, 255),  # polegar
+    (128, 64, 128),   # indicador
+    (0, 204, 255),    # medio
+    (48, 255, 48),    # anelar
+    (192, 101, 21),   # minimo
+)
+_PALM_COLOR_BGR = (128, 128, 128)
+_JOINT_COLOR_BGR = (48, 48, 255)
+
+_SWAP_HANDEDNESS = {"Left": "Right", "Right": "Left"}
 
 
 @dataclass(frozen=True)
@@ -102,13 +144,16 @@ class HandLandmarks:
 
 class HandTracker:
     """
-    Wrapper sobre MediaPipe Hands.
+    Wrapper sobre MediaPipe Hand Landmarker (modo VIDEO, com tracking
+    entre frames).
 
     Args:
         max_num_hands: Quantas maos detectar.
         min_detection_confidence: Threshold inicial.
         min_tracking_confidence: Threshold para manter tracking.
-        model_complexity: 0 (lite) ou 1 (full).
+        model_complexity: Mantido por compatibilidade com config.py. A
+            Tasks API tem um unico modelo, entao o valor e' ignorado.
+        model_path: Caminho do `.task`. Default = modelo empacotado.
 
     Examples:
         >>> tracker = HandTracker()
@@ -123,21 +168,40 @@ class HandTracker:
         min_detection_confidence: float = 0.7,
         min_tracking_confidence: float = 0.6,
         model_complexity: int = 1,
+        model_path: Optional[Path] = None,
     ) -> None:
-        self._mp_hands = mp.solutions.hands
-        self._hands = self._mp_hands.Hands(
-            static_image_mode=False,
-            max_num_hands=max_num_hands,
-            min_detection_confidence=min_detection_confidence,
+        path = Path(model_path) if model_path is not None else MODEL_PATH
+        # Carrega por buffer (bytes) em vez de caminho: o loader nativo do
+        # mediapipe pode falhar no Windows com acento no path (C:\Users\Joao).
+        model_bytes = path.read_bytes()
+        options = mp_vision.HandLandmarkerOptions(
+            base_options=BaseOptions(model_asset_buffer=model_bytes),
+            running_mode=mp_vision.RunningMode.VIDEO,
+            num_hands=max_num_hands,
+            min_hand_detection_confidence=min_detection_confidence,
+            min_hand_presence_confidence=min_tracking_confidence,
             min_tracking_confidence=min_tracking_confidence,
-            model_complexity=model_complexity,
         )
-        self._mp_drawing = mp.solutions.drawing_utils
-        self._mp_styles = mp.solutions.drawing_styles
+        self._landmarker = mp_vision.HandLandmarker.create_from_options(options)
+        # VIDEO mode exige timestamps estritamente crescentes (ms).
+        self._t0 = time.monotonic()
+        self._last_ts_ms = -1
         logger.info(
-            "HandTracker inicializado (max_hands=%d, complexity=%d)",
-            max_num_hands, model_complexity,
+            "HandTracker inicializado (max_hands=%d, model=%s)",
+            max_num_hands, path.name,
         )
+        if model_complexity != 1:
+            logger.debug(
+                "model_complexity=%d ignorado: Tasks API usa modelo unico",
+                model_complexity,
+            )
+
+    def _next_timestamp_ms(self) -> int:
+        ts = int((time.monotonic() - self._t0) * 1000)
+        if ts <= self._last_ts_ms:
+            ts = self._last_ts_ms + 1
+        self._last_ts_ms = ts
+        return ts
 
     def process(self, frame_rgb: np.ndarray) -> List[HandLandmarks]:
         """
@@ -149,77 +213,40 @@ class HandTracker:
         Returns:
             Lista de HandLandmarks (vazia se nada detectado).
         """
-        results = self._hands.process(frame_rgb)
-        if not results.multi_hand_landmarks:
-            return []
-
-        hands: List[HandLandmarks] = []
-        handedness_list = results.multi_handedness or []
-
-        for i, hand_lms in enumerate(results.multi_hand_landmarks):
-            # Handedness e score
-            handedness = "Right"
-            score = 0.0
-            if i < len(handedness_list):
-                cl = handedness_list[i].classification[0]
-                handedness = cl.label
-                score = float(cl.score)
-
-            landmarks_tuple = tuple(
-                (float(lm.x), float(lm.y), float(lm.z)) for lm in hand_lms.landmark
-            )
-            hands.append(
-                HandLandmarks(
-                    landmarks=landmarks_tuple,
-                    handedness=handedness,
-                    score=score,
-                )
-            )
-
-        return hands
-
-    def draw(self, frame_bgr: np.ndarray, hands_raw_results=None) -> None:
-        """
-        Desenha landmarks no frame BGR (in-place).
-
-        Para usar isto, recomenda-se chamar `process_with_raw` para
-        manter o resultado MediaPipe original; alternativa abaixo.
-        """
-        # Passamos por process_with_raw em camadas superiores para nao
-        # reprocessar; aqui mantemos signature simples por ora.
-        if hands_raw_results and hands_raw_results.multi_hand_landmarks:
-            for hand_lms in hands_raw_results.multi_hand_landmarks:
-                self._mp_drawing.draw_landmarks(
-                    frame_bgr,
-                    hand_lms,
-                    self._mp_hands.HAND_CONNECTIONS,
-                    self._mp_styles.get_default_hand_landmarks_style(),
-                    self._mp_styles.get_default_hand_connections_style(),
-                )
+        image = mp.Image(
+            image_format=mp.ImageFormat.SRGB,
+            data=np.ascontiguousarray(frame_rgb),
+        )
+        result = self._landmarker.detect_for_video(image, self._next_timestamp_ms())
+        return self._result_to_hands(result)
 
     def process_with_raw(self, frame_rgb: np.ndarray):
         """
-        Versao que retorna (lista_HandLandmarks, raw_results) para quem
-        precisa desenhar via MediaPipe drawing utils.
+        Versao que retorna (lista_HandLandmarks, raw) para quem precisa
+        desenhar o esqueleto. `raw` e' a propria lista, aceita por `draw`.
         """
-        results = self._hands.process(frame_rgb)
-        hands = self._results_to_hands(results)
-        return hands, results
+        hands = self.process(frame_rgb)
+        return hands, hands
 
-    def _results_to_hands(self, results) -> List[HandLandmarks]:
-        if not results.multi_hand_landmarks:
+    @staticmethod
+    def _result_to_hands(result) -> List[HandLandmarks]:
+        if not result.hand_landmarks:
             return []
         out: List[HandLandmarks] = []
-        handedness_list = results.multi_handedness or []
-        for i, hand_lms in enumerate(results.multi_hand_landmarks):
+        handedness_list = result.handedness or []
+        for i, hand_lms in enumerate(result.hand_landmarks):
             handedness = "Right"
             score = 0.0
-            if i < len(handedness_list):
-                cl = handedness_list[i].classification[0]
-                handedness = cl.label
-                score = float(cl.score)
+            if i < len(handedness_list) and handedness_list[i]:
+                cat = handedness_list[i][0]
+                label = cat.category_name or cat.display_name or ""
+                # mp.solutions assumia imagem espelhada (selfie) e a Tasks
+                # API nao: o rotulo vem trocado. Destroca pra manter a
+                # convencao que fingers_up() sempre usou.
+                handedness = _SWAP_HANDEDNESS.get(label, handedness)
+                score = float(cat.score)
             landmarks_tuple = tuple(
-                (float(lm.x), float(lm.y), float(lm.z)) for lm in hand_lms.landmark
+                (float(lm.x), float(lm.y), float(lm.z)) for lm in hand_lms
             )
             out.append(
                 HandLandmarks(
@@ -230,9 +257,26 @@ class HandTracker:
             )
         return out
 
+    def draw(self, frame_bgr: np.ndarray, hands: Optional[List[HandLandmarks]] = None) -> None:
+        """Desenha o esqueleto das maos no frame BGR (in-place)."""
+        if not hands:
+            return
+        import cv2
+
+        h, w = frame_bgr.shape[:2]
+        for hand in hands:
+            pts = [(int(x * w), int(y * h)) for x, y, _z in hand.landmarks]
+            for a, b in _PALM_CONNECTIONS:
+                cv2.line(frame_bgr, pts[a], pts[b], _PALM_COLOR_BGR, 2, cv2.LINE_AA)
+            for chain, color in zip(_FINGER_CHAINS, _FINGER_COLORS_BGR):
+                for a, b in zip(chain, chain[1:]):
+                    cv2.line(frame_bgr, pts[a], pts[b], color, 2, cv2.LINE_AA)
+            for p in pts:
+                cv2.circle(frame_bgr, p, 3, _JOINT_COLOR_BGR, -1, cv2.LINE_AA)
+
     def close(self) -> None:
         """Libera recursos do MediaPipe."""
         try:
-            self._hands.close()
+            self._landmarker.close()
         except Exception as e:
             logger.warning("Erro ao fechar MediaPipe: %s", e)

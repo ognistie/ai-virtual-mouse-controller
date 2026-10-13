@@ -135,7 +135,7 @@
         e começar a controlar o computador com a mão.
       </p>
       <div class="docs-meta">
-        <span>Python 3.11, 3.12 ou 3.13</span>
+        <span>Python 3.10 ou mais novo</span>
         <span>Windows · macOS · Linux X11</span>
         <span>Tempo estimado: 10–15 min</span>
       </div>
@@ -209,8 +209,8 @@ avmc</code></pre>
             </article>
             <article class="requirement-card">
               <span>Runtime</span>
-              <h3>Python 3.11, 3.12 ou 3.13</h3>
-              <p>O projeto aceita Python abaixo da versão 3.14.</p>
+              <h3>Python 3.10 ou mais novo</h3>
+              <p>Testado do Python 3.10 ao 3.14.</p>
             </article>
             <article class="requirement-card">
               <span>Entrada</span>
@@ -220,8 +220,8 @@ avmc</code></pre>
           </div>
 
           <div class="doc-callout">
-            <strong>MediaPipe:</strong> o projeto fixa uma versão compatível abaixo
-            de 0.10.30. Não é necessário instalar essa dependência manualmente.
+            <strong>MediaPipe:</strong> instalado automaticamente junto com o projeto,
+            com o modelo de mão incluso. Não é necessário instalar nada manualmente.
           </div>
         </section>
 
@@ -320,7 +320,7 @@ avmc</code></pre>
                     <span>ubuntu / debian · X11</span>
                     <button type="button" data-copy-target="linux-install">Copiar</button>
                   </div>
-                  <pre id="linux-install"><code>sudo apt install scrot python3-tk python3-dev
+                  <pre id="linux-install"><code>sudo apt install scrot python3-tk python3-dev libegl1
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install ai-virtual-mouse-controller
@@ -535,7 +535,7 @@ avmc</code></pre>
                     <span>terminal</span>
                     <button type="button" data-copy-target="repair-deps">Copiar</button>
                   </div>
-                  <pre id="repair-deps"><code>pip install --force-reinstall "mediapipe>=0.10.18,<0.10.30"</code></pre>
+                  <pre id="repair-deps"><code>pip install --upgrade --force-reinstall "mediapipe>=0.10.18"</code></pre>
                 </div>
               </div>
             </details>

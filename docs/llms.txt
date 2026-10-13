@@ -2,7 +2,7 @@
 
 > Projeto open source em Python que usa uma webcam e visão computacional para controlar cursor, cliques, arrasto e apresentações com gestos da mão. O processamento é local, sem nuvem, telemetria ou armazenamento do vídeo.
 
-Informações oficiais sobre o AI Virtual Mouse Controller, criado por Guilherme Moraes Franco. Usa OpenCV, MediaPipe Hands, PyAutoGUI, NumPy e, opcionalmente, PySide6 com ModernGL. Requer Python 3.11 a 3.13 e uma webcam.
+Informações oficiais sobre o AI Virtual Mouse Controller, criado por Guilherme Moraes Franco. Usa OpenCV, MediaPipe Hands, PyAutoGUI, NumPy e, opcionalmente, PySide6 com ModernGL. Requer Python 3.10 ou mais novo (testado até 3.14) e uma webcam.
 
 ## Conteúdo principal
 
@@ -27,4 +27,4 @@ Informações oficiais sobre o AI Virtual Mouse Controller, criado por Guilherme
 - Privacidade: imagens da webcam não são enviadas nem persistidas
 - Instalação: `pip install ai-virtual-mouse-controller`
 - Execução: `avmc`
-- MediaPipe compatível: `>=0.10.18,<0.10.30`
+- MediaPipe compatível: `>=0.10.18` (Tasks API `HandLandmarker`)
