@@ -29,7 +29,8 @@ API publica:
     on_slider_change(key, value)   value 0-1
     on_profile_change(profile)
     on_toggle(key, value)          key in {"aim", "sticky",
-                                            "presentation", "hologram"}
+                                            "presentation", "hologram",
+                                            "two_hands"}
     on_reset()
     on_apply_recommended()
 """
@@ -229,6 +230,9 @@ if _PYSIDE_OK:
             self._hologram_switch = self._make_toggle(
                 col, "Modo holograma", "hologram",
             )
+            self._two_hands_switch = self._make_toggle(
+                col, "Modo duas mãos", "two_hands",
+            )
 
             col.addWidget(self._divider())
 
@@ -306,6 +310,7 @@ if _PYSIDE_OK:
             profile: str,
             presentation: bool = False,
             hologram: bool = False,
+            two_hands: bool = False,
         ) -> None:
             for key, s in self._sliders.items():
                 s.blockSignals(True)
@@ -318,6 +323,7 @@ if _PYSIDE_OK:
             self._sticky_switch.set_on(sticky)
             self._presentation_switch.set_on(presentation)
             self._hologram_switch.set_on(hologram)
+            self._two_hands_switch.set_on(two_hands)
 
         def set_slider_display(self, key: str, text: str) -> None:
             if key in self._slider_vals:
@@ -589,12 +595,13 @@ class SettingsPanel:
         profile: str,
         presentation: bool = False,
         hologram: bool = False,
+        two_hands: bool = False,
     ) -> None:
         """Popula o painel com o estado atual do RuntimeSettings."""
         if self._panel is not None:
             self._panel.apply_snapshot(
                 sliders, displays, aim, sticky, profile,
-                presentation, hologram,
+                presentation, hologram, two_hands,
             )
 
     def set_slider_display(self, key: str, text: str) -> None:

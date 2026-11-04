@@ -171,28 +171,13 @@ class HandTracker:
         model_path: Optional[Path] = None,
     ) -> None:
         path = Path(model_path) if model_path is not None else MODEL_PATH
-        # Carrega por buffer (bytes) em vez de caminho: o loader nativo do
-        # mediapipe pode falhar no Windows com acento no path (C:\Users\Joao).
-        model_bytes = path.read_bytes()
-        options = mp_vision.HandLandmarkerOptions(
-            base_options=BaseOptions(model_asset_buffer=model_bytes),
-            running_mode=mp_vision.RunningMode.VIDEO,
-            num_hands=max_num_hands,
-            min_hand_detection_confidence=min_detection_confidence,
-            min_hand_presence_confidence=min_tracking_confidence,
-            min_tracking_confidence=min_tracking_confidence,
-        )
-        try:
-            self._landmarker = mp_vision.HandLandmarker.create_from_options(options)
-        except OSError as e:
-            # mediapipe 0.10.30+ carrega a lib nativa via ctypes; no Linux ela
-            # depende do libEGL, ausente em instalacoes minimas.
-            if "libEGL" in str(e) or "libGLES" in str(e):
-                raise RuntimeError(
-                    f"{e}\nO MediaPipe precisa do libEGL. No Ubuntu/Debian: "
-                    "sudo apt install libegl1 libgles2"
-                ) from e
-            raise
+        # Em memoria: recriar o rastreamento nao relê o arquivo do disco.
+        self._model_bytes = path.read_bytes()
+        self._model_name = path.name
+        self._min_detection_confidence = min_detection_confidence
+        self._min_tracking_confidence = min_tracking_confidence
+        self._max_num_hands = max_num_hands
+        self._landmarker = self._create_landmarker(max_num_hands)
         # VIDEO mode exige timestamps estritamente crescentes (ms).
         self._t0 = time.monotonic()
         self._last_ts_ms = -1
@@ -205,6 +190,52 @@ class HandTracker:
                 "model_complexity=%d ignorado: Tasks API usa modelo unico",
                 model_complexity,
             )
+
+    def _create_landmarker(self, max_num_hands: int):
+        # Carrega por buffer (bytes) em vez de caminho: o loader nativo do
+        # mediapipe pode falhar no Windows com acento no path (C:\Users\Joao).
+        options = mp_vision.HandLandmarkerOptions(
+            base_options=BaseOptions(model_asset_buffer=self._model_bytes),
+            running_mode=mp_vision.RunningMode.VIDEO,
+            num_hands=max_num_hands,
+            min_hand_detection_confidence=self._min_detection_confidence,
+            min_hand_presence_confidence=self._min_tracking_confidence,
+            min_tracking_confidence=self._min_tracking_confidence,
+        )
+        try:
+            return mp_vision.HandLandmarker.create_from_options(options)
+        except OSError as e:
+            # mediapipe 0.10.30+ carrega a lib nativa via ctypes; no Linux ela
+            # depende do libEGL, ausente em instalacoes minimas.
+            if "libEGL" in str(e) or "libGLES" in str(e):
+                raise RuntimeError(
+                    f"{e}\nO MediaPipe precisa do libEGL. No Ubuntu/Debian: "
+                    "sudo apt install libegl1 libgles2"
+                ) from e
+            raise
+
+    def set_max_hands(self, max_num_hands: int) -> None:
+        """Recria o landmarker com outro `num_hands` (fixado na criacao).
+
+        Com 2, o detector de palma roda em todo frame enquanto nao houver
+        duas maos em cena: so ligar quando o modo duas maos pedir. Se a
+        criacao falhar, levanta e o landmarker atual continua valendo.
+        """
+        if max_num_hands == self._max_num_hands:
+            return
+        new = self._create_landmarker(max_num_hands)
+        old = self._landmarker
+        self._landmarker = new
+        self._max_num_hands = max_num_hands
+        old.close()
+        logger.info("HandTracker: max_hands=%d", max_num_hands)
+
+    def reset_tracking(self) -> None:
+        """Esquece o que esta seguindo: o proximo frame procura mao do zero."""
+        new = self._create_landmarker(self._max_num_hands)
+        old = self._landmarker
+        self._landmarker = new
+        old.close()
 
     def _next_timestamp_ms(self) -> int:
         ts = int((time.monotonic() - self._t0) * 1000)

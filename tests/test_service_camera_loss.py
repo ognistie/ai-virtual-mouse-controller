@@ -6,6 +6,7 @@ colaboradores que o caminho ocioso usa.
 
 from __future__ import annotations
 
+import threading
 from unittest.mock import MagicMock
 
 from services.virtual_mouse_service import VirtualMouseService
@@ -18,6 +19,10 @@ def _service(stalled: bool, silent_for: float = 0.0) -> VirtualMouseService:
     svc.camera = MagicMock()
     svc.camera.read_new.return_value = (None, 7)
     svc.camera.is_stalled = stalled
+    svc._two_hands = None
+    svc._vision_lock = threading.RLock()
+    svc._hand_gate = MagicMock()
+    svc._two_hands_mode = False
     svc.cursor = MagicMock()
     svc.gesture_detector = MagicMock()
     svc.smoother = MagicMock()

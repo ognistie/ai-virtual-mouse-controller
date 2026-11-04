@@ -30,6 +30,7 @@ CAMERA_FPS_TARGET: int = 60
 # ---------------------------------------------------------------------
 
 MAX_NUM_HANDS: int = 1
+"""Maos detectadas fora do modo duas maos (ver TWO_HANDS_ENABLED)."""
 MIN_DETECTION_CONFIDENCE: float = 0.6
 MIN_TRACKING_CONFIDENCE: float = 0.4
 MODEL_COMPLEXITY: int = 0
@@ -38,6 +39,31 @@ MODEL_COMPLEXITY: int = 0
 O HandLandmarker tem um unico modelo (equivalente ao antigo 1=full).
 Mantido so pra nao quebrar configs existentes.
 """
+
+VISION_THREAD_ENABLED: bool = True
+"""Roda camera -> MediaPipe -> gestos -> cursor em thread propria.
+
+Preview e holograma nao atrasam mais o cursor: sem isso, com o holograma
+ligado, o loop caia de 29 para 16 quadros por segundo e metade dos cliques do
+video de teste se perdia (ver scripts/eval_latency.py)."""
+
+POWER_THROTTLING_OFF: bool = True
+"""Windows: tira este processo da economia de energia. Sem foco, ele ia pros
+nucleos economicos e a inferencia ficava mais lenta."""
+
+OPENCV_SINGLE_THREAD: bool = True
+"""OpenCV com 1 thread: nao disputa nucleo com o MediaPipe. O que ele faz aqui
+(converter cor, desenhar o preview) nao precisa de mais."""
+
+PREVIEW_MAX_FPS: float = 30.0
+"""Limite do preview da camera. O cursor nao depende dele. 0 = sem limite."""
+
+TRACKING_RECOVERY_ENABLED: bool = True
+"""Com uma mao so: se o que o MediaPipe segue fica parado, ele volta a procurar
+mao. Sem isso ele podia grudar em algo que nao e' mao e nao ver a real."""
+
+HAND_CONFIRM_FRAMES: int = 2
+"""Frames seguidos que uma mao nova precisa aparecer antes de agir."""
 
 INFERENCE_PRE_RESIZE_ENABLED: bool = False
 """Redimensiona o frame BGR antes de enviar pro MediaPipe.
@@ -630,6 +656,19 @@ PERF_TELEMETRY_WINDOW: int = 120
 
 PERF_TELEMETRY_REPORT_EVERY: int = 120
 """Logar report a cada N ticks (= 2s a 60 FPS)."""
+
+# ---------------------------------------------------------------------
+# MODO DUAS MAOS
+# ---------------------------------------------------------------------
+# As duas maos aparecem no holograma e executam os mesmos gestos. O sistema
+# tem um cursor so: ele segue a mao dona, a outra clica no proprio ponteiro
+# e so uma arrasta por vez (ver core/two_hands.py). Toggle via tecla B ou
+# painel S; exclusivo com o modo apresentacao. Desligado nao custa nada.
+
+TWO_HANDS_ENABLED: bool = False
+"""Comeca com o modo ligado."""
+
+TWO_HANDS_TOGGLE_KEY: str = "b"
 
 # ---------------------------------------------------------------------
 # MODO APRESENTACAO

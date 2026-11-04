@@ -43,7 +43,7 @@ from typing import List, Optional, Sequence, Tuple
 
 from .click_burst import BurstManager
 from .hand_gl_renderer import STYLE_PRESETS
-from .hand_pose import HandPoseSolver, PosedHand
+from .hand_pose import HandPoseSlots
 from .hand_renderer import compute_hand_primitives, get_particle_cloud
 from .hand_soft_renderer import SoftHandRenderer
 from .smoothing import OneEuroSmoother2D
@@ -183,11 +183,8 @@ class HologramOverlay:
         self._style_name = (style or "quest").lower()
         self._legacy = self._style_name == "neon"
         hand_style = STYLE_PRESETS.get(self._style_name, STYLE_PRESETS["quest"])
-        self._solver = HandPoseSolver(
-            hand_size_px=hand_size_px, frame_aspect=frame_aspect,
-        )
+        self._slots = HandPoseSlots(hand_size_px, frame_aspect)
         self._soft = SoftHandRenderer(style=hand_style, opacity=opacity)
-        self._posed: Optional[PosedHand] = None
 
         # Nuvem densa de particles — cached, gerada 1x.
         self._particles_enabled = bool(particles_enabled)
@@ -390,8 +387,8 @@ class HologramOverlay:
             self._gl_backend.update_pose(landmarks, screen_x, screen_y)
             return
         if not self._legacy:
-            self._posed = self._solver.solve(landmarks, screen_x, screen_y)
-            self._pose_visible = self._posed is not None
+            self._slots.update([(landmarks, screen_x, screen_y)])
+            self._pose_visible = self._slots.any_visible
             self._pose_x = screen_x
             self._pose_y = screen_y
             return
@@ -416,6 +413,25 @@ class HologramOverlay:
         self._pose_visible = True
         self._pose_x = screen_x
         self._pose_y = screen_y
+
+    def update_poses(
+        self,
+        poses: Sequence[Optional[Tuple]],
+        primary: int = 0,
+    ) -> None:
+        """Modo duas maos: uma entrada por mao, (landmarks, x, y) ou None.
+
+        `primary` e' a mao dona: a unica desenhada no estilo "neon" legado.
+        """
+        if self._gl_backend is not None:
+            self._gl_backend.update_poses(poses)
+            return
+        if self._legacy:
+            pose = poses[primary] if primary < len(poses) else None
+            self.update_pose(*(pose if pose is not None else (None, 0.0, 0.0)))
+            return
+        self._slots.update(poses)
+        self._pose_visible = self._slots.any_visible
 
     def _smooth_landmarks(
         self,
@@ -450,7 +466,7 @@ class HologramOverlay:
         if self._gl_backend is not None:
             self._gl_backend.set_frame_aspect(aspect)
             return
-        self._solver.set_frame_aspect(aspect)
+        self._slots.set_frame_aspect(aspect)
 
     def update_cursor(self, screen_x: float, screen_y: float) -> None:
         # Delega pra GL backend se ativo
@@ -544,9 +560,11 @@ class HologramOverlay:
             self._anim_t = t
 
             if not self._legacy:
-                if self._posed is not None:
-                    self._soft.paint(painter, self._posed)
-                    pinch = self._posed.pinch_point
+                for posed in self._slots.posed:
+                    if posed is None:
+                        continue
+                    self._soft.paint(painter, posed)
+                    pinch = posed.pinch_point
                     self._latest_pinch_left = pinch
                     self._latest_pinch_right = pinch
                     self._latest_pinch_double = pinch

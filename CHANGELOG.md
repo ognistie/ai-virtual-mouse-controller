@@ -7,6 +7,36 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Added
+- **Modo duas mãos** (tecla `B` ou painel), exclusivo com o modo
+  apresentação e desligado por padrão. As duas mãos aparecem no holograma
+  e executam os mesmos gestos. O sistema tem um cursor só: ele segue a mão
+  dona, a outra clica no próprio ponteiro e o cursor volta no mesmo tick,
+  e só uma mão arrasta por vez. Desligado, o caminho é o de uma mão e o
+  rastreador detecta uma só.
+- **Escolha da câmera sem editar arquivo:** `avmc --list-cameras` lista as
+  câmeras e `avmc --camera N` usa a escolhida e a lembra nas próximas vezes.
+  Se ela não abrir, o app usa a câmera padrão.
+
+### Changed
+- **Reconhecimento e cursor não dependem mais da tela.** Câmera, MediaPipe,
+  gestos e cursor rodam em thread própria (`VISION_THREAD_ENABLED`); preview e
+  holograma não atrasam mais o cursor. `scripts/eval_latency.py` mede o tempo
+  da câmera até o cursor.
+- **Inferência mais estável no Windows 11:** o app sai da economia de energia
+  (só o próprio processo, enquanto roda) e o OpenCV usa um thread, sem disputar
+  núcleo com o MediaPipe.
+- **Dedos do holograma mais fiéis à mão real:** menos atraso nos gestos, sem
+  mudar o visual.
+
+### Fixed
+- **Reconhecimento que parava do nada:** com uma mão só, o MediaPipe podia
+  grudar em algo parado que não é mão (até o rosto) e não via mais a mão real.
+  Agora ele volta a procurar quando o que segue não se mexe por 1 s.
+- A mão 3D não pisca mais em falhas curtas do reconhecimento.
+- Modo duas mãos: "segunda mão" fantasma sobre os dedos da mão real é ignorada,
+  e detecções de poucos quadros não agem.
+
 ## [1.3.0] — 2026-10-13
 
 ### Changed

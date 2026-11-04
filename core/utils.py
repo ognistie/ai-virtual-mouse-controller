@@ -13,6 +13,7 @@ Funcoes utilitarias puras (sem efeitos colaterais).
 from __future__ import annotations
 
 import math
+import sys
 import time
 from collections import deque
 from typing import Tuple
@@ -87,6 +88,41 @@ def clamp(value: float, low: float, high: float) -> float:
 # ---------------------------------------------------------------------
 # FPS
 # ---------------------------------------------------------------------
+
+def disable_power_throttling() -> bool:
+    """Windows 11: tira ESTE processo da economia de energia (EcoQoS).
+
+    A janela do app quase nunca tem o foco, e o Windows joga processo sem foco
+    nos nucleos economicos: a inferencia ficava ~30% mais lenta. Nao mexe em
+    configuracao do sistema e vale so enquanto o app roda. False se nao deu.
+    """
+    if sys.platform != "win32":
+        return False
+    try:
+        import ctypes
+
+        class _ThrottlingState(ctypes.Structure):
+            _fields_ = [
+                ("Version", ctypes.c_ulong),
+                ("ControlMask", ctypes.c_ulong),
+                ("StateMask", ctypes.c_ulong),
+            ]
+
+        process_power_throttling = 4
+        execution_speed = 1
+        state = _ThrottlingState(1, execution_speed, 0)
+        kernel32 = ctypes.windll.kernel32
+        kernel32.GetCurrentProcess.restype = ctypes.c_void_p
+        kernel32.SetProcessInformation.argtypes = [
+            ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_ulong,
+        ]
+        return bool(kernel32.SetProcessInformation(
+            kernel32.GetCurrentProcess(), process_power_throttling,
+            ctypes.byref(state), ctypes.sizeof(state),
+        ))
+    except Exception:
+        return False
+
 
 class FPSCounter:
     """

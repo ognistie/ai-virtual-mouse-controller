@@ -71,6 +71,7 @@ Posicione a mão a ~50cm da câmera. Atalhos em runtime:
 | Tecla | Ação |
 |---|---|
 | `H` | liga/desliga o holograma 3D |
+| `B` | liga/desliga o modo duas mãos |
 | `S` | abre/fecha o painel de configurações |
 | `T` | alterna janela sempre-no-topo |
 | `ESC` | sai |
@@ -154,7 +155,7 @@ Toda a calibração vive em [`config.py`](config.py) — constantes nomeadas com
 
 | Seção | O que controla |
 |---|---|
-| `CAMERA` | índice da câmera, resolução, FPS alvo |
+| `CAMERA` | índice padrão da câmera, resolução, FPS alvo (escolha sem editar: `avmc --list-cameras` e `avmc --camera N`) |
 | `PROFILE` | perfil inicial do painel: `smooth`, `precise`, `responsive`, `stable` |
 | `CURSOR_ANCHOR` | qual ponto da mão o cursor segue (`-2` = âncora robusta, default) |
 | `PINCH` | thresholds de detecção de clique (escala adaptativa por tamanho da mão + histerese pra soltar) |
@@ -162,6 +163,7 @@ Toda a calibração vive em [`config.py`](config.py) — constantes nomeadas com
 | `SCREEN_MARGIN_*` | margens assimétricas (top/bottom < lateral) pra alcançar cantos |
 | `CURSOR_FOLLOWTHROUGH_*` | cinematic prediction quando a mão sai do FOV |
 | `HOLOGRAM` | estilo (`quest`, `graphite`, `neon`), backend (OpenGL/QPainter), tamanho, opacidade, FPS |
+| `TWO_HANDS` | modo duas mãos ao iniciar e tecla de atalho |
 
 Ajustes em tempo de execução também ficam disponíveis no painel (tecla `S`) — perfis prontos: *smooth*, *precise*, *responsive*, *stable*.
 

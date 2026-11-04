@@ -132,6 +132,9 @@ class CursorController:
         self._last_x: Optional[int] = None
         self._last_y: Optional[int] = None
         self._dragging = False
+        # False = so calcula o ponteiro desta mao, sem mover o cursor do
+        # sistema (modo duas maos: quem move e' a mao dona).
+        self.drives_os_cursor: bool = True
 
         # Estado do freeze (timestamp futuro ate o qual ignoramos move).
         self._frozen_until: float = 0.0
@@ -227,14 +230,24 @@ class CursorController:
                abs(y - self._last_y) < self.dead_zone:
                 return
 
-        try:
-            pyautogui.moveTo(x, y, _pause=False)
-        except Exception as e:
-            logger.warning("Falha ao mover cursor: %s", e)
-            return
+        if self.drives_os_cursor:
+            try:
+                pyautogui.moveTo(x, y, _pause=False)
+            except Exception as e:
+                logger.warning("Falha ao mover cursor: %s", e)
+                return
 
         self._last_x = x
         self._last_y = y
+
+    def sync_os_cursor(self) -> None:
+        """Leva o cursor do sistema ate o ponteiro atual desta mao."""
+        if self._last_x is None or self._last_y is None:
+            return
+        try:
+            pyautogui.moveTo(self._last_x, self._last_y, _pause=False)
+        except Exception as e:
+            logger.warning("Falha ao mover cursor: %s", e)
 
     def _apply_bottom_reach(self, y: int) -> int:
         """Fecha o gap terminal acima da taskbar.

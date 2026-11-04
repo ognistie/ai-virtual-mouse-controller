@@ -91,6 +91,53 @@ def _ema_alpha(dt: float, tau: float) -> float:
     return 1.0 - math.exp(-max(0.0, dt) / tau)
 
 
+class HandPoseSlots:
+    """Um HandPoseSolver por mao; a segunda so existe quando for usada.
+
+    `versions[i]` muda a cada pose nova: quem desenha sabe quando refazer
+    a malha daquela mao.
+    """
+
+    def __init__(self, hand_size_px: float, frame_aspect: float) -> None:
+        self._hand_size_px = hand_size_px
+        self._frame_aspect = frame_aspect
+        self._solvers: List[HandPoseSolver] = []
+        self.posed: List[Optional[PosedHand]] = []
+        self.versions: List[int] = []
+        self._grow(1)
+
+    def _grow(self, count: int) -> None:
+        while len(self._solvers) < count:
+            self._solvers.append(HandPoseSolver(
+                hand_size_px=self._hand_size_px, frame_aspect=self._frame_aspect,
+            ))
+            self.posed.append(None)
+            self.versions.append(0)
+
+    def update(self, poses: Sequence[Optional[Tuple]]) -> None:
+        """poses[i] = (landmarks, cursor_x, cursor_y) ou None (sem mao)."""
+        self._grow(len(poses))
+        for i, solver in enumerate(self._solvers):
+            pose = poses[i] if i < len(poses) else None
+            self.posed[i] = None if pose is None else solver.solve(*pose)
+            if self.posed[i] is None:
+                solver.reset()
+            else:
+                self.versions[i] += 1
+
+    def clear(self) -> None:
+        self.update(())
+
+    def set_frame_aspect(self, aspect: float) -> None:
+        self._frame_aspect = aspect
+        for solver in self._solvers:
+            solver.set_frame_aspect(aspect)
+
+    @property
+    def any_visible(self) -> bool:
+        return any(p is not None for p in self.posed)
+
+
 class HandPoseSolver:
     """Stateful: suavizacao e escala dependem do historico. Um por mao.
 
@@ -108,9 +155,9 @@ class HandPoseSolver:
         *,
         hand_size_px: float = 180.0,
         frame_aspect: float = 16.0 / 9.0,
-        min_cutoff: float = 1.2,
-        beta: float = 2.0,
-        z_min_cutoff: float = 0.6,
+        min_cutoff: float = 0.8,
+        beta: float = 30.0,
+        z_min_cutoff: float = 0.8,
         scale_tau_s: float = 0.4,
         offset_tau_s: float = 0.5,
     ) -> None:

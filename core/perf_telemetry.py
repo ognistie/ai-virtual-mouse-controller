@@ -27,6 +27,7 @@ from __future__ import annotations
 import logging
 import time
 from collections import defaultdict, deque
+import threading
 from contextlib import contextmanager
 from typing import Deque, Dict, Optional
 
@@ -38,7 +39,8 @@ class TickProfiler:
     """
     Agregador de timing por estagio. Rolling window com p50/p99.
 
-    Thread-safe? Nao. Usar do thread do main loop.
+    Thread-safe: a visao e a UI rodam em threads separadas e registram no
+    mesmo profiler.
     """
 
     def __init__(
@@ -58,6 +60,7 @@ class TickProfiler:
         )
         self._tick_count = 0
         self._enabled = True
+        self._lock = threading.Lock()
 
     @property
     def enabled(self) -> bool:
@@ -83,7 +86,8 @@ class TickProfiler:
             yield
         finally:
             dt_ms = (time.perf_counter() - start) * 1000.0
-            self._stages[name].append(dt_ms)
+            with self._lock:
+                self._stages[name].append(dt_ms)
 
     def tick(self) -> None:
         """Marca fim de um frame. Reports periodicos sao disparados aqui."""
@@ -99,7 +103,9 @@ class TickProfiler:
         do window atual. Util pra inspecao programatica.
         """
         out: Dict[str, Dict[str, float]] = {}
-        for name, samples in self._stages.items():
+        with self._lock:
+            copies = {name: list(samples) for name, samples in self._stages.items()}
+        for name, samples in copies.items():
             if not samples:
                 continue
             sorted_s = sorted(samples)
@@ -111,7 +117,8 @@ class TickProfiler:
 
     def reset(self) -> None:
         """Limpa todas as samples e zera tick counter."""
-        self._stages.clear()
+        with self._lock:
+            self._stages.clear()
         self._tick_count = 0
 
     @property

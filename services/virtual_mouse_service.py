@@ -17,28 +17,57 @@ from __future__ import annotations
 import logging
 import signal
 import sys
+import threading
 import time
-from typing import Optional
+from dataclasses import dataclass
+from typing import List, Optional
 
 import cv2
 import numpy as np
 
 import config
-from core.camera import ThreadedCamera
+from core.camera import CameraOpenError, ThreadedCamera
 from core.cursor_controller import CursorController
 from core.gesture_detector import Gesture, GestureDetector
-from core.hand_tracker import HandTracker
+from core.hand_arbiter import LEFT, RIGHT
+from core.hand_gate import HandGate, StaleTrackWatchdog
+from core.hand_tracker import HandLandmarks, HandTracker
 from core.hologram_overlay import HologramOverlay
 from core.perf_telemetry import configure as configure_perf, get_profiler
 from core.presentation_controller import PresentationController
 from core.runtime_settings import RuntimeSettings
 from core.settings_panel import SettingsPanel
 from core.smoothing import make_smoother
+from core.two_hands import HandChannel, TwoHandsController
 from core.ui_overlay import UICallbacks, UIOverlay
-from core.utils import FPSCounter
+from core.utils import FPSCounter, disable_power_throttling
 
 
 logger = logging.getLogger(__name__)
+
+
+def _open_camera(camera: ThreadedCamera, default_index: int) -> None:
+    """Abre a webcam escolhida; se ela nao abrir (ex.: USB desconectada),
+    usa a camera padrao em vez de nao iniciar."""
+    try:
+        camera.open()
+    except CameraOpenError:
+        if camera.index == default_index:
+            raise
+        logger.warning(
+            "Camera %d nao abriu; usando a camera %d", camera.index, default_index,
+        )
+        camera.index = default_index
+        camera.open()
+
+
+@dataclass
+class _VisionResult:
+    """Saida de um frame processado, pra UI desenhar."""
+
+    frame: np.ndarray
+    hand: Optional[HandLandmarks]
+    hands: List[HandLandmarks]
 
 
 # ===================================================================
@@ -100,6 +129,24 @@ class VirtualMouseService:
 
         self._fps = FPSCounter(window=30)
         self._should_stop = False
+        preview_fps = float(getattr(config, "PREVIEW_MAX_FPS", 30.0))
+        self._preview_interval = 1.0 / preview_fps if preview_fps > 0.0 else 0.0
+        self._preview_shown_t = 0.0
+        # Visao (camera -> MediaPipe -> gestos -> cursor) separada da UI.
+        # O lock protege o rastreador e os gestos de quem troca de modo.
+        self._vision_lock = threading.RLock()
+        self._vision_failed = False
+        self._latest_cond = threading.Condition()
+        self._latest: Optional[_VisionResult] = None
+        self._hand_gate = HandGate(
+            confirm_frames=getattr(config, "HAND_CONFIRM_FRAMES", 2),
+        )
+        self._track_watchdog: Optional[StaleTrackWatchdog] = (
+            StaleTrackWatchdog()
+            if getattr(config, "TRACKING_RECOVERY_ENABLED", True) else None
+        )
+        # Ultima mao vista: a mao 3D e o preview nao piscam em falha curta.
+        self._last_hand: Optional[HandLandmarks] = None
         self._hand_lost_frames = 0
         # Controle de frames novos da webcam (ver _tick / _idle_tick).
         self._frame_seq = 0
@@ -159,6 +206,14 @@ class VirtualMouseService:
                 config, "PRESENTATION_EXTENSION_THRESHOLD", 0.80
             ),
         )
+
+        # Modo duas maos. O segundo canal so existe depois da primeira
+        # ativacao: desligado, o caminho e' o de uma mao.
+        self._two_hands_mode: bool = False
+        self._two_hands: Optional[TwoHandsController] = None
+        self._two_hands_toggle_key: str = (
+            getattr(config, "TWO_HANDS_TOGGLE_KEY", "b") or "b"
+        ).lower()
 
         # Hologram overlay (mao virtual desenhada sobre o desktop).
         # Falha silenciosamente se a plataforma nao suportar - o resto do
@@ -225,19 +280,23 @@ class VirtualMouseService:
                 logger.warning("Falha ao iniciar SettingsPanel: %s", e)
                 self.settings_panel = None
 
+        if getattr(config, "TWO_HANDS_ENABLED", False):
+            self._set_two_hands_mode(True)
+
     # -----------------------------------------------------------------
     # Factory (todas as chamadas verificadas contra core/)
     # -----------------------------------------------------------------
 
     @classmethod
-    def from_config(cls) -> "VirtualMouseService":
+    def from_config(cls, camera_index: Optional[int] = None) -> "VirtualMouseService":
         # 1. Runtime settings (perfil inicial)
         initial_profile = getattr(config, "PROFILE", "smooth")
         runtime = RuntimeSettings(initial_profile=initial_profile)
 
         # 2. Camera (API real: fps, .open())
+        default_index = config.CAMERA_INDEX
         camera = ThreadedCamera(
-            index=config.CAMERA_INDEX,
+            index=default_index if camera_index is None else camera_index,
             width=config.CAMERA_WIDTH,
             height=config.CAMERA_HEIGHT,
             fps=config.CAMERA_FPS_TARGET,
@@ -254,8 +313,34 @@ class VirtualMouseService:
         # 4. Gesture detector — usa valores do runtime
         gesture_detector = cls._build_detector(runtime)
 
-        # 5. Cursor — margens assimetricas (X != Y) com fallback isotropico
-        cursor = CursorController(
+        # 5. Cursor e suavizacao
+        cursor = cls._build_cursor(runtime)
+        smoother = cls._build_smoother(runtime)
+
+        # Camera abre por ultimo: se algo antes falhar, nao fica webcam
+        # presa (luz acesa) com o processo saindo por erro.
+        try:
+            _open_camera(camera, default_index)
+            return cls(
+                camera=camera,
+                tracker=tracker,
+                gesture_detector=gesture_detector,
+                cursor=cursor,
+                smoother=smoother,
+                runtime_settings=runtime,
+                enable_preview=config.ENABLE_PREVIEW,
+                draw_landmarks=config.DRAW_LANDMARKS,
+                window_name=config.WINDOW_NAME,
+            )
+        except BaseException:
+            camera.close()
+            tracker.close()
+            raise
+
+    @staticmethod
+    def _build_cursor(runtime: RuntimeSettings) -> CursorController:
+        """Margens assimetricas (X != Y) com fallback isotropico."""
+        return CursorController(
             screen_margin_percentage=config.SCREEN_MARGIN_PERCENTAGE,
             screen_margin_x=getattr(config, "SCREEN_MARGIN_X", None),
             screen_margin_top=getattr(config, "SCREEN_MARGIN_TOP", None),
@@ -306,8 +391,10 @@ class VirtualMouseService:
             ),
         )
 
-        # 6. Smoother (API real: kwargs alpha, freq, min_cutoff, beta, d_cutoff)
-        smoother = make_smoother(
+    @staticmethod
+    def _build_smoother(runtime: RuntimeSettings):
+        """API real: kwargs alpha, freq, min_cutoff, beta, d_cutoff."""
+        return make_smoother(
             config.SMOOTHING_STRATEGY,
             alpha=config.SMOOTHING_FACTOR,
             freq=config.ONE_EURO_FREQ,
@@ -315,26 +402,6 @@ class VirtualMouseService:
             beta=runtime.get("one_euro_beta"),
             d_cutoff=config.ONE_EURO_D_CUTOFF,
         )
-
-        # Camera abre por ultimo: se algo antes falhar, nao fica webcam
-        # presa (luz acesa) com o processo saindo por erro.
-        try:
-            camera.open()
-            return cls(
-                camera=camera,
-                tracker=tracker,
-                gesture_detector=gesture_detector,
-                cursor=cursor,
-                smoother=smoother,
-                runtime_settings=runtime,
-                enable_preview=config.ENABLE_PREVIEW,
-                draw_landmarks=config.DRAW_LANDMARKS,
-                window_name=config.WINDOW_NAME,
-            )
-        except BaseException:
-            camera.close()
-            tracker.close()
-            raise
 
     @staticmethod
     def _build_detector(runtime: RuntimeSettings) -> GestureDetector:
@@ -413,18 +480,36 @@ class VirtualMouseService:
                 )
             self._apply_always_on_top()
 
+        if getattr(config, "POWER_THROTTLING_OFF", True) and disable_power_throttling():
+            logger.info("Economia de energia do Windows desligada pra este app")
+        if getattr(config, "OPENCV_SINGLE_THREAD", True):
+            cv2.setNumThreads(1)
+
         self._last_frame_t = time.perf_counter()
+        worker: Optional[threading.Thread] = None
+        if getattr(config, "VISION_THREAD_ENABLED", True):
+            worker = threading.Thread(
+                target=self._vision_loop, name="VisionThread", daemon=True,
+            )
+            worker.start()
         try:
             while not self._should_stop:
-                self._tick()
+                if worker is not None:
+                    self._ui_tick()
+                else:
+                    self._tick()
         except KeyboardInterrupt:
             pass
         except Exception:
             logger.exception("Erro no loop principal")
             return 1
         finally:
+            # Espera a visao parar antes de fechar o rastreador que ela usa.
+            self._should_stop = True
+            if worker is not None:
+                worker.join(timeout=2.0)
             self._cleanup()
-        return 0
+        return 1 if self._vision_failed else 0
 
     def stop(self) -> None:
         self._should_stop = True
@@ -488,24 +573,59 @@ class VirtualMouseService:
     # bombeia UI + teclado). ~60 Hz mantem painel/holograma fluidos sem
     # reprocessar frames repetidos da webcam.
     _FRAME_WAIT_S = 1.0 / 60.0
+    _VISION_WAIT_S = 0.05
+    # Falha curta do MediaPipe nao apaga a mao 3D (mesma janela em que o
+    # detector ainda segura o cursor).
+    _DISPLAY_HOLD_FRAMES = 5
     # Sem frame novo por mais que isso = camera perdida (mesmo se o
     # driver nao reportar erro).
     _CAMERA_LOST_AFTER_S = 2.0
 
     def _tick(self) -> None:
+        """Visao e UI em sequencia (VISION_THREAD_ENABLED = False)."""
+        result = self._vision_step(self._FRAME_WAIT_S)
+        if result is None:
+            self._idle_tick()
+        else:
+            self._ui_step(result)
+
+    def _vision_loop(self) -> None:
+        """Thread da visao: cada frame novo vira gesto e cursor na hora."""
+        try:
+            while not self._should_stop:
+                result = self._vision_step(self._VISION_WAIT_S)
+                if result is not None:
+                    with self._latest_cond:
+                        self._latest = result
+                        self._latest_cond.notify_all()
+        except Exception:
+            logger.exception("Erro na thread de visao")
+            self._vision_failed = True
+            self._should_stop = True
+
+    def _ui_tick(self) -> None:
+        """Thread principal: desenha o resultado mais novo, pulando os velhos."""
+        with self._latest_cond:
+            if self._latest is None:
+                self._latest_cond.wait(self._FRAME_WAIT_S)
+            result, self._latest = self._latest, None
+        if result is None:
+            self._idle_tick()
+        else:
+            self._ui_step(result)
+
+    def _vision_step(self, timeout: float) -> Optional[_VisionResult]:
         prof = self._perf
         with prof.stage("camera"):
             # Inclui a espera pelo proximo frame da webcam.
             frame, seq = self.camera.read_new(
-                self._frame_seq, timeout=self._FRAME_WAIT_S, mirror=True,
+                self._frame_seq, timeout=timeout, mirror=True,
             )
         if frame is None:
-            self._idle_tick()
-            return
+            return None
 
         self._frame_seq = seq
         self._last_frame_t = time.perf_counter()
-        self._sync_frame_aspect(frame)
         if self._camera_lost:
             self._camera_lost = False
             print("[AVM] Webcam de volta", flush=True)
@@ -513,7 +633,61 @@ class VirtualMouseService:
 
         self._fps.tick()
 
-        with prof.stage("inference"):
+        with self._vision_lock:
+            hands = self._detect_hands(frame)
+            two = self._active_two_hands()
+            if two is not None:
+                hand = self._tick_two_hands(two, hands)
+            else:
+                hand = hands[0] if hands else None
+
+                if hand is None:
+                    self._hand_lost_frames += 1
+                    if self._hand_lost_frames == 5:
+                        self.smoother.reset()
+                else:
+                    self._hand_lost_frames = 0
+
+                # Modos sao mutuamente exclusivos — detector de mouse e
+                # apresentacao nunca rodam juntos no mesmo frame.
+                if self._presentation_mode:
+                    with prof.stage("gesture"):
+                        slide_event = self._presentation.update(hand)
+                    with prof.stage("events"):
+                        self._handle_slide_event(slide_event)
+                else:
+                    with prof.stage("gesture"):
+                        events = self.gesture_detector.update(hand)
+                    with prof.stage("events"):
+                        self._handle_events(events, hand)
+
+                self._recover_stale_tracking(hands)
+
+                if hand is not None:
+                    self._last_hand = hand
+                elif (
+                    self._hand_lost_frames <= self._DISPLAY_HOLD_FRAMES
+                    and self._last_hand is not None
+                ):
+                    hand = self._last_hand
+        return _VisionResult(frame, hand, hands)
+
+    def _recover_stale_tracking(self, hands: List[HandLandmarks]) -> None:
+        """Rastreamento preso em algo parado: volta a procurar mao."""
+        dog = self._track_watchdog
+        if dog is None:
+            return
+        busy = self.gesture_detector.is_gesture_held() or self.cursor.is_dragging
+        if dog.update(hands, busy, time.perf_counter()):
+            try:
+                self.tracker.reset_tracking()
+                logger.debug("Rastreamento reiniciado (nada se mexeu)")
+            except Exception as e:
+                logger.warning("Falha ao reiniciar o rastreamento: %s", e)
+
+    def _detect_hands(self, frame: np.ndarray) -> List[HandLandmarks]:
+        """MediaPipe + filtro do que nao e' mao (ver core/hand_gate.py)."""
+        with self._perf.stage("inference"):
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             # Pre-resize opt-in: corta memcpy + acelera mediapipe.
             # Landmarks voltam normalizados (0-1) entao escala = mesma.
@@ -524,28 +698,13 @@ class VirtualMouseService:
                     th = int(h * tw / w)
                     rgb = cv2.resize(rgb, (tw, th),
                                      interpolation=cv2.INTER_AREA)
-            hands, raw_results = self.tracker.process_with_raw(rgb)
-        hand = hands[0] if hands else None
+            hands, _ = self.tracker.process_with_raw(rgb)
+            return self._hand_gate.filter(hands)
 
-        if hand is None:
-            self._hand_lost_frames += 1
-            if self._hand_lost_frames == 5:
-                self.smoother.reset()
-        else:
-            self._hand_lost_frames = 0
-
-        # Modos sao mutuamente exclusivos — detector de mouse e
-        # apresentacao nunca rodam juntos no mesmo frame.
-        if self._presentation_mode:
-            with prof.stage("gesture"):
-                slide_event = self._presentation.update(hand)
-            with prof.stage("events"):
-                self._handle_slide_event(slide_event)
-        else:
-            with prof.stage("gesture"):
-                events = self.gesture_detector.update(hand)
-            with prof.stage("events"):
-                self._handle_events(events, hand)
+    def _ui_step(self, result: _VisionResult) -> None:
+        prof = self._perf
+        frame, hand = result.frame, result.hand
+        self._sync_frame_aspect(frame)
 
         with prof.stage("hologram"):
             self._update_hologram(hand)
@@ -553,18 +712,34 @@ class VirtualMouseService:
         # Painel Qt: drena eventos (handle + animacoes). Barato quando
         # nada mudou; None-safe quando indisponivel.
         if self.settings_panel is not None:
-            self.settings_panel.pump()
+            with prof.stage("panel"):
+                self.settings_panel.pump()
 
         if self.enable_preview:
-            with prof.stage("preview"):
-                self._draw_overlays(frame, hand, raw_results)
-                cv2.imshow(self.window_name, frame)
+            now = time.perf_counter()
+            if now - self._preview_shown_t >= self._preview_interval:
+                self._preview_shown_t = now
+                with prof.stage("preview"):
+                    self._draw_overlays(frame, hand, result.hands)
+                    cv2.imshow(self.window_name, frame)
             with prof.stage("waitkey"):
                 key = self._read_key()
             if self._handle_key(key, hand):
                 return
 
         prof.tick()
+
+    def _active_two_hands(self) -> Optional[TwoHandsController]:
+        return self._two_hands if self._two_hands_mode else None
+
+    def _tick_two_hands(self, two: TwoHandsController, hands):
+        """Roda os dois canais; devolve a mao dona (usada pelo preview)."""
+        prof = self._perf
+        with prof.stage("gesture"):
+            results = two.update(hands)
+        with prof.stage("events"):
+            two.apply(results)
+        return two.owner.hand
 
     def _read_key(self) -> int:
         return cv2.pollKey() if self._use_pollkey else cv2.waitKeyEx(1)
@@ -601,6 +776,10 @@ class VirtualMouseService:
             pkey = self._presentation_toggle_key
             if key_masked in (ord(pkey), ord(pkey.upper())):
                 self._set_presentation_mode(not self._presentation_mode)
+                return True
+            tkey = self._two_hands_toggle_key
+            if key_masked in (ord(tkey), ord(tkey.upper())):
+                self._set_two_hands_mode(not self._two_hands_mode)
                 return True
             hkey = self._hologram_toggle_key
             if key_masked in (ord(hkey), ord(hkey.upper())):
@@ -675,10 +854,14 @@ class VirtualMouseService:
         print(f"[AVM] {msg}", flush=True)
         logger.warning(msg)
         # Nunca deixar o botao do mouse preso num drag sem camera.
-        self.cursor.force_release()
-        self.gesture_detector.reset()
-        self.smoother.reset()
-        self._presentation.reset()
+        with self._vision_lock:
+            self.cursor.force_release()
+            self.gesture_detector.reset()
+            self.smoother.reset()
+            self._presentation.reset()
+            self._hand_gate.reset()
+            if self._two_hands is not None:
+                self._two_hands.reset()
 
     def _camera_lost_frame(self) -> np.ndarray:
         if self._lost_frame is None:
@@ -718,7 +901,9 @@ class VirtualMouseService:
         if h.enabled:
             # Prefere posicao real do controller; fallback pyautogui pra
             # desenhar idle ring antes da primeira deteccao de mao.
-            sx, sy = self.cursor.last_position
+            two = self._active_two_hands()
+            cursor = two.owner.cursor if two is not None else self.cursor
+            sx, sy = cursor.last_position
             if sx is None or sy is None:
                 try:
                     import pyautogui
@@ -728,7 +913,10 @@ class VirtualMouseService:
                     sx = self.cursor.screen_width // 2
                     sy = self.cursor.screen_height // 2
             h.update_cursor(sx, sy)
-            h.update_pose(hand.landmarks if hand is not None else None, sx, sy)
+            if two is not None:
+                h.update_poses(two.poses(), two.owner_index)
+            else:
+                h.update_pose(hand.landmarks if hand is not None else None, sx, sy)
 
         h.pump()
 
@@ -814,22 +1002,22 @@ class VirtualMouseService:
         """Aplica setting individual no detector/smoother/cursor sem
         restart.
         """
-        d = self.gesture_detector
-
-        if key == "dpi_fixed_multiplier":
-            d.dpi_fixed = value
-        elif key == "aim_assist_slowdown_factor":
-            d.aim_assist_slowdown_factor = value
-        elif key == "one_euro_min_cutoff":
+        if key == "one_euro_min_cutoff":
             self._apply_smoothing_change("min_cutoff", value)
         elif key == "one_euro_beta":
             self._apply_smoothing_change("beta", value)
-        elif key == "pinch_distance_threshold":
-            d.pinch_threshold = value
-        elif key == "sticky_friction_factor":
-            d.sticky_friction_factor = value
-        elif key == "anchor_freeze_duration_ms":
-            self.cursor.click_freeze_seconds = max(0.0, value / 1000.0)
+
+        for d, _, cursor in self._pipelines():
+            if key == "dpi_fixed_multiplier":
+                d.dpi_fixed = value
+            elif key == "aim_assist_slowdown_factor":
+                d.aim_assist_slowdown_factor = value
+            elif key == "pinch_distance_threshold":
+                d.pinch_threshold = value
+            elif key == "sticky_friction_factor":
+                d.sticky_friction_factor = value
+            elif key == "anchor_freeze_duration_ms":
+                cursor.click_freeze_seconds = max(0.0, value / 1000.0)
 
     def _apply_smoothing_change(self, attr: str, value: float) -> None:
         """Atualiza OneEuroSmoother2D ao vivo.
@@ -837,12 +1025,20 @@ class VirtualMouseService:
         OneEuroSmoother2D usa atributos internos _fx e _fy (nao _x/_y).
         Cada um e um _OneEuroAxis com .min_cutoff e .beta como campos.
         """
-        sm = self.smoother
-        if hasattr(sm, "_fx") and hasattr(sm._fx, attr):
-            setattr(sm._fx, attr, value)
-        if hasattr(sm, "_fy") and hasattr(sm._fy, attr):
-            setattr(sm._fy, attr, value)
+        for _, sm, _ in self._pipelines():
+            if hasattr(sm, "_fx") and hasattr(sm._fx, attr):
+                setattr(sm._fx, attr, value)
+            if hasattr(sm, "_fy") and hasattr(sm._fy, attr):
+                setattr(sm._fy, attr, value)
         # EMA: nao tem esses atributos — ignora
+
+    def _pipelines(self):
+        """(detector, suavizador, cursor) de cada mao ja criada."""
+        out = [(self.gesture_detector, self.smoother, self.cursor)]
+        if self._two_hands is not None:
+            left = self._two_hands.left
+            out.append((left.detector, left.smoother, left.cursor))
+        return out
 
     def _on_profile_change(self, profile: str) -> None:
         logger.info("PROFILE -> %s", profile)
@@ -853,12 +1049,16 @@ class VirtualMouseService:
     def _on_toggle(self, key: str, value: bool) -> None:
         if key == "aim":
             self.runtime_settings.set_aim_enabled(value)
-            self.gesture_detector.aim_assist_enabled = value
+            for d, _, _ in self._pipelines():
+                d.aim_assist_enabled = value
         elif key == "sticky":
             self.runtime_settings.set_sticky_enabled(value)
-            self.gesture_detector.sticky_targeting_enabled = value
+            for d, _, _ in self._pipelines():
+                d.sticky_targeting_enabled = value
         elif key == "presentation":
             self._set_presentation_mode(value)
+        elif key == "two_hands":
+            self._set_two_hands_mode(value)
         elif key == "hologram":
             self._set_hologram_enabled(value)
         logger.info("TOGGLE %s = %s", key, value)
@@ -877,10 +1077,13 @@ class VirtualMouseService:
 
     def _set_presentation_mode(self, active: bool) -> None:
         """Liga/desliga modo apresentacao e sincroniza UI + estado interno."""
-        self._presentation_mode = active
-        self._presentation.reset()
-        if active:
-            self.cursor.force_release()
+        with self._vision_lock:
+            if active and self._two_hands_mode:
+                self._set_two_hands_mode(False)
+            self._presentation_mode = active
+            self._presentation.reset()
+            if active:
+                self.cursor.force_release()
         self.ui.set_presentation_active(active)
         msg = (
             f"PRESENTATION_MODE = {active} | "
@@ -892,6 +1095,52 @@ class VirtualMouseService:
         # Reflete no painel Qt o estado atual (util quando alternado pela
         # tecla Z, nao pelo proprio painel).
         self._sync_settings_panel()
+
+    def _set_two_hands_mode(self, active: bool) -> None:
+        """Liga/desliga o modo duas maos. Recria o rastreador (o `num_hands`
+        e' fixo na criacao); se falhar ao ligar, segue com uma mao."""
+        active = bool(active)
+        if active == self._two_hands_mode:
+            self._sync_settings_panel()
+            return
+        if active and self._presentation_mode:
+            self._set_presentation_mode(False)
+        with self._vision_lock:
+            try:
+                self.tracker.set_max_hands(2 if active else config.MAX_NUM_HANDS)
+            except Exception as e:
+                msg = f"Modo duas maos: falha ao recriar o rastreador ({e})"
+                print(f"[AVM] {msg}", flush=True)
+                logger.warning(msg)
+                if active:
+                    self._sync_settings_panel()
+                    return
+            if active and self._two_hands is None:
+                self._two_hands = self._build_two_hands()
+            if self._two_hands is not None:
+                self._two_hands.reset()
+            self._hand_gate.reset()
+            self._two_hands_mode = active
+        msg = f"TWO_HANDS_MODE = {active}"
+        print(f"[AVM] {msg}", flush=True)
+        logger.info(msg)
+        self._sync_settings_panel()
+
+    def _build_two_hands(self) -> TwoHandsController:
+        """A direita reaproveita os objetos atuais; a esquerda nasce com os
+        ajustes vigentes (o runtime ja reflete o painel)."""
+        runtime = self.runtime_settings
+        return TwoHandsController(
+            right=HandChannel(
+                RIGHT, self.gesture_detector, self.smoother, self.cursor,
+            ),
+            left=HandChannel(
+                LEFT,
+                self._build_detector(runtime),
+                self._build_smoother(runtime),
+                self._build_cursor(runtime),
+            ),
+        )
 
     def _on_reset(self) -> None:
         logger.info("RESET profile")
@@ -911,18 +1160,17 @@ class VirtualMouseService:
 
     def _sync_detector_from_settings(self) -> None:
         s = self.runtime_settings
-        d = self.gesture_detector
 
-        d.dpi_fixed = s.get("dpi_fixed_multiplier")
-        d.aim_assist_slowdown_factor = s.get("aim_assist_slowdown_factor")
-        d.pinch_threshold = s.get("pinch_distance_threshold")
-        d.sticky_friction_factor = s.get("sticky_friction_factor")
-        d.aim_assist_enabled = s.aim_enabled
-        d.sticky_targeting_enabled = s.sticky_enabled
-
-        self.cursor.click_freeze_seconds = max(
-            0.0, s.get("anchor_freeze_duration_ms") / 1000.0,
-        )
+        for d, _, cursor in self._pipelines():
+            d.dpi_fixed = s.get("dpi_fixed_multiplier")
+            d.aim_assist_slowdown_factor = s.get("aim_assist_slowdown_factor")
+            d.pinch_threshold = s.get("pinch_distance_threshold")
+            d.sticky_friction_factor = s.get("sticky_friction_factor")
+            d.aim_assist_enabled = s.aim_enabled
+            d.sticky_targeting_enabled = s.sticky_enabled
+            cursor.click_freeze_seconds = max(
+                0.0, s.get("anchor_freeze_duration_ms") / 1000.0,
+            )
 
         self._apply_smoothing_change("min_cutoff", s.get("one_euro_min_cutoff"))
         self._apply_smoothing_change("beta", s.get("one_euro_beta"))
@@ -957,7 +1205,8 @@ class VirtualMouseService:
             and self.hologram.enabled
         )
         panel.sync(sliders, displays, s.aim_enabled, s.sticky_enabled,
-                   s.current_profile, self._presentation_mode, hologram_on)
+                   s.current_profile, self._presentation_mode, hologram_on,
+                   self._two_hands_mode)
 
     # -----------------------------------------------------------------
     # Overlay rendering
@@ -971,7 +1220,8 @@ class VirtualMouseService:
             except Exception as e:
                 logger.debug("tracker.draw falhou: %s", e)
 
-        d = self.gesture_detector
+        two = self._active_two_hands()
+        d = two.owner.detector if two is not None else self.gesture_detector
         shape_name = d.current_shape.name if d.current_shape else "UNKNOWN"
 
         # Properties: getattr defensivo (anchor_frozen pode nao existir)
@@ -1007,6 +1257,32 @@ class VirtualMouseService:
                 self._draw_presentation_overlay(frame)
             except Exception as e:
                 logger.debug("Falha ao renderizar overlay apresentacao: %s", e)
+
+        if two is not None:
+            try:
+                self._draw_two_hands_overlay(frame, two)
+            except Exception as e:
+                logger.debug("Falha ao renderizar overlay duas maos: %s", e)
+
+    def _draw_two_hands_overlay(
+        self, frame: np.ndarray, two: TwoHandsController,
+    ) -> None:
+        """Marca cada mao (E/D) e qual e' a dona do cursor."""
+        h, w = frame.shape[:2]
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        for channel, letter in ((two.right, "D"), (two.left, "E")):
+            if channel.hand is None:
+                continue
+            x, y = channel.hand.landmarks[0][:2]
+            color = (0, 255, 0) if channel is two.owner else (200, 200, 200)
+            cv2.putText(
+                frame, letter, (int(x * w), int(y * h)),
+                font, 0.9, color, 2, cv2.LINE_AA,
+            )
+        cv2.putText(
+            frame, "DUAS MAOS", (8, h - 12),
+            font, 0.6, (0, 255, 0), 2, cv2.LINE_AA,
+        )
 
     _PRESENTATION_ORANGE = (0, 140, 255)
 
@@ -1069,6 +1345,8 @@ class VirtualMouseService:
             logger.debug("SIGTERM nao registrado: %s", e)
 
     def _cleanup(self) -> None:
+        if self._two_hands is not None:
+            self._two_hands.left.cursor.force_release()
         for label, fn in (
             ("cursor.force_release", self.cursor.force_release),
             ("tracker.close", self.tracker.close),

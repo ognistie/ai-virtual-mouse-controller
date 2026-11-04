@@ -29,11 +29,11 @@ from __future__ import annotations
 import contextlib
 import logging
 import sys
-from typing import Optional, Sequence, Tuple
+from typing import Dict, Optional, Sequence, Tuple
 
 from .hand_gl_renderer import STYLE_PRESETS, HandGLRenderer, HandStyle, clear_framebuffer
 from .hand_mesh import HandMesh, build_hand_mesh
-from .hand_pose import HandPoseSolver, PosedHand
+from .hand_pose import HandPoseSlots
 
 logger = logging.getLogger(__name__)
 
@@ -205,16 +205,12 @@ class HologramGLBackend:
         self._screen_w: int = 1920
         self._screen_h: int = 1080
 
-        self._solver = HandPoseSolver(
-            hand_size_px=hand_size_px, frame_aspect=frame_aspect,
-        )
+        self._slots = HandPoseSlots(hand_size_px, frame_aspect)
         self._renderer = HandGLRenderer(
             style=style or STYLE_PRESETS["quest"], opacity=opacity,
         )
-        self._posed: Optional[PosedHand] = None
-        self._mesh: Optional[HandMesh] = None
-        self._pose_version = 0
-        self._mesh_version = -1
+        # Cache de malha por mao: (versao da pose, malha).
+        self._meshes: Dict[int, Tuple[int, HandMesh]] = {}
 
         self._app = None
         self._window: Optional["_HologramGLWindow"] = None
@@ -260,7 +256,7 @@ class HologramGLBackend:
             self._window.raise_()
         else:
             self._window.hide()
-            self._posed = None
+            self._slots.clear()
 
     def toggle(self) -> bool:
         self.set_enabled(not self._enabled)
@@ -275,7 +271,7 @@ class HologramGLBackend:
         return self._screen_w, self._screen_h
 
     def set_frame_aspect(self, aspect: float) -> None:
-        self._solver.set_frame_aspect(aspect)
+        self._slots.set_frame_aspect(aspect)
 
     def update_pose(
         self,
@@ -283,10 +279,14 @@ class HologramGLBackend:
         screen_x: float,
         screen_y: float,
     ) -> None:
-        self._posed = self._solver.solve(landmarks, screen_x, screen_y)
-        self._pose_version += 1
+        self.update_poses([(landmarks, screen_x, screen_y)])
+
+    def update_poses(self, poses: Sequence[Optional[Tuple]]) -> None:
+        """Uma entrada por mao: (landmarks, x, y) ou None. Posicao estavel
+        na lista: cada indice tem a suavizacao da propria mao."""
+        self._slots.update(poses)
         if self._window is not None:
-            self._window.set_active_rate(self._posed is not None)
+            self._window.set_active_rate(self._slots.any_visible)
 
     def update_cursor(self, screen_x: float, screen_y: float) -> None:
         """Mantido por compat (o cursor ja chega via update_pose)."""
@@ -323,12 +323,17 @@ class HologramGLBackend:
 
     def _render(self) -> None:
         """Chamado pelo paintGL (contexto atual, framebuffer limpo)."""
-        posed = self._posed
-        if not self._enabled or posed is None:
+        if not self._enabled:
             return
-        # Mesh so e' refeita quando chega pose nova (o timer de repaint
-        # pode rodar mais rapido que a camera).
-        if self._mesh is None or self._mesh_version != self._pose_version:
-            self._mesh = build_hand_mesh(posed)
-            self._mesh_version = self._pose_version
-        self._renderer.render(self._mesh, posed, self._screen_w, self._screen_h)
+        for i, posed in enumerate(self._slots.posed):
+            if posed is None:
+                continue
+            # Mesh so e' refeita quando chega pose nova (o timer de repaint
+            # pode rodar mais rapido que a camera).
+            version = self._slots.versions[i]
+            cached = self._meshes.get(i)
+            if cached is None or cached[0] != version:
+                cached = (version, build_hand_mesh(posed))
+                self._meshes[i] = cached
+            # Sem limpar o depth entre as maos: a mais proxima cobre a outra.
+            self._renderer.render(cached[1], posed, self._screen_w, self._screen_h)

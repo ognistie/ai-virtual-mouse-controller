@@ -9,6 +9,10 @@ Uso:
     py -m avmc      (Windows, funciona mesmo sem a pasta Scripts no PATH)
     python main.py  (a partir do repositorio)
 
+Opcoes:
+    --list-cameras  lista as webcams encontradas e sai
+    --camera N      usa a webcam N e lembra a escolha nas proximas vezes
+
 Sai com codigo:
     0 = ok
     1 = falha de webcam
@@ -17,8 +21,10 @@ Sai com codigo:
 
 from __future__ import annotations
 
+import argparse
 import logging
 import sys
+from typing import Optional, Sequence
 
 
 def _check_environment() -> None:
@@ -82,7 +88,61 @@ def _setup_logging() -> None:
     )
 
 
-def main() -> int:
+def _parse_args(argv: Optional[Sequence[str]]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="avmc",
+        description="AI Virtual Mouse Controller: controle o mouse com a mao.",
+    )
+    parser.add_argument(
+        "--camera", type=int, metavar="N",
+        help="usa a webcam N (veja --list-cameras) e salva como padrao",
+    )
+    parser.add_argument(
+        "--list-cameras", action="store_true",
+        help="lista as webcams encontradas e sai",
+    )
+    args = parser.parse_args(argv)
+    if args.camera is not None and args.camera < 0:
+        parser.error("--camera precisa ser 0 ou maior")
+    return args
+
+
+def _list_cameras() -> int:
+    import config
+    from core.camera_select import list_cameras, resolve_camera_index
+
+    print("Procurando webcams...", flush=True)
+    cameras = list_cameras()
+    if not cameras:
+        print("Nenhuma webcam encontrada (ou todas ocupadas por outro app).")
+        return 1
+    current = resolve_camera_index(None, config.CAMERA_INDEX)
+    for cam in cameras:
+        mark = "  <- em uso" if cam.index == current else ""
+        print(f"  {cam.index}: {cam.width}x{cam.height}{mark}")
+    print("\nPra trocar: avmc --camera N  (a escolha fica salva)")
+    return 0
+
+
+def _choose_camera(cli_index: Optional[int]) -> int:
+    """Indice da webcam; --camera N tambem salva N como padrao."""
+    import config
+    from core.camera_select import resolve_camera_index, save_camera
+
+    if cli_index is not None:
+        try:
+            path = save_camera(cli_index)
+            print(f"[AVM] Camera {cli_index} salva como padrao ({path})", flush=True)
+        except OSError as e:
+            print(f"[AVM] Nao consegui salvar a camera padrao: {e}", flush=True)
+    return resolve_camera_index(cli_index, config.CAMERA_INDEX)
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    args = _parse_args(argv)
+    if args.list_cameras:
+        return _list_cameras()
+
     _setup_windows_path()
 
     # Check ANTES de importar service (que ja tocaria em mediapipe)
@@ -95,14 +155,16 @@ def main() -> int:
     from core.camera import CameraOpenError
     from services.virtual_mouse_service import VirtualMouseService
 
+    camera_index = _choose_camera(args.camera)
+    logger.info("Webcam: indice %d", camera_index)
     try:
-        service = VirtualMouseService.from_config()
+        service = VirtualMouseService.from_config(camera_index=camera_index)
     except CameraOpenError as e:
         sys.stderr.write(
             f"\nERRO: {e}\n"
             "Dicas: feche Zoom/Teams/OBS ou o app de Camera; confira se a\n"
-            "webcam esta conectada; com mais de uma camera, ajuste\n"
-            "CAMERA_INDEX em config.py.\n\n"
+            "webcam esta conectada; com mais de uma camera, rode\n"
+            "'avmc --list-cameras' e depois 'avmc --camera N'.\n\n"
         )
         return 1
     except Exception:

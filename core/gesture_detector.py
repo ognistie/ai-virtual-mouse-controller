@@ -1094,6 +1094,16 @@ class GestureDetector:
     def is_dragging(self) -> bool:
         return self._drag_active
 
+    def is_gesture_held(self) -> bool:
+        """Pinca ou arrasto em andamento: a mao nao deve perder o cursor."""
+        return (
+            self._drag_active
+            or self._pinch_started_at is not None
+            or self._pinch_middle_started_at is not None
+            or self._previous_raw_shape
+            in (HandShape.PINCH, HandShape.PINCH_MIDDLE)
+        )
+
     @property
     def hand_size(self) -> float:
         return self._last_hand_size
