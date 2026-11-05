@@ -22,6 +22,7 @@ def _service(stalled: bool, silent_for: float = 0.0) -> VirtualMouseService:
     svc._two_hands = None
     svc._vision_lock = threading.RLock()
     svc._hand_gate = MagicMock()
+    svc._last_hand = object()
     svc._two_hands_mode = False
     svc.cursor = MagicMock()
     svc.gesture_detector = MagicMock()

@@ -30,7 +30,7 @@ from core.camera import CameraOpenError, ThreadedCamera
 from core.cursor_controller import CursorController
 from core.gesture_detector import Gesture, GestureDetector
 from core.hand_arbiter import LEFT, RIGHT
-from core.hand_gate import HandGate, StaleTrackWatchdog
+from core.hand_gate import HandGate
 from core.hand_tracker import HandLandmarks, HandTracker
 from core.hologram_overlay import HologramOverlay
 from core.perf_telemetry import configure as configure_perf, get_profiler
@@ -38,7 +38,7 @@ from core.presentation_controller import PresentationController
 from core.runtime_settings import RuntimeSettings
 from core.settings_panel import SettingsPanel
 from core.smoothing import make_smoother
-from core.two_hands import HandChannel, TwoHandsController
+from core.two_hands import DISPLAY_HOLD_FRAMES, HandChannel, TwoHandsController
 from core.ui_overlay import UICallbacks, UIOverlay
 from core.utils import FPSCounter, disable_power_throttling
 
@@ -141,10 +141,6 @@ class VirtualMouseService:
         self._hand_gate = HandGate(
             confirm_frames=getattr(config, "HAND_CONFIRM_FRAMES", 2),
         )
-        self._track_watchdog: Optional[StaleTrackWatchdog] = (
-            StaleTrackWatchdog()
-            if getattr(config, "TRACKING_RECOVERY_ENABLED", True) else None
-        )
         # Ultima mao vista: a mao 3D e o preview nao piscam em falha curta.
         self._last_hand: Optional[HandLandmarks] = None
         self._hand_lost_frames = 0
@@ -226,7 +222,7 @@ class VirtualMouseService:
             self.hologram = HologramOverlay(
                 hand_size_px=getattr(config, "HOLOGRAM_HAND_SIZE_PX", 180),
                 opacity=getattr(config, "HOLOGRAM_OPACITY", 0.90),
-                target_fps=getattr(config, "HOLOGRAM_FPS", 30),
+                target_fps=getattr(config, "HOLOGRAM_FPS", 60),
                 bone_color=getattr(config, "HOLOGRAM_COLOR_BONE", "#00d4ff"),
                 point_color=getattr(config, "HOLOGRAM_COLOR_POINT", "#e0f7ff"),
                 transparent_color=getattr(
@@ -457,6 +453,8 @@ class VirtualMouseService:
                 config, "CURSOR_FOLLOWTHROUGH_DAMPING", 0.82,
             ),
             pinch_release_ratio=getattr(config, "PINCH_RELEASE_RATIO", 1.25),
+            pinch_open_fingers_min=getattr(config, "PINCH_OPEN_FINGERS_MIN", 0.82),
+            pinch_rearm_seconds=getattr(config, "PINCH_REARM_SECONDS", 0.12),
             dpi_size_smoothing_s=getattr(config, "DPI_SIZE_SMOOTHING_S", 0.6),
         )
 
@@ -507,8 +505,11 @@ class VirtualMouseService:
             # Espera a visao parar antes de fechar o rastreador que ela usa.
             self._should_stop = True
             if worker is not None:
-                worker.join(timeout=2.0)
-            self._cleanup()
+                worker.join(timeout=self._VISION_JOIN_S)
+            vision_stopped = worker is None or not worker.is_alive()
+            if not vision_stopped:
+                logger.warning("Thread de visao nao parou a tempo")
+            self._cleanup(vision_stopped)
         return 1 if self._vision_failed else 0
 
     def stop(self) -> None:
@@ -574,9 +575,7 @@ class VirtualMouseService:
     # reprocessar frames repetidos da webcam.
     _FRAME_WAIT_S = 1.0 / 60.0
     _VISION_WAIT_S = 0.05
-    # Falha curta do MediaPipe nao apaga a mao 3D (mesma janela em que o
-    # detector ainda segura o cursor).
-    _DISPLAY_HOLD_FRAMES = 5
+    _VISION_JOIN_S = 2.0
     # Sem frame novo por mais que isso = camera perdida (mesmo se o
     # driver nao reportar erro).
     _CAMERA_LOST_AFTER_S = 2.0
@@ -661,29 +660,18 @@ class VirtualMouseService:
                     with prof.stage("events"):
                         self._handle_events(events, hand)
 
-                self._recover_stale_tracking(hands)
-
                 if hand is not None:
                     self._last_hand = hand
                 elif (
-                    self._hand_lost_frames <= self._DISPLAY_HOLD_FRAMES
+                    self._hand_lost_frames <= DISPLAY_HOLD_FRAMES
                     and self._last_hand is not None
                 ):
                     hand = self._last_hand
         return _VisionResult(frame, hand, hands)
 
-    def _recover_stale_tracking(self, hands: List[HandLandmarks]) -> None:
-        """Rastreamento preso em algo parado: volta a procurar mao."""
-        dog = self._track_watchdog
-        if dog is None:
-            return
-        busy = self.gesture_detector.is_gesture_held() or self.cursor.is_dragging
-        if dog.update(hands, busy, time.perf_counter()):
-            try:
-                self.tracker.reset_tracking()
-                logger.debug("Rastreamento reiniciado (nada se mexeu)")
-            except Exception as e:
-                logger.warning("Falha ao reiniciar o rastreamento: %s", e)
+    def _reset_hand_tracking_state(self) -> None:
+        self._hand_gate.reset()
+        self._last_hand = None
 
     def _detect_hands(self, frame: np.ndarray) -> List[HandLandmarks]:
         """MediaPipe + filtro do que nao e' mao (ver core/hand_gate.py)."""
@@ -859,7 +847,7 @@ class VirtualMouseService:
             self.gesture_detector.reset()
             self.smoother.reset()
             self._presentation.reset()
-            self._hand_gate.reset()
+            self._reset_hand_tracking_state()
             if self._two_hands is not None:
                 self._two_hands.reset()
 
@@ -1119,7 +1107,7 @@ class VirtualMouseService:
                 self._two_hands = self._build_two_hands()
             if self._two_hands is not None:
                 self._two_hands.reset()
-            self._hand_gate.reset()
+            self._reset_hand_tracking_state()
             self._two_hands_mode = active
         msg = f"TWO_HANDS_MODE = {active}"
         print(f"[AVM] {msg}", flush=True)
@@ -1344,14 +1332,18 @@ class VirtualMouseService:
         except Exception as e:
             logger.debug("SIGTERM nao registrado: %s", e)
 
-    def _cleanup(self) -> None:
+    def _cleanup(self, vision_stopped: bool = True) -> None:
+        """`vision_stopped` False: a thread de visao ainda pode estar usando
+        rastreador e camera, entao eles ficam pro fim do processo."""
         if self._two_hands is not None:
             self._two_hands.left.cursor.force_release()
-        for label, fn in (
-            ("cursor.force_release", self.cursor.force_release),
-            ("tracker.close", self.tracker.close),
-            ("camera.close", self.camera.close),
-        ):
+        steps = [("cursor.force_release", self.cursor.force_release)]
+        if vision_stopped:
+            steps += [
+                ("tracker.close", self.tracker.close),
+                ("camera.close", self.camera.close),
+            ]
+        for label, fn in steps:
             try:
                 fn()
             except Exception as e:

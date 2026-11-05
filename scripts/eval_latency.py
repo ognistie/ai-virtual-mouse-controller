@@ -181,7 +181,6 @@ def main() -> int:
             config.VISION_THREAD_ENABLED = False
             config.POWER_THROTTLING_OFF = False
             config.OPENCV_SINGLE_THREAD = False
-            config.TRACKING_RECOVERY_ENABLED = False
             config.HAND_CONFIRM_FRAMES = 1
             config.PREVIEW_MAX_FPS = 0.0
         if args.preview_fps is not None:

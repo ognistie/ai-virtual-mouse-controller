@@ -111,7 +111,8 @@ def disable_power_throttling() -> bool:
         process_power_throttling = 4
         execution_speed = 1
         state = _ThrottlingState(1, execution_speed, 0)
-        kernel32 = ctypes.windll.kernel32
+        # Instancia propria: nao muda os tipos de quem usa ctypes.windll.
+        kernel32 = ctypes.WinDLL("kernel32")
         kernel32.GetCurrentProcess.restype = ctypes.c_void_p
         kernel32.SetProcessInformation.argtypes = [
             ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_ulong,

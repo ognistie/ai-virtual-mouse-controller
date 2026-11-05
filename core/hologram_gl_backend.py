@@ -29,6 +29,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import sys
+import time
 from typing import Dict, Optional, Sequence, Tuple
 
 from .hand_gl_renderer import STYLE_PRESETS, HandGLRenderer, HandStyle, clear_framebuffer
@@ -39,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 
 try:
-    from PySide6.QtCore import Qt, QTimer
+    from PySide6.QtCore import QCoreApplication, QEvent, Qt
     from PySide6.QtGui import QOffscreenSurface, QOpenGLContext, QSurfaceFormat
     from PySide6.QtOpenGL import QOpenGLWindow
     from PySide6.QtWidgets import QApplication
@@ -126,7 +127,7 @@ if _PYSIDE_OK:
     class _HologramGLWindow(QOpenGLWindow):
         """Janela OpenGL transparente, sempre no topo, click-through."""
 
-        def __init__(self, overlay: "HologramGLBackend", target_fps: int) -> None:
+        def __init__(self, overlay: "HologramGLBackend") -> None:
             super().__init__()
             self._overlay = overlay
             self.setFlags(
@@ -142,19 +143,9 @@ if _PYSIDE_OK:
             if screen is not None:
                 self.setGeometry(screen.geometry())
 
-            # Repaint adaptativo: rate ativo com mao visivel, idle sem mao.
-            self._active_ms = max(8, int(1000 / max(10, target_fps)))
-            self._idle_ms = 100
-            self._timer = QTimer(self)
-            self._timer.timeout.connect(self.update)
-            self._timer.start(self._idle_ms)
-            self._timer_active = False
-
-        def set_active_rate(self, active: bool) -> None:
-            if active == self._timer_active:
-                return
-            self._timer_active = active
-            self._timer.start(self._active_ms if active else self._idle_ms)
+        def paint_now(self) -> None:
+            """Desenha agora, sem esperar o agendamento de update() do Qt."""
+            QCoreApplication.sendEvent(self, QEvent(QEvent.Type.UpdateRequest))
 
         def initializeGL(self) -> None:
             try:
@@ -201,7 +192,10 @@ class HologramGLBackend:
         self.available: bool = False
         self.click_through_active: bool = False
         self._enabled: bool = False
-        self._target_fps = max(10, int(target_fps))
+        # Limite de desenhos: pose mais rapida que isso espera o proximo pump.
+        self._min_paint_interval = 1.0 / max(10, int(target_fps))
+        self._last_paint_t = 0.0
+        self._dirty = False
         self._screen_w: int = 1920
         self._screen_h: int = 1080
 
@@ -236,7 +230,7 @@ class HologramGLBackend:
                 dpr = float(screen.devicePixelRatio() or 1.0)
                 self._screen_w = int(round(geom.width() * dpr))
                 self._screen_h = int(round(geom.height() * dpr))
-            self._window = _HologramGLWindow(self, self._target_fps)
+            self._window = _HologramGLWindow(self)
             self._window.hide()
             self.available = True
             self.click_through_active = True
@@ -285,8 +279,7 @@ class HologramGLBackend:
         """Uma entrada por mao: (landmarks, x, y) ou None. Posicao estavel
         na lista: cada indice tem a suavizacao da propria mao."""
         self._slots.update(poses)
-        if self._window is not None:
-            self._window.set_active_rate(self._slots.any_visible)
+        self._dirty = True
 
     def update_cursor(self, screen_x: float, screen_y: float) -> None:
         """Mantido por compat (o cursor ja chega via update_pose)."""
@@ -299,8 +292,21 @@ class HologramGLBackend:
             return
         try:
             self._app.processEvents()
+            self._paint_if_needed()
         except Exception as e:  # pragma: no cover
             logger.debug("pump erro: %s", e)
+
+    def _paint_if_needed(self) -> None:
+        """Desenha quando chega pose nova. Com um timer proprio, fora de fase
+        com a camera, poses eram descartadas e o movimento ficava irregular."""
+        if not self._dirty or self._window is None or not self._enabled:
+            return
+        now = time.perf_counter()
+        if now - self._last_paint_t < self._min_paint_interval:
+            return
+        self._dirty = False
+        self._last_paint_t = now
+        self._window.paint_now()
 
     def close(self) -> None:
         if self._window is not None:

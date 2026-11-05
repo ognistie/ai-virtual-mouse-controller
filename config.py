@@ -58,10 +58,6 @@ OPENCV_SINGLE_THREAD: bool = True
 PREVIEW_MAX_FPS: float = 30.0
 """Limite do preview da camera. O cursor nao depende dele. 0 = sem limite."""
 
-TRACKING_RECOVERY_ENABLED: bool = True
-"""Com uma mao so: se o que o MediaPipe segue fica parado, ele volta a procurar
-mao. Sem isso ele podia grudar em algo que nao e' mao e nao ver a real."""
-
 HAND_CONFIRM_FRAMES: int = 2
 """Frames seguidos que uma mao nova precisa aparecer antes de agir."""
 
@@ -237,6 +233,17 @@ vem do debounce de 2 frames + threshold.
 """
 
 PINCH_VELOCITY_THRESHOLD: float = 0.008
+
+PINCH_OPEN_FINGERS_MIN: float = 0.82
+"""Pra COMECAR uma pinca, os outros dedos precisam estar abertos (extensao
+media; 1 = retos). Fechar a mao aproxima o polegar do indicador, e isso virava
+clique. Em uso real: pinca >= 0.87, dedos fechados <= 0.79. Quem pinca com os
+outros dedos bem dobrados pode abaixar; 0 desliga. Quem ja segura a pinca nao
+e' afetado."""
+
+PINCH_REARM_SECONDS: float = 0.12
+"""Tempo minimo com os dedos abertos antes de outra pinca valer como clique.
+Evita rajada quando a pinca oscila (mao na frente do rosto, por exemplo)."""
 
 PINCH_RELEASE_RATIO: float = 1.25
 """Histerese da pinca (Schmitt trigger): pra SOLTAR a pinca, polegar e
@@ -525,7 +532,7 @@ SHOW_DPI: bool = True
 SHOW_DRAG_PROGRESS: bool = True
 SHOW_AIM_ASSIST: bool = True
 DRAW_LANDMARKS: bool = True
-WINDOW_NAME: str = "AI Virtual Mouse — ESC to quit"
+WINDOW_NAME: str = "AI Virtual Mouse - ESC to quit"
 
 # ---------------------------------------------------------------------
 # JANELA DE EXIBICAO
@@ -614,8 +621,9 @@ HOLOGRAM_HAND_SIZE_PX: int = 180
 """Tamanho da mao na tela (px): comprimento da mao aberta, do pulso a
 ponta do dedo medio. Nao muda com o gesto."""
 
-HOLOGRAM_FPS: int = 30
-"""Taxa de redesenho. 30 Hz e' suave + economico em CPU."""
+HOLOGRAM_FPS: int = 60
+"""Limite de desenhos por segundo. A mao e' desenhada quando chega pose nova,
+entao na pratica segue a camera; parada, nao gasta nada."""
 
 HOLOGRAM_COLOR_BONE: str = "#00d4ff"
 """Cor primaria do holograma — azul neon ciano (linhas/contornos)."""

@@ -19,24 +19,14 @@ import math
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 
-from .hand_tracker import LM_WRIST, HandLandmarks
-
-LM_MIDDLE_MCP = 9
+from .hand_tracker import HandLandmarks
+from .hand_tracker import palm_point as _palm
+from .hand_tracker import palm_size as _size
 
 LEFT = "left"
 RIGHT = "right"
 
 Point = Tuple[float, float]
-
-
-def _palm(hand: HandLandmarks) -> Point:
-    lm = hand.landmarks[LM_MIDDLE_MCP]
-    return lm[0], lm[1]
-
-
-def _size(hand: HandLandmarks) -> float:
-    a, b = hand.landmarks[LM_WRIST], hand.landmarks[LM_MIDDLE_MCP]
-    return max(1e-3, math.hypot(a[0] - b[0], a[1] - b[1]))
 
 
 def _dist(a: Point, b: Point) -> float:
@@ -74,9 +64,6 @@ class HandArbiter:
     """Velocidades em tamanhos de mao por segundo: independem da distancia
     da camera."""
 
-    # Duas deteccoes mais proximas que isso (em tamanhos de mao) sao a
-    # mesma mao: o MediaPipe as vezes duplica uma mao com num_hands=2.
-    _DUPLICATE_DIST = 0.6
     # Salto maximo (tamanhos de mao) pra considerar a mesma mao entre frames.
     _MAX_JUMP = 2.5
     _SPEED_TAU_S = 0.08
@@ -117,7 +104,7 @@ class HandArbiter:
         for slot in self._slots.values():
             slot.hand = None
 
-        pending = self._match_tracked(self._unique(hands), dt, now)
+        pending = self._match_tracked(list(hands), dt, now)
         self._release_lost(now, locked)
         self._place_new(pending, now)
         self._update_owner(now, locked)
@@ -133,14 +120,6 @@ class HandArbiter:
         self._switch_t = now
         for slot in self._slots.values():
             slot.fast_since = None
-
-    def _unique(self, hands: Sequence[HandLandmarks]) -> List[HandLandmarks]:
-        out: List[HandLandmarks] = []
-        for hand in sorted(hands, key=lambda h: -h.score):
-            limit = self._DUPLICATE_DIST * _size(hand)
-            if all(_dist(_palm(hand), _palm(kept)) > limit for kept in out):
-                out.append(hand)
-        return out
 
     def _match_tracked(
         self, hands: List[HandLandmarks], dt: float, now: float,

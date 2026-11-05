@@ -28,6 +28,19 @@ except Exception:
     sys.modules.setdefault("pyautogui", _fake_pyautogui)
 
 
+@pytest.fixture(autouse=True)
+def _no_real_mouse(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Nenhum teste aperta o mouse de verdade: rodar pytest nao pode clicar
+    onde o ponteiro estiver. Quem precisa ver as chamadas usa o proprio mock."""
+    import pyautogui as gui
+
+    for name in (
+        "moveTo", "click", "doubleClick", "rightClick",
+        "mouseDown", "mouseUp", "press", "scroll",
+    ):
+        monkeypatch.setattr(gui, name, MagicMock(name=f"pyautogui.{name}"))
+
+
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
         "--gpu",

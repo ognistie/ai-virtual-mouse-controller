@@ -66,13 +66,6 @@ def test_flickering_label_keeps_channels():
         assert result.left is left and result.right is right
 
 
-def test_duplicate_detection_is_one_hand():
-    run = _Run()
-    a = _hand(0.5, score=0.95)
-    result = run.step(a, _hand(0.51, score=0.5))
-    assert result.right is a and result.left is None
-
-
 def test_first_hand_becomes_owner():
     run = _Run()
     assert run.step(_hand(0.2, label="Left")).owner == LEFT

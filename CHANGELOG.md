@@ -26,16 +26,25 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - **Inferência mais estável no Windows 11:** o app sai da economia de energia
   (só o próprio processo, enquanto roda) e o OpenCV usa um thread, sem disputar
   núcleo com o MediaPipe.
+- **Mão 3D fluida:** ela era desenhada por um timer próprio, fora de fase com a
+  câmera, que descartava poses. Agora é desenhada assim que a pose chega: nenhuma
+  pose perdida (21 → 25 desenhos/s com poses a 25/s), intervalos regulares (p95 de
+  ~72 para ~48 ms) e atraso da pose até a tela de ~30 para ~9 ms. A malha ficou
+  com metade do custo e idêntica à anterior; parada, a mão não gasta nada.
 - **Dedos do holograma mais fiéis à mão real:** menos atraso nos gestos, sem
   mudar o visual.
 
 ### Fixed
-- **Reconhecimento que parava do nada:** com uma mão só, o MediaPipe podia
-  grudar em algo parado que não é mão (até o rosto) e não via mais a mão real.
-  Agora ele volta a procurar quando o que segue não se mexe por 1 s.
 - A mão 3D não pisca mais em falhas curtas do reconhecimento.
 - Modo duas mãos: "segunda mão" fantasma sobre os dedos da mão real é ignorada,
   e detecções de poucos quadros não agem.
+- **Fechar a mão não clica mais:** o polegar passava perto do indicador e virava
+  pinça, disparando clique e clique direito sem querer. A pinça só começa com os
+  outros dedos abertos (`PINCH_OPEN_FINGERS_MIN`); quem já segura não é afetado.
+- **Rajada de cliques:** pinça que oscila não vira vários cliques; os dedos
+  precisam ficar abertos por um instante (`PINCH_REARM_SECONDS`).
+- Título da janela sem caractere quebrado.
+- `pytest` não aperta mais o mouse de verdade.
 
 ## [1.3.0] — 2026-10-13
 

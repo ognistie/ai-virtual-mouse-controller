@@ -33,6 +33,7 @@ aparece, o que da a translucidez "de camada unica" das maos de VR.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import List, Optional, Sequence, Tuple
@@ -194,29 +195,42 @@ def _transport_frames(
     tangents: np.ndarray, first_u: Optional[np.ndarray] = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Quadros (u, v) por transporte paralelo — sem torcao entre aneis."""
-    n = len(tangents)
-    us = np.empty((n, 3))
-    vs = np.empty((n, 3))
-    t0 = tangents[0]
+    # Em floats do Python, nao numpy: esta funcao roda por anel, por dedo, a
+    # cada pose, e np.cross em vetor unico era metade do custo da malha.
+    def cross(a: Tuple[float, float, float], b: Tuple[float, float, float]):
+        return (
+            a[1] * b[2] - a[2] * b[1],
+            a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0],
+        )
+
+    rows = [(t[0], t[1], t[2]) for t in tangents.tolist()]
+    t0 = rows[0]
     if first_u is None or float(np.linalg.norm(first_u)) < 1e-9:
-        ref = np.array([0.0, 0.0, 1.0])
-        if abs(float(np.dot(ref, t0))) > 0.9:
-            ref = np.array([1.0, 0.0, 0.0])
-        u = np.cross(t0, ref)
+        ref = (0.0, 0.0, 1.0)
+        if abs(t0[2]) > 0.9:
+            ref = (1.0, 0.0, 0.0)
+        ux, uy, uz = cross(t0, ref)
     else:
-        u = np.asarray(first_u, dtype=np.float64)
-    for i in range(n):
-        t = tangents[i]
-        u = u - t * float(np.dot(u, t))
-        norm = float(np.linalg.norm(u))
+        ux, uy, uz = (float(c) for c in first_u)
+    us = []
+    vs = []
+    for t in rows:
+        along = ux * t[0] + uy * t[1] + uz * t[2]
+        ux -= t[0] * along
+        uy -= t[1] * along
+        uz -= t[2] * along
+        norm = math.sqrt(ux * ux + uy * uy + uz * uz)
         if norm < 1e-9:
-            ref = np.array([1.0, 0.0, 0.0]) if abs(t[0]) < 0.9 else np.array([0.0, 1.0, 0.0])
-            u = np.cross(t, ref)
-            norm = float(np.linalg.norm(u))
-        u = u / norm
-        us[i] = u
-        vs[i] = np.cross(t, u)
-    return us, vs
+            ref = (1.0, 0.0, 0.0) if abs(t[0]) < 0.9 else (0.0, 1.0, 0.0)
+            ux, uy, uz = cross(t, ref)
+            norm = math.sqrt(ux * ux + uy * uy + uz * uz)
+        ux /= norm
+        uy /= norm
+        uz /= norm
+        us.append((ux, uy, uz))
+        vs.append(cross(t, (ux, uy, uz)))
+    return np.array(us), np.array(vs)
 
 
 def _ring_block(

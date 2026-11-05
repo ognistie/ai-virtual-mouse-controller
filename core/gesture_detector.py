@@ -36,6 +36,8 @@ from typing import Deque, List, Optional, Tuple
 from .finger_posture import (
     FINGER_CHAIN_INDEX,
     FINGER_CHAIN_MIDDLE,
+    FINGER_CHAIN_PINKY,
+    FINGER_CHAIN_RING,
     finger_extension,
 )
 from .hand_anchor import RobustHandAnchor
@@ -208,6 +210,14 @@ def apply_dpi_to_position(pos, dpi_mult, center=(0.5, 0.5)):
     )
 
 
+def _fingers_open_enough(lm, chains, minimum: float) -> bool:
+    """Extensao media dos dedos `chains` >= minimum (0 desliga)."""
+    if minimum <= 0.0:
+        return True
+    total = sum(finger_extension(lm, chain) for chain in chains)
+    return total / len(chains) >= minimum
+
+
 def classify_shape(
     hand: HandLandmarks,
     pinch_threshold: float,
@@ -216,6 +226,7 @@ def classify_shape(
     *,
     pinch_middle_index_extension_min: float = 0.88,
     pinch_middle_middle_extension_max: float = 0.92,
+    pinch_open_fingers_min: float = 0.0,
 ) -> HandShape:
     """
     Classifica a forma da mao em uma das HandShape.
@@ -254,6 +265,10 @@ def classify_shape(
                                            medio (default 0.92 = nao pode
                                            estar reto pra ser "tocando" o
                                            polegar de forma intencional).
+        pinch_open_fingers_min: extensao media minima dos dedos que NAO
+                                participam da pinca. Fechar a mao leva o
+                                polegar pra perto do indicador; sem isso,
+                                fechar os dedos vira clique. 0 desliga.
     """
     lm = hand.landmarks
     # 3D pinch distances — orientation-invariant. Distancia 2D no plano
@@ -276,6 +291,10 @@ def classify_shape(
             posture_intentional = (
                 index_ext >= pinch_middle_index_extension_min
                 and middle_ext <= pinch_middle_middle_extension_max
+                and _fingers_open_enough(
+                    lm, (FINGER_CHAIN_RING, FINGER_CHAIN_PINKY),
+                    pinch_open_fingers_min,
+                )
             )
 
             if posture_intentional:
@@ -294,7 +313,10 @@ def classify_shape(
                 ):
                     return HandShape.PINCH_MIDDLE
 
-    if dist_thumb_index < pinch_threshold:
+    if dist_thumb_index < pinch_threshold and _fingers_open_enough(
+        lm, (FINGER_CHAIN_MIDDLE, FINGER_CHAIN_RING, FINGER_CHAIN_PINKY),
+        pinch_open_fingers_min,
+    ):
         return HandShape.PINCH
 
     fingers = hand.fingers_up()
@@ -426,6 +448,8 @@ class GestureDetector:
         # Histerese da pinca (Schmitt trigger): pra SOLTAR, a distancia
         # precisa passar de threshold * ratio. 1.0 = limiar unico (legado).
         pinch_release_ratio: float = 1.0,
+        pinch_open_fingers_min: float = 0.0,
+        pinch_rearm_seconds: float = 0.0,
         # Constante de tempo (s) do tamanho da mao usado no DPI adaptativo.
         # 0 = cru frame a frame (legado).
         dpi_size_smoothing_s: float = 0.0,
@@ -478,6 +502,8 @@ class GestureDetector:
             pinch_middle_middle_extension_max
         )
         self.pinch_release_ratio = max(1.0, float(pinch_release_ratio))
+        self.pinch_open_fingers_min = max(0.0, float(pinch_open_fingers_min))
+        self.pinch_rearm_seconds = max(0.0, float(pinch_rearm_seconds))
         # Tamanho da mao pro DPI adaptativo = proxy da DISTANCIA ate a
         # camera, que muda devagar. Cru, ele oscila quando o pulso inclina
         # ou gira (pulso->MCP encurta no frame) e com o ruido do tracker —
@@ -505,6 +531,8 @@ class GestureDetector:
         self._pinch_middle_started_at: Optional[float] = None
         # Press-to-click
         self._previous_raw_shape: HandShape = HandShape.UNKNOWN
+        # Desde quando os dedos estao abertos (None = pronto pra clicar).
+        self._pinch_open_since: Optional[float] = None
         self._click_already_fired: bool = False
         self._right_click_already_fired: bool = False
         self._last_double_click_time: float = 0.0
@@ -558,6 +586,7 @@ class GestureDetector:
         self._last_velocity_vec = (0.0, 0.0)
         # Press-to-click state
         self._previous_raw_shape = HandShape.UNKNOWN
+        self._pinch_open_since = None
         self._click_already_fired = False
         self._right_click_already_fired = False
         # Drag tambem zera: sem isso, apos um reset no meio do drag a
@@ -710,6 +739,7 @@ class GestureDetector:
         *,
         effective_pinch_middle_threshold: Optional[float] = None,
         effective_pinch_middle_index_guard: Optional[float] = None,
+        pinch_open_fingers_min: float = 0.0,
     ) -> HandShape:
         pinch_dist = _pinch_distance(
             hand.landmarks[LM_THUMB_TIP],
@@ -741,6 +771,7 @@ class GestureDetector:
             pinch_middle_middle_extension_max=(
                 self.pinch_middle_middle_extension_max
             ),
+            pinch_open_fingers_min=pinch_open_fingers_min,
         )
 
         if not self.pinch_dual_detection:
@@ -866,10 +897,18 @@ class GestureDetector:
         )
 
         # Classificacao DUAL — passa effective middle params escalados
+        # A postura so vale pra COMECAR a pinca: quem ja segura (arrasto) pode
+        # relaxar os outros dedos sem soltar.
+        already_pinching = self._previous_raw_shape in (
+            HandShape.PINCH, HandShape.PINCH_MIDDLE,
+        )
         raw_shape = self._classify_shape_dual(
             hand, effective_pinch_threshold, now,
             effective_pinch_middle_threshold=effective_pinch_middle_threshold,
             effective_pinch_middle_index_guard=effective_pinch_middle_index_guard,
+            pinch_open_fingers_min=(
+                0.0 if already_pinching else self.pinch_open_fingers_min
+            ),
         )
 
         # PRESS-TO-CLICK
@@ -888,6 +927,15 @@ class GestureDetector:
             self._previous_raw_shape != HandShape.PINCH
             and raw_shape == HandShape.PINCH
         )
+        # Pinca que oscila (aberta por um instante) nao e' clique novo: os
+        # dedos precisam ficar abertos por um tempo minimo.
+        if raw_shape == HandShape.PINCH:
+            opened_at = self._pinch_open_since
+            if opened_at is not None and now - opened_at < self.pinch_rearm_seconds:
+                edge_pinch = False
+            self._pinch_open_since = None
+        elif self._pinch_open_since is None:
+            self._pinch_open_since = now
         edge_pinch_middle = (
             self._previous_raw_shape != HandShape.PINCH_MIDDLE
             and raw_shape == HandShape.PINCH_MIDDLE

@@ -3,16 +3,12 @@ core.hand_gate
 ==============
 
 Filtra o que o MediaPipe acha que e' mao, antes de virar cursor ou clique:
-- FANTASMA DENTRO DA MAO: com num_hands=2, surge uma "segunda mao" pequena
-  sobre os dedos dobrados da real, com confianca alta. A mao contida em outra
-  e' descartada.
+- MAO REPETIDA: com num_hands=2, a mesma mao pode vir duas vezes, ou surgir
+  uma "segunda mao" pequena sobre os dedos dobrados da real, com confianca
+  alta. Deteccao colada em outra ou contida nela e' descartada.
 - PISCADA: deteccao que dura poucos frames nao chega a agir: a mao precisa
   persistir `confirm_frames` pra valer. Mao ja confirmada que some por poucos
   frames volta na hora.
-- RASTREAMENTO PRESO: com uma mao so, enquanto o MediaPipe segue algo ele nao
-  procura mais nada; se grudou em algo parado (ate o rosto), a mao real volta e
-  nao e' vista. `StaleTrackWatchdog` manda procurar de novo quando o que esta
-  sendo seguido nao se mexe.
 """
 
 from __future__ import annotations
@@ -21,68 +17,11 @@ import math
 from dataclasses import dataclass
 from typing import List, Optional, Sequence, Tuple
 
-from .hand_tracker import LM_WRIST, HandLandmarks
-
-LM_MIDDLE_MCP = 9
+from .hand_tracker import HandLandmarks
+from .hand_tracker import palm_point as _palm
+from .hand_tracker import palm_size as _size
 
 Box = Tuple[float, float, float, float]  # x0, y0, x1, y1 normalizados
-
-
-class StaleTrackWatchdog:
-    """Avisa quando a "mao" seguida ficou parada tempo demais.
-
-    Uma mao de verdade parada so perde 1 ou 2 frames com a nova busca, que o
-    detector ja absorve. Nao age no meio de um gesto (`busy`).
-    """
-
-    _MAX_GAP_S = 0.5
-
-    def __init__(self, still_s: float = 1.0, still_dist: float = 0.05) -> None:
-        self.still_s = float(still_s)
-        self.still_dist = float(still_dist)  # fracao da imagem
-        self._anchor: Optional[Tuple[float, float]] = None
-        self._since = 0.0
-        self._seen = 0.0
-
-    def reset(self) -> None:
-        self._anchor = None
-
-    def update(self, hands: Sequence[HandLandmarks], busy: bool, now: float) -> bool:
-        """True = recriar o rastreamento agora."""
-        if busy:
-            self._anchor = None
-            return False
-        if not hands:
-            # Um falso pisca: falha curta nao zera a contagem.
-            if now - self._seen > self._MAX_GAP_S:
-                self._anchor = None
-            return False
-        self._seen = now
-        hand = hands[0]
-        # So a palma: os pontos de um falso tremem bastante mesmo sem sair do
-        # lugar, e a mao real que navega desloca a palma.
-        palm = _palm(hand)
-        if self._anchor is None or (
-            math.hypot(palm[0] - self._anchor[0], palm[1] - self._anchor[1])
-            > self.still_dist
-        ):
-            self._anchor = palm
-            self._since = now
-            return False
-        if now - self._since < self.still_s:
-            return False
-        self._anchor = None
-        return True
-
-
-def _palm(hand: HandLandmarks) -> Tuple[float, float]:
-    lm = hand.landmarks[LM_MIDDLE_MCP]
-    return lm[0], lm[1]
-
-
-def _size(hand: HandLandmarks) -> float:
-    a, b = hand.landmarks[LM_WRIST], hand.landmarks[LM_MIDDLE_MCP]
-    return max(1e-3, math.hypot(a[0] - b[0], a[1] - b[1]))
 
 
 def _bbox(hand: HandLandmarks) -> Box:
@@ -112,6 +51,8 @@ class _Track:
 class HandGate:
     """So deixa passar mao que nao e' fantasma e que persiste."""
 
+    # Palma mais perto que isso (em tamanhos de mao) = mesma mao.
+    _DUPLICATE_DIST = 0.6
     # Mao contida em outra (fracao da area) = fantasma.
     _NESTED_FRACTION = 0.6
     _MAX_JUMP = 2.5  # tamanhos de mao entre frames pra ser a mesma mao
@@ -128,23 +69,27 @@ class HandGate:
 
     def filter(self, hands: Sequence[HandLandmarks]) -> List[HandLandmarks]:
         """Maos validas, na mesma ordem da entrada."""
-        return self._confirmed(self._drop_nested(hands))
+        return self._confirmed(self._drop_repeated(hands))
 
-    def _drop_nested(self, hands: Sequence[HandLandmarks]) -> List[HandLandmarks]:
+    def _drop_repeated(self, hands: Sequence[HandLandmarks]) -> List[HandLandmarks]:
         if len(hands) < 2:
             return list(hands)
-        boxes = [_bbox(h) for h in hands]
-        kept = []
-        for i, hand in enumerate(hands):
-            nested = any(
-                j != i
-                and _size(other) >= _size(hand)
-                and _inside_fraction(boxes[i], boxes[j]) >= self._NESTED_FRACTION
-                for j, other in enumerate(hands)
-            )
-            if not nested:
+        # Maior primeiro (fantasma e' menor, mesmo com confianca alta);
+        # no empate, a mais confiavel.
+        ordered = sorted(hands, key=lambda h: (-round(_size(h), 3), -h.score))
+        kept: List[HandLandmarks] = []
+        for hand in ordered:
+            if not any(self._repeats(hand, other) for other in kept):
                 kept.append(hand)
-        return kept
+        return [h for h in hands if any(h is k for k in kept)]
+
+    def _repeats(self, a: HandLandmarks, b: HandLandmarks) -> bool:
+        pa, pb = _palm(a), _palm(b)
+        limit = self._DUPLICATE_DIST * max(_size(a), _size(b))
+        if math.hypot(pa[0] - pb[0], pa[1] - pb[1]) <= limit:
+            return True
+        small, big = (a, b) if _size(a) <= _size(b) else (b, a)
+        return _inside_fraction(_bbox(small), _bbox(big)) >= self._NESTED_FRACTION
 
     def _confirmed(self, hands: List[HandLandmarks]) -> List[HandLandmarks]:
         for existing in self._tracks:

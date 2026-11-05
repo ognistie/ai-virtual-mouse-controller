@@ -29,6 +29,9 @@ logger = logging.getLogger(__name__)
 
 # Mesma janela do fluxo de uma mao: mao sumida ha mais que isso zera o filtro.
 _SMOOTHER_RESET_FRAMES = 5
+# Falha curta do MediaPipe nao apaga a mao 3D (mesma janela em que o detector
+# ainda segura o ponteiro).
+DISPLAY_HOLD_FRAMES = 5
 
 Pose = Tuple[Sequence[Tuple[float, float, float]], float, float]
 
@@ -41,6 +44,7 @@ class HandChannel:
     cursor: CursorController
     hand: Optional[HandLandmarks] = None
     lost_frames: int = 0
+    last_hand: Optional[HandLandmarks] = None
 
     def clear(self) -> None:
         self.cursor.force_release()
@@ -48,6 +52,7 @@ class HandChannel:
         self.smoother.reset()
         self.hand = None
         self.lost_frames = 0
+        self.last_hand = None
 
 
 class TwoHandsController:
@@ -102,6 +107,7 @@ class TwoHandsController:
                     channel.smoother.reset()
             else:
                 channel.lost_frames = 0
+                channel.last_hand = channel.hand
             out.append((channel, channel.detector.update(channel.hand)))
         return out
 
@@ -126,9 +132,12 @@ class TwoHandsController:
     @staticmethod
     def _pose(channel: HandChannel) -> Optional[Pose]:
         x, y = channel.cursor.last_position
-        if channel.hand is None or x is None or y is None:
+        hand = channel.hand
+        if hand is None and channel.lost_frames <= DISPLAY_HOLD_FRAMES:
+            hand = channel.last_hand
+        if hand is None or x is None or y is None:
             return None
-        return channel.hand.landmarks, x, y
+        return hand.landmarks, x, y
 
     def _set_owner(self, name: str) -> None:
         if name == self._owner_name:

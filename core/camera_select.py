@@ -24,7 +24,8 @@ import json
 import logging
 import os
 import sys
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -106,22 +107,21 @@ def list_cameras(max_index: int = 6) -> list[CameraInfo]:
         return _probe(cv2, max_index)
 
 
-class _quiet_opencv:
-    def __init__(self, cv2) -> None:
-        self._log = getattr(getattr(cv2, "utils", None), "logging", None)
-        self._prev = None
-
-    def __enter__(self) -> None:
-        if self._log is not None:
-            try:
-                self._prev = self._log.getLogLevel()
-                self._log.setLogLevel(self._log.LOG_LEVEL_SILENT)
-            except Exception:
-                self._log = None
-
-    def __exit__(self, *exc) -> None:
-        if self._log is not None and self._prev is not None:
-            self._log.setLogLevel(self._prev)
+@contextmanager
+def _quiet_opencv(cv2) -> Iterator[None]:
+    log = getattr(getattr(cv2, "utils", None), "logging", None)
+    previous = None
+    if log is not None:
+        try:
+            previous = log.getLogLevel()
+            log.setLogLevel(log.LOG_LEVEL_SILENT)
+        except Exception:
+            log = None
+    try:
+        yield
+    finally:
+        if log is not None and previous is not None:
+            log.setLogLevel(previous)
 
 
 def _probe(cv2, max_index: int) -> list[CameraInfo]:

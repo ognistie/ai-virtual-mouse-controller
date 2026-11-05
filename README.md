@@ -145,7 +145,26 @@ Histórico de mudanças em [CHANGELOG.md](CHANGELOG.md).
 | Punho fechado | ✊ | Cursor congelado |
 | Mão fora do frame | — | Pausa automática |
 
-Os cliques (esquerdo e direito) disparam no **press** — assim que os dedos se encostam — replicando o feedback de um botão físico.
+Os cliques (esquerdo e direito) disparam no **press** — assim que os dedos se encostam — replicando o feedback de um botão físico. Pra evitar clique sem querer, a pinça só começa com os outros dedos abertos: fechar a mão não clica.
+
+### Modo duas mãos
+
+Aperte `B` (ou use o painel) pra usar as duas mãos: as duas aparecem no holograma e fazem os mesmos gestos. O Windows tem um cursor só, então:
+
+- o cursor segue a mão **dona**: a primeira que apareceu ou a que se mexeu enquanto a outra estava parada;
+- a outra mão clica na própria posição, e o cursor volta pra dona na hora;
+- só uma mão arrasta por vez; enquanto isso, as ações da outra ficam em espera.
+
+O modo é opcional porque detectar duas mãos custa mais processamento, e não funciona junto com o modo apresentação.
+
+### Escolher a câmera
+
+```bash
+avmc --list-cameras
+avmc --camera 1
+```
+
+A câmera escolhida fica salva pras próximas vezes. Se ela não abrir, o app usa a padrão.
 
 ---
 
@@ -187,6 +206,8 @@ Ajustes em tempo de execução também ficam disponíveis no painel (tecla `S`) 
 ```
 webcam → MediaPipe Hands (21 landmarks)
           ↓
+     HandGate          ← descarta mão repetida, fantasma e detecção passageira
+          ↓
      RobustHandAnchor  ← combina anatomia + estabilidade + edge extrapolation
           ↓
      GestureDetector   ← state machine: shape → event (CLICK, MOVE, DRAG…)
@@ -196,7 +217,7 @@ webcam → MediaPipe Hands (21 landmarks)
      CursorController  ← PyAutoGUI move o cursor real
 ```
 
-Componentes auxiliares: `HologramOverlay` (mão 3D estilo headset VR: `hand_pose` → `hand_mesh` → shader OpenGL do Qt, com fallback 2D QPainter), `RuntimeSettings` (perfis e sliders), `PerfTelemetry` (timing p50/p99 por estágio).
+Esse caminho roda em thread própria: holograma e preview ficam na thread principal e não atrasam o cursor. Componentes auxiliares: `HologramOverlay` (mão 3D estilo headset VR: `hand_pose` → `hand_mesh` → shader OpenGL do Qt, com fallback 2D QPainter), `RuntimeSettings` (perfis e sliders), `PerfTelemetry` (timing p50/p99 por estágio).
 
 Estrutura de pastas:
 
@@ -205,7 +226,7 @@ core/        # camera, hand_tracker, gesture_detector, hand_anchor, smoothing
 services/    # orquestração do loop principal
 config.py    # constantes de calibração documentadas
 main.py      # entry point
-scripts/     # eval_motion.py: mede jitter/atraso/cliques com mãos sintéticas
+scripts/     # eval_motion.py: jitter/atraso/cliques; eval_latency.py: câmera -> cursor
 tests/       # unitários + gate de qualidade de movimento
 docs/        # site estático + assets
 ```

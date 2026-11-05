@@ -27,6 +27,7 @@ roda offline, sem download no primeiro uso.
 from __future__ import annotations
 
 import logging
+import math
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -45,6 +46,7 @@ MODEL_PATH = Path(__file__).resolve().parent / "models" / "hand_landmarker.task"
 
 # Indices uteis dos 21 landmarks do MediaPipe Hands
 LM_WRIST = 0
+LM_MIDDLE_MCP = 9
 LM_THUMB_TIP = 4
 LM_INDEX_TIP = 8
 LM_MIDDLE_TIP = 12
@@ -142,6 +144,18 @@ class HandLandmarks:
         return result
 
 
+def palm_point(hand: HandLandmarks) -> Tuple[float, float]:
+    """Centro da palma (base do dedo medio), estavel com os dedos mexendo."""
+    lm = hand.landmarks[LM_MIDDLE_MCP]
+    return lm[0], lm[1]
+
+
+def palm_size(hand: HandLandmarks) -> float:
+    """Pulso -> base do medio: escala da mao no quadro."""
+    a, b = hand.landmarks[LM_WRIST], hand.landmarks[LM_MIDDLE_MCP]
+    return max(1e-3, math.hypot(a[0] - b[0], a[1] - b[1]))
+
+
 class HandTracker:
     """
     Wrapper sobre MediaPipe Hand Landmarker (modo VIDEO, com tracking
@@ -171,9 +185,7 @@ class HandTracker:
         model_path: Optional[Path] = None,
     ) -> None:
         path = Path(model_path) if model_path is not None else MODEL_PATH
-        # Em memoria: recriar o rastreamento nao relê o arquivo do disco.
-        self._model_bytes = path.read_bytes()
-        self._model_name = path.name
+        self._model_path = path
         self._min_detection_confidence = min_detection_confidence
         self._min_tracking_confidence = min_tracking_confidence
         self._max_num_hands = max_num_hands
@@ -194,8 +206,9 @@ class HandTracker:
     def _create_landmarker(self, max_num_hands: int):
         # Carrega por buffer (bytes) em vez de caminho: o loader nativo do
         # mediapipe pode falhar no Windows com acento no path (C:\Users\Joao).
+        model_bytes = self._model_path.read_bytes()
         options = mp_vision.HandLandmarkerOptions(
-            base_options=BaseOptions(model_asset_buffer=self._model_bytes),
+            base_options=BaseOptions(model_asset_buffer=model_bytes),
             running_mode=mp_vision.RunningMode.VIDEO,
             num_hands=max_num_hands,
             min_hand_detection_confidence=self._min_detection_confidence,
@@ -229,13 +242,6 @@ class HandTracker:
         self._max_num_hands = max_num_hands
         old.close()
         logger.info("HandTracker: max_hands=%d", max_num_hands)
-
-    def reset_tracking(self) -> None:
-        """Esquece o que esta seguindo: o proximo frame procura mao do zero."""
-        new = self._create_landmarker(self._max_num_hands)
-        old = self._landmarker
-        self._landmarker = new
-        old.close()
 
     def _next_timestamp_ms(self) -> int:
         ts = int((time.monotonic() - self._t0) * 1000)

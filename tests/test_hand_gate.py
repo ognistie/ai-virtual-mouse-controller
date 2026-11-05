@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import numpy as np
 
-from core.hand_gate import HandGate, StaleTrackWatchdog
+from core.hand_gate import HandGate
 from core.perf_telemetry import TickProfiler
 from services.virtual_mouse_service import VirtualMouseService, _VisionResult
 from tests.synthetic_hand import make_hand
@@ -151,34 +151,3 @@ def test_disable_power_throttling_returns_bool_on_any_platform():
     from core.utils import disable_power_throttling
 
     assert isinstance(disable_power_throttling(), bool)
-
-
-# Rastreamento preso ------------------------------------------------------
-
-def test_watchdog_fires_when_nothing_moves():
-    dog = StaleTrackWatchdog(still_s=1.0)
-    hand = _at(0.5)
-    assert not dog.update([hand], False, 0.0)
-    assert not dog.update([hand], False, 0.9)
-    assert dog.update([hand], False, 1.1)
-    # Dispara uma vez e recomeca a contagem.
-    assert not dog.update([hand], False, 1.2)
-
-
-def test_watchdog_quiet_while_hand_moves():
-    dog = StaleTrackWatchdog(still_s=1.0)
-    for i in range(60):
-        assert not dog.update([_at(0.3 + (i % 2) * 0.1)], False, i / 30)
-
-
-def test_watchdog_never_interrupts_a_gesture():
-    dog = StaleTrackWatchdog(still_s=1.0)
-    hand = _at(0.5)
-    for i in range(60):
-        assert not dog.update([hand], True, i / 30)
-
-
-def test_watchdog_ignores_no_hand():
-    dog = StaleTrackWatchdog(still_s=0.1)
-    for i in range(10):
-        assert not dog.update([], False, i * 1.0)

@@ -21,7 +21,7 @@ from core.hand_pose import HandPoseSlots
 from core.hand_tracker import HandLandmarks
 from core.runtime_settings import RuntimeSettings
 from core.smoothing import OneEuroSmoother2D
-from core.two_hands import HandChannel, TwoHandsController
+from core.two_hands import DISPLAY_HOLD_FRAMES, HandChannel, TwoHandsController
 from services.virtual_mouse_service import VirtualMouseService
 from tests.synthetic_hand import FakeClock, make_hand
 
@@ -202,7 +202,10 @@ def test_poses_follow_channels(env):
     _settle(two, clock)
     right, left = two.poses()
     assert right[1] > left[1]
+    # Falha curta: a mao 3D segura a ultima pose; depois, some.
     _feed(two, clock, _left(), frames=1)
+    assert two.poses()[0] is not None
+    _feed(two, clock, _left(), frames=DISPLAY_HOLD_FRAMES + 1)
     right, left = two.poses()
     assert right is None and left is not None
 
@@ -228,7 +231,6 @@ def _service():
     svc._two_hands = None
     svc._vision_lock = threading.RLock()
     svc._hand_gate = HandGate(confirm_frames=1)
-    svc._track_watchdog = None
     svc._last_hand = None
     return svc
 
