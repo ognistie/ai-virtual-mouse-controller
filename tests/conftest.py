@@ -34,6 +34,9 @@ def _no_real_mouse(monkeypatch: pytest.MonkeyPatch) -> None:
     onde o ponteiro estiver. Quem precisa ver as chamadas usa o proprio mock."""
     import pyautogui as gui
 
+    if isinstance(gui, MagicMock):
+        return  # sem tela (CI Linux): ja e' o stub acima
+
     for name in (
         "moveTo", "click", "doubleClick", "rightClick",
         "mouseDown", "mouseUp", "press", "scroll",
