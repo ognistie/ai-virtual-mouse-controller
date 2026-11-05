@@ -7,6 +7,8 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-11-05
+
 ### Added
 - **Modo duas mãos** (tecla `B` ou painel), exclusivo com o modo
   apresentação e desligado por padrão. As duas mãos aparecem no holograma
