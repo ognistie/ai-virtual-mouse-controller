@@ -7,6 +7,13 @@ Versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Fixed
+- **Python 3.15: o app não iniciava** (`TypeError: 'lazy_import' object is not
+  callable`, issue #6). No 3.15 a biblioteca padrão usa lazy imports, e o PySide6
+  troca o `__import__`: o MediaPipe recebia o `ThreadPoolExecutor` ainda não
+  resolvido. O pacote `core` agora mantém os imports imediatos no 3.15+, antes de
+  PySide6 e MediaPipe. O CI passa a testar o 3.15 no Ubuntu e no Windows.
+
 ## [1.4.0] — 2026-11-05
 
 ### Added
