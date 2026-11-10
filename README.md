@@ -6,7 +6,7 @@
 
 [![CI](https://github.com/ognistie/ai-virtual-mouse-controller/actions/workflows/ci.yml/badge.svg)](https://github.com/ognistie/ai-virtual-mouse-controller/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/ai-virtual-mouse-controller?style=flat-square&color=22d3ee&label=pypi)](https://pypi.org/project/ai-virtual-mouse-controller/)
-[![Python](https://img.shields.io/badge/python-3.10--3.14-22d3ee?style=flat-square)](https://pypi.org/project/ai-virtual-mouse-controller/)
+[![Python](https://img.shields.io/badge/python-3.10--3.15-22d3ee?style=flat-square)](https://pypi.org/project/ai-virtual-mouse-controller/)
 [![License](https://img.shields.io/badge/license-MIT-22d3ee?style=flat-square)](LICENSE)
 
 Webcam → 21 landmarks → cursor do sistema. Sem hardware extra. Sem GPU.
@@ -48,7 +48,7 @@ O **AI Virtual Mouse Controller** é um mouse virtual com reconhecimento de gest
 
 ## Instalar
 
-Requer **Python 3.10 ou mais novo** (testado de 3.10 a 3.14) + webcam.
+Requer **Python 3.10 ou mais novo** (testado de 3.10 a 3.15) + webcam.
 
 ```bash
 pip install ai-virtual-mouse-controller
